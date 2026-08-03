@@ -1,5 +1,15 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,7 +28,7 @@ function isWithin(path, rootPath) {
 }
 
 function safeRegistryPath(testCase) {
-  if (testCase.input.includes("\0") || !testCase.regularFile) {
+  if (testCase.input.includes("\0")) {
     return false;
   }
 
@@ -26,37 +36,66 @@ function safeRegistryPath(testCase) {
     return false;
   }
 
-  if (!isAbsolute(testCase.resolvedPath)) {
-    return false;
-  }
+  const sandbox = mkdtempSync(join(tmpdir(), "capykit-path-policy-"));
+  const allowedRoot = join(sandbox, "registries");
+  const outsideFile = join(sandbox, "outside.registry.json");
+  mkdirSync(allowedRoot);
+  writeFileSync(outsideFile, "{}\n");
 
-  return testCase.allowedRoots.some((rootPath) => isWithin(testCase.resolvedPath, rootPath));
+  let input = testCase.input;
+  const insidePath = join(allowedRoot, input);
+
+  try {
+    if (testCase.setup === "regular-file" || testCase.setup === "absolute-regular-file") {
+      mkdirSync(dirname(insidePath), { recursive: true });
+      writeFileSync(insidePath, "{}\n");
+      if (testCase.setup === "absolute-regular-file") {
+        input = insidePath;
+      }
+    } else if (testCase.setup === "symlink-outside") {
+      symlinkSync(outsideFile, insidePath);
+    } else if (testCase.setup === "directory") {
+      mkdirSync(insidePath, { recursive: true });
+    }
+
+    const candidate = isAbsolute(input) ? input : resolve(allowedRoot, input);
+    const canonical = realpathSync(candidate);
+    return statSync(canonical).isFile() && isWithin(canonical, allowedRoot);
+  } catch {
+    return false;
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+  }
 }
 
-function isPrivateHostname(hostname) {
-  const normalized = hostname.replace(/^\[|\]$/g, "").toLowerCase();
-  if (normalized === "localhost" || normalized.endsWith(".localhost") || normalized.endsWith(".local")) {
-    return true;
+function isNonPublicAddress(address) {
+  const normalized = address.replace(/^\[|\]$/g, "").toLowerCase();
+  const mapped = normalized.match(/^::ffff:([0-9]+(?:\.[0-9]+){3})$/);
+  if (mapped) {
+    return isNonPublicAddress(mapped[1]);
   }
 
-  if (normalized === "::" || normalized === "::1" || normalized.startsWith("fc") ||
+  if (normalized.includes(":")) {
+    return normalized === "::" || normalized === "::1" || normalized.startsWith("fc") ||
       normalized.startsWith("fd") || normalized.startsWith("fe8") || normalized.startsWith("fe9") ||
-      normalized.startsWith("fea") || normalized.startsWith("feb")) {
-    return true;
+      normalized.startsWith("fea") || normalized.startsWith("feb") || normalized.startsWith("ff");
   }
 
   const octets = normalized.split(".").map(Number);
-  if (octets.length !== 4 || octets.some((part) => !Number.isInteger(part))) {
+  if (octets.length !== 4 || octets.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
     return false;
   }
 
   return octets[0] === 0 || octets[0] === 10 || octets[0] === 127 ||
+    (octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127) ||
     (octets[0] === 169 && octets[1] === 254) ||
     (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
-    (octets[0] === 192 && octets[1] === 168);
+    (octets[0] === 192 && octets[1] === 168) ||
+    (octets[0] === 198 && (octets[1] === 18 || octets[1] === 19)) ||
+    octets[0] >= 224;
 }
 
-function safeUrl(value) {
+function parseSafeUrl(value) {
   let parsed;
   try {
     parsed = new URL(value);
@@ -64,8 +103,39 @@ function safeUrl(value) {
     return false;
   }
 
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  const localName = hostname === "localhost" || hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local");
   return policy.sourceSafety.urls.schemes.includes(parsed.protocol.slice(0, -1)) &&
-    !parsed.username && !parsed.password && !parsed.hash && !isPrivateHostname(parsed.hostname);
+    !parsed.username && !parsed.password && !parsed.hash && !localName &&
+    (!hostname.match(/^[0-9a-f:.]+$/i) || !isNonPublicAddress(hostname)) ? parsed : null;
+}
+
+function safeUrl(testCase) {
+  const initial = parseSafeUrl(testCase.url);
+  if (!initial || !Array.isArray(testCase.resolvedAddresses) ||
+      testCase.resolvedAddresses.length === 0 ||
+      testCase.resolvedAddresses.some(isNonPublicAddress)) {
+    return false;
+  }
+
+  if (testCase.usesAmbientProxy === true ||
+      (testCase.durationMs ?? 0) > policy.sourceSafety.urls.maximumDurationMs ||
+      (testCase.responseBytes ?? 0) > policy.sourceSafety.urls.maximumResponseBytes) {
+    return false;
+  }
+
+  const redirects = testCase.redirects ?? [];
+  if (redirects.length > policy.registryTrust.updates.maximumRedirects) {
+    return false;
+  }
+
+  return redirects.every((redirect) => {
+    const parsed = parseSafeUrl(redirect.url);
+    return parsed && parsed.origin === initial.origin &&
+      Array.isArray(redirect.resolvedAddresses) && redirect.resolvedAddresses.length > 0 &&
+      !redirect.resolvedAddresses.some(isNonPublicAddress);
+  });
 }
 
 const forbiddenKeyPatterns = policy.credentials.forbiddenKeyPatterns.map(
@@ -80,7 +150,25 @@ function containsSecret(key, value) {
     forbiddenValuePatterns.some((pattern) => pattern.test(value));
 }
 
-function validHealthCheck(check) {
+function validProvenance(provenance) {
+  const required = policy.registryTrust.updates.requiredProvenance;
+  if (!required.every((field) => typeof provenance[field] === "string" && provenance[field])) {
+    return false;
+  }
+
+  return provenance.revision === undefined ||
+    (typeof provenance.revision === "string" && provenance.revision.length > 0);
+}
+
+function validRuntime(runtime) {
+  return runtime && runtime.durationMs <= policy.healthChecks.maximumDurationMs &&
+    runtime.responseBytes <= policy.healthChecks.maximumResponseBytes &&
+    runtime.hasStdin === false && Array.isArray(runtime.credentialNames) &&
+    runtime.credentialNames.length === 0;
+}
+
+function validHealthCheck(testCase) {
+  const { check, context = {}, runtime, network = {} } = testCase;
   const contract = policy.healthChecks.kinds[check.kind];
   if (!contract) {
     return false;
@@ -95,20 +183,57 @@ function validHealthCheck(check) {
     return false;
   }
 
+  if (!validRuntime(runtime)) {
+    return false;
+  }
+
   if (check.kind === "command-available") {
-    return new RegExp(contract.executablePattern).test(check.command);
+    return new RegExp(contract.executablePattern).test(check.command) &&
+      Array.isArray(context.approvedCommands) && context.approvedCommands.includes(check.command);
   }
 
   if (check.kind === "http-get") {
-    return safeUrl(check.url);
+    return safeUrl({
+      url: check.url,
+      ...network,
+      durationMs: runtime.durationMs,
+      responseBytes: runtime.responseBytes,
+    });
   }
 
   if (check.kind === "file-readable") {
-    return isAbsolute(check.path) && !check.path.includes("\0") &&
-      !check.path.split(/[\\/]/).includes("..");
+    return !check.path.includes("\0") && !check.path.split(/[\\/]/).includes("..") &&
+      isAbsolute(context.resolvedFilePath ?? "") &&
+      Array.isArray(context.approvedFileRoots) &&
+      context.approvedFileRoots.some((rootPath) => isWithin(context.resolvedFilePath, rootPath));
   }
 
-  return typeof check.interfaceId === "string" && check.interfaceId.length > 0;
+  if (check.kind === "service-active") {
+    return Array.isArray(context.approvedServiceInterfaces) &&
+      context.approvedServiceInterfaces.includes(check.interfaceId);
+  }
+
+  const entry = context.interfaces?.find((candidate) => candidate.id === check.interfaceId);
+  if (!entry || entry.type !== "mcp" || !Array.isArray(context.approvedMcpTransports)) {
+    return false;
+  }
+
+  const endpoint = entry.transport === "stdio" ? entry.command : entry.url;
+  const fingerprint = `${entry.id}:${entry.transport}:${endpoint}`;
+  if (!context.approvedMcpTransports.includes(fingerprint)) {
+    return false;
+  }
+
+  if (entry.transport === "http") {
+    return safeUrl({
+      url: entry.url,
+      ...(context.mcpNetwork ?? {}),
+      durationMs: runtime.durationMs,
+      responseBytes: runtime.responseBytes,
+    });
+  }
+
+  return entry.transport === "stdio" && typeof entry.command === "string" && entry.command.length > 0;
 }
 
 function validMcpTool(name) {
@@ -122,7 +247,12 @@ assert.equal(policy.policyVersion, "0.1.0");
 assert.deepEqual(policy.registryTrust.precedence, ["operator-approved", "bundled", "untrusted"]);
 assert.equal(policy.registryTrust.updates.defaultMode, "manual");
 assert.equal(policy.registryTrust.updates.validateBeforeActivation, true);
+assert.equal(policy.registryTrust.updates.requiredProvenance.includes("revision"), false);
+assert.equal(policy.registryTrust.updates.optionalProvenance.includes("revision"), true);
+assert.equal(policy.registryTrust.updates.revisionFallback, "sha256");
 assert.equal(policy.credentials.dereferenceDuring.length, 0);
+assert.equal(policy.sourceSafety.paths.verifyOpenedDescriptor, true);
+assert.equal(policy.sourceSafety.urls.allowAmbientProxy, false);
 assert.equal(policy.mcp.mode, "read-only");
 assert.equal(policy.mcp.genericRemoteExecution, false);
 
@@ -131,15 +261,19 @@ for (const testCase of cases.pathCases) {
 }
 
 for (const testCase of cases.urlCases) {
-  assert.equal(safeUrl(testCase.url), testCase.expected, testCase.name);
+  assert.equal(safeUrl(testCase), testCase.expected, testCase.name);
 }
 
 for (const testCase of cases.secretCases) {
   assert.equal(containsSecret(testCase.key, testCase.value), testCase.expected, testCase.name);
 }
 
+for (const testCase of cases.provenanceCases) {
+  assert.equal(validProvenance(testCase.provenance), testCase.expected, testCase.name);
+}
+
 for (const testCase of cases.healthCheckCases) {
-  assert.equal(validHealthCheck(testCase.check), testCase.expected, testCase.name);
+  assert.equal(validHealthCheck(testCase), testCase.expected, testCase.name);
 }
 
 for (const testCase of cases.mcpToolCases) {

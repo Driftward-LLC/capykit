@@ -3,61 +3,37 @@
     {
       "name": "relative registry inside configured root",
       "input": "team/tools.registry.json",
-      "resolvedPath": "/srv/capykit/registries/team/tools.registry.json",
-      "allowedRoots": [
-        "/srv/capykit/registries"
-      ],
-      "regularFile": true,
+      "setup": "regular-file",
       "expected": true
     },
     {
       "name": "absolute registry inside configured root",
-      "input": "/etc/capykit/registries/company.registry.json",
-      "resolvedPath": "/etc/capykit/registries/company.registry.json",
-      "allowedRoots": [
-        "/etc/capykit/registries"
-      ],
-      "regularFile": true,
+      "input": "company.registry.json",
+      "setup": "absolute-regular-file",
       "expected": true
     },
     {
       "name": "parent traversal is rejected",
       "input": "../credentials.json",
-      "resolvedPath": "/srv/capykit/credentials.json",
-      "allowedRoots": [
-        "/srv/capykit/registries"
-      ],
-      "regularFile": true,
+      "setup": "outside-regular-file",
       "expected": false
     },
     {
       "name": "symlink escape is rejected after canonicalization",
       "input": "linked.registry.json",
-      "resolvedPath": "/root/private.registry.json",
-      "allowedRoots": [
-        "/srv/capykit/registries"
-      ],
-      "regularFile": true,
+      "setup": "symlink-outside",
       "expected": false
     },
     {
       "name": "directory is not a registry document",
       "input": "team",
-      "resolvedPath": "/srv/capykit/registries/team",
-      "allowedRoots": [
-        "/srv/capykit/registries"
-      ],
-      "regularFile": false,
+      "setup": "directory",
       "expected": false
     },
     {
       "name": "null byte is rejected",
       "input": "safe.json\u0000private",
-      "resolvedPath": "/srv/capykit/registries/safe.json",
-      "allowedRoots": [
-        "/srv/capykit/registries"
-      ],
-      "regularFile": true,
+      "setup": "regular-file",
       "expected": false
     }
   ],
@@ -65,41 +41,171 @@
     {
       "name": "public HTTPS registry",
       "url": "https://registry.example.com/capykit/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "redirects": [],
+      "usesAmbientProxy": false,
+      "durationMs": 250,
+      "responseBytes": 4096,
+      "expected": true
+    },
+    {
+      "name": "same-origin redirect is revalidated",
+      "url": "https://registry.example.com/capykit/latest",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "redirects": [
+        {
+          "url": "https://registry.example.com/capykit/registry.json",
+          "resolvedAddresses": [
+            "93.184.216.35"
+          ]
+        }
+      ],
+      "usesAmbientProxy": false,
+      "durationMs": 300,
+      "responseBytes": 4096,
       "expected": true
     },
     {
       "name": "HTTP is rejected",
       "url": "http://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
       "expected": false
     },
     {
       "name": "URL credentials are rejected",
       "url": "https://user:synthetic-password@registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
       "expected": false
     },
     {
       "name": "fragments are rejected",
       "url": "https://registry.example.com/registry.json#private",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
       "expected": false
     },
     {
       "name": "localhost is rejected",
       "url": "https://localhost/registry.json",
+      "resolvedAddresses": [
+        "127.0.0.1"
+      ],
       "expected": false
     },
     {
       "name": "private IPv4 is rejected",
       "url": "https://192.168.1.2/registry.json",
+      "resolvedAddresses": [
+        "192.168.1.2"
+      ],
       "expected": false
     },
     {
       "name": "cloud metadata address is rejected",
       "url": "https://169.254.169.254/latest/meta-data/",
+      "resolvedAddresses": [
+        "169.254.169.254"
+      ],
       "expected": false
     },
     {
       "name": "IPv6 loopback is rejected",
       "url": "https://[::1]/registry.json",
+      "resolvedAddresses": [
+        "::1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "DNS resolution to a private address is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "10.0.0.8"
+      ],
+      "expected": false
+    },
+    {
+      "name": "cross-origin redirect is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "redirects": [
+        {
+          "url": "https://other.example.net/registry.json",
+          "resolvedAddresses": [
+            "93.184.216.35"
+          ]
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "redirect rebinding to private address is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "redirects": [
+        {
+          "url": "https://registry.example.com/next.json",
+          "resolvedAddresses": [
+            "10.0.0.9"
+          ]
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "IPv6 multicast is rejected",
+      "url": "https://[ff02::1]/registry.json",
+      "resolvedAddresses": [
+        "ff02::1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "IPv4-mapped loopback is rejected",
+      "url": "https://[::ffff:127.0.0.1]/registry.json",
+      "resolvedAddresses": [
+        "::ffff:127.0.0.1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "ambient proxy use is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "usesAmbientProxy": true,
+      "expected": false
+    },
+    {
+      "name": "response size is bounded",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "responseBytes": 65537,
+      "expected": false
+    },
+    {
+      "name": "request duration is bounded",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "durationMs": 5001,
       "expected": false
     }
   ],
@@ -123,9 +229,21 @@
       "expected": true
     },
     {
+      "name": "camel-case access token key is rejected",
+      "key": "accessToken",
+      "value": "synthetic-value",
+      "expected": true
+    },
+    {
       "name": "authorization value is rejected",
       "key": "description",
       "value": "Bearer synthetic-token-value",
+      "expected": true
+    },
+    {
+      "name": "recognized token prefix in prose is rejected",
+      "key": "description",
+      "value": "The accidental value was ghp_syntheticvalue in this sentence.",
       "expected": true
     },
     {
@@ -139,6 +257,47 @@
       "key": "url",
       "value": "https://discord.com/api/webhooks/123456789/synthetic-value",
       "expected": true
+    },
+    {
+      "name": "Discord webhook with query is rejected",
+      "key": "url",
+      "value": "https://discord.com/api/webhooks/123456789/synthetic-value?wait=true",
+      "expected": true
+    }
+  ],
+  "provenanceCases": [
+    {
+      "name": "local source uses digest as revision fallback",
+      "provenance": {
+        "sourceId": "local-company",
+        "sourceUri": "file:///etc/capykit/registries/company.json",
+        "trustTier": "operator-approved",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "fetchedAt": "2026-08-03T00:00:00Z"
+      },
+      "expected": true
+    },
+    {
+      "name": "remote source may record immutable revision",
+      "provenance": {
+        "sourceId": "public-release",
+        "sourceUri": "https://registry.example.com/registry.json",
+        "trustTier": "bundled",
+        "revision": "v0.1.0",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "fetchedAt": "2026-08-03T00:00:00Z"
+      },
+      "expected": true
+    },
+    {
+      "name": "digest is always required",
+      "provenance": {
+        "sourceId": "missing-digest",
+        "sourceUri": "file:///etc/capykit/registries/company.json",
+        "trustTier": "operator-approved",
+        "fetchedAt": "2026-08-03T00:00:00Z"
+      },
+      "expected": false
     }
   ],
   "healthCheckCases": [
@@ -149,6 +308,17 @@
         "kind": "command-available",
         "command": "git"
       },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": []
+      },
       "expected": true
     },
     {
@@ -157,6 +327,17 @@
         "id": "git-version",
         "kind": "command-available",
         "command": "git --version"
+      },
+      "context": {
+        "approvedCommands": [
+          "git --version"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": []
       },
       "expected": false
     },
@@ -170,6 +351,17 @@
           "--version"
         ]
       },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": []
+      },
       "expected": false
     },
     {
@@ -179,6 +371,19 @@
         "kind": "http-get",
         "url": "https://status.example.com/health",
         "expectedStatus": 200
+      },
+      "network": {
+        "resolvedAddresses": [
+          "93.184.216.34"
+        ],
+        "redirects": [],
+        "usesAmbientProxy": false
+      },
+      "runtime": {
+        "durationMs": 100,
+        "responseBytes": 128,
+        "hasStdin": false,
+        "credentialNames": []
       },
       "expected": true
     },
@@ -192,6 +397,19 @@
           "Authorization": "synthetic-value"
         }
       },
+      "network": {
+        "resolvedAddresses": [
+          "93.184.216.34"
+        ],
+        "redirects": [],
+        "usesAmbientProxy": false
+      },
+      "runtime": {
+        "durationMs": 100,
+        "responseBytes": 128,
+        "hasStdin": false,
+        "credentialNames": []
+      },
       "expected": false
     },
     {
@@ -200,6 +418,19 @@
         "id": "private-status",
         "kind": "http-get",
         "url": "https://10.0.0.4/health"
+      },
+      "network": {
+        "resolvedAddresses": [
+          "10.0.0.4"
+        ],
+        "redirects": [],
+        "usesAmbientProxy": false
+      },
+      "runtime": {
+        "durationMs": 100,
+        "responseBytes": 128,
+        "hasStdin": false,
+        "credentialNames": []
       },
       "expected": false
     },
@@ -210,14 +441,108 @@
         "kind": "mcp-initialize",
         "interfaceId": "catalog-mcp"
       },
+      "context": {
+        "interfaces": [
+          {
+            "id": "catalog-mcp",
+            "type": "mcp",
+            "transport": "stdio",
+            "command": "capykit-mcp"
+          }
+        ],
+        "approvedMcpTransports": [
+          "catalog-mcp:stdio:capykit-mcp"
+        ]
+      },
+      "runtime": {
+        "durationMs": 500,
+        "responseBytes": 512,
+        "hasStdin": false,
+        "credentialNames": []
+      },
       "expected": true
     },
     {
-      "name": "file check is metadata-only",
+      "name": "registry cannot substitute MCP executable after approval",
+      "check": {
+        "id": "mcp-ready",
+        "kind": "mcp-initialize",
+        "interfaceId": "catalog-mcp"
+      },
+      "context": {
+        "interfaces": [
+          {
+            "id": "catalog-mcp",
+            "type": "mcp",
+            "transport": "stdio",
+            "command": "substituted-mcp"
+          }
+        ],
+        "approvedMcpTransports": [
+          "catalog-mcp:stdio:capykit-mcp"
+        ]
+      },
+      "runtime": {
+        "durationMs": 500,
+        "responseBytes": 512,
+        "hasStdin": false,
+        "credentialNames": []
+      },
+      "expected": false
+    },
+    {
+      "name": "approved HTTP MCP transport still applies URL safety",
+      "check": {
+        "id": "remote-mcp-ready",
+        "kind": "mcp-initialize",
+        "interfaceId": "remote-mcp"
+      },
+      "context": {
+        "interfaces": [
+          {
+            "id": "remote-mcp",
+            "type": "mcp",
+            "transport": "http",
+            "url": "https://mcp.example.com/mcp"
+          }
+        ],
+        "approvedMcpTransports": [
+          "remote-mcp:http:https://mcp.example.com/mcp"
+        ],
+        "mcpNetwork": {
+          "resolvedAddresses": [
+            "10.0.0.10"
+          ],
+          "redirects": [],
+          "usesAmbientProxy": false
+        }
+      },
+      "runtime": {
+        "durationMs": 500,
+        "responseBytes": 512,
+        "hasStdin": false,
+        "credentialNames": []
+      },
+      "expected": false
+    },
+    {
+      "name": "relative file check resolves inside approved root",
       "check": {
         "id": "config-present",
         "kind": "file-readable",
-        "path": "/etc/capykit/config.json"
+        "path": "skills/research/SKILL.md"
+      },
+      "context": {
+        "approvedFileRoots": [
+          "/opt/capykit"
+        ],
+        "resolvedFilePath": "/opt/capykit/skills/research/SKILL.md"
+      },
+      "runtime": {
+        "durationMs": 5,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": []
       },
       "expected": true
     },
@@ -228,6 +553,80 @@
         "kind": "file-readable",
         "path": "../private/config.json"
       },
+      "context": {
+        "approvedFileRoots": [
+          "/opt/capykit"
+        ],
+        "resolvedFilePath": "/opt/private/config.json"
+      },
+      "runtime": {
+        "durationMs": 5,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": []
+      },
+      "expected": false
+    },
+    {
+      "name": "service status requires explicit interface approval",
+      "check": {
+        "id": "service-ready",
+        "kind": "service-active",
+        "interfaceId": "catalog-service"
+      },
+      "context": {
+        "approvedServiceInterfaces": [
+          "catalog-service"
+        ]
+      },
+      "runtime": {
+        "durationMs": 10,
+        "responseBytes": 64,
+        "hasStdin": false,
+        "credentialNames": []
+      },
+      "expected": true
+    },
+    {
+      "name": "health check cannot inherit credentials",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [
+          "GITHUB_TOKEN"
+        ]
+      },
+      "expected": false
+    },
+    {
+      "name": "health check timeout is bounded",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 5001,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": []
+      },
       "expected": false
     },
     {
@@ -236,6 +635,12 @@
         "id": "generic-command",
         "kind": "command",
         "command": "true"
+      },
+      "runtime": {
+        "durationMs": 10,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": []
       },
       "expected": false
     }

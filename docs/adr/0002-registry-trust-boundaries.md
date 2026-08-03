@@ -58,9 +58,12 @@ registry document:
 - stable source ID;
 - canonical source URI;
 - assigned trust tier;
-- immutable revision when the transport supplies one;
 - SHA-256 digest of the exact bytes validated; and
 - fetch or read timestamp.
+
+An immutable transport revision is recorded when available. Revisionless local
+or HTTPS sources use the mandatory SHA-256 digest as their revision identity;
+they do not invent a transport revision.
 
 The effective catalog MUST retain the winning source ID, revision, and digest
 for each record. Logs and MCP responses MAY expose those identifiers but MUST
@@ -132,23 +135,30 @@ risks that tests MUST exercise before remote synchronization ships.
 Registry health checks are declarations. A consumer MAY decline to run any of
 them. A consumer that runs checks MUST use the allowlist below and MUST enforce
 a five-second timeout, bounded output, no inherited stdin, and no credential
-injection.
+or ambient environment injection. Allowlist entries are operator configuration
+outside registry content. A registry cannot approve its own executable,
+service, file root, or MCP transport.
 
 <!-- markdownlint-disable MD013 -->
 
 | Kind | Permitted operation | Explicitly forbidden |
 | --- | --- | --- |
-| `command-available` | Look up one executable name on the consumer's approved `PATH` | Shells, arguments, scripts, executable paths, environment or working-directory changes |
+| `command-available` | Look up one executable name present in the operator's command allowlist on the approved `PATH` | Registry-defined allowlist entries, shells, arguments, scripts, executable paths, environment or working-directory changes |
 | `http-get` | Unauthenticated HTTPS GET with status and size limits | Headers, bodies, non-GET methods, private networks, cross-origin redirects |
-| `mcp-initialize` | Initialize the declared MCP interface and close it | Tool invocation, resource reads, sampling, elicitation, or credential discovery |
-| `service-active` | Query declared service-manager status | Start, stop, restart, enable, logs, `sudo`, or manager mutation |
-| `file-readable` | Check metadata and effective read permission for an absolute declared path | Reading content, following an out-of-policy path, or checking an authentication-reference file |
+| `mcp-initialize` | Initialize an exact transport fingerprint independently approved by the operator and close it | Trusting registry approval, changed commands or URLs, tool invocation, resource reads, sampling, elicitation, or credential discovery |
+| `service-active` | Query status for an operator-allowlisted service interface | Registry-defined approval, start, stop, restart, enable, logs, `sudo`, or manager mutation |
+| `file-readable` | Resolve a declared path under an operator-approved health root and check metadata and effective read permission | Reading content, escaping the approved root, or checking an authentication-reference file |
 
 <!-- markdownlint-enable MD013 -->
 
 Unknown health-check kinds and unknown fields fail closed. Consumers MUST NOT
 translate declarative checks into a shell command. `command-available` accepts
-only a single executable token matching the policy's allowlist expression.
+only a single executable token matching the policy's expression and an
+independent operator allowlist. `mcp-initialize` can launch a process or open a
+network connection, so approval binds the interface ID, transport, and exact
+command or URL. A changed fingerprint requires new operator approval. HTTP MCP
+transports also apply the remote URL, address, redirect, proxy, timeout, and
+response-size rules before connecting.
 
 ## Read-only MCP contract
 

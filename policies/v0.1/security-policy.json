@@ -47,10 +47,13 @@
         "sourceId",
         "sourceUri",
         "trustTier",
-        "revision",
         "sha256",
         "fetchedAt"
-      ]
+      ],
+      "optionalProvenance": [
+        "revision"
+      ],
+      "revisionFallback": "sha256"
     }
   },
   "sourceSafety": {
@@ -60,7 +63,8 @@
       "requireRegularFile": true,
       "rejectTraversalSegments": true,
       "rejectSymlinkEscape": true,
-      "rejectNullBytes": true
+      "rejectNullBytes": true,
+      "verifyOpenedDescriptor": true
     },
     "urls": {
       "schemes": [
@@ -69,8 +73,11 @@
       "allowUserInfo": false,
       "allowFragments": false,
       "allowPrivateNetworks": false,
+      "allowAmbientProxy": false,
       "resolveAndValidateEveryConnection": true,
-      "redirectPolicy": "same-origin"
+      "redirectPolicy": "same-origin",
+      "maximumDurationMs": 5000,
+      "maximumResponseBytes": 65536
     }
   },
   "credentials": {
@@ -82,13 +89,13 @@
       "oauth-issuer"
     ],
     "forbiddenKeyPatterns": [
-      "(^|[_-])(api[_-]?key|token|secret|password|passwd|cookie|authorization|private[_-]?key|client[_-]?secret)($|[_-])"
+      "(^|[_-])(api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|refresh[_-]?token|session[_-]?(cookie|token)|private[_-]?key|token|secret|password|passwd|cookie|authorization)([_-].*|$)"
     ],
     "forbiddenValuePatterns": [
       "-----BEGIN [A-Z ]*PRIVATE KEY-----",
-      "^(Bearer|Basic)\\s+\\S+",
-      "^(gh[pousr]_|sk-|xox[baprs]-|AKIA)[A-Za-z0-9_-]+",
-      "^https://(discord(app)?\\.com)/api/webhooks/[0-9]+/[^/]+$"
+      "(^|\\s)(Bearer|Basic)\\s+\\S+",
+      "(^|[^A-Za-z0-9])(gh[pousr]_|sk-|xox[baprs]-|AKIA)[A-Za-z0-9_-]+",
+      "https://(discord(app)?\\.com)/api/webhooks/[0-9]+/[^\\s]+"
     ],
     "redaction": "[REDACTED]"
   },
@@ -114,7 +121,8 @@
           "command"
         ],
         "executablePattern": "^[A-Za-z0-9][A-Za-z0-9._+-]*$",
-        "operation": "path-lookup"
+        "operation": "path-lookup",
+        "requiresOperatorAllowlist": true
       },
       "http-get": {
         "fields": [
@@ -131,7 +139,9 @@
           "kind",
           "interfaceId"
         ],
-        "operation": "initialize-only"
+        "operation": "initialize-only",
+        "requiresApprovedTransportFingerprint": true,
+        "httpTransportUsesSourceUrlPolicy": true
       },
       "service-active": {
         "fields": [
@@ -139,7 +149,8 @@
           "kind",
           "interfaceId"
         ],
-        "operation": "manager-status"
+        "operation": "manager-status",
+        "requiresOperatorAllowlist": true
       },
       "file-readable": {
         "fields": [
@@ -147,7 +158,8 @@
           "kind",
           "path"
         ],
-        "operation": "metadata-only"
+        "operation": "metadata-only",
+        "requiresApprovedRoot": true
       }
     }
   },
