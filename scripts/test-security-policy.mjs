@@ -75,6 +75,8 @@ const blockedAddresses = {
   ipv4: new BlockList(),
   ipv6: new BlockList(),
 };
+const publicIpv6 = new BlockList();
+publicIpv6.addSubnet("2000::", 3, "ipv6");
 for (const [network, prefix, type] of [
   ["0.0.0.0", 8, "ipv4"],
   ["10.0.0.0", 8, "ipv4"],
@@ -84,7 +86,11 @@ for (const [network, prefix, type] of [
   ["172.16.0.0", 12, "ipv4"],
   ["192.0.0.0", 24, "ipv4"],
   ["192.0.2.0", 24, "ipv4"],
+  ["192.31.196.0", 24, "ipv4"],
+  ["192.52.193.0", 24, "ipv4"],
+  ["192.88.99.0", 24, "ipv4"],
   ["192.168.0.0", 16, "ipv4"],
+  ["192.175.48.0", 24, "ipv4"],
   ["198.18.0.0", 15, "ipv4"],
   ["198.51.100.0", 24, "ipv4"],
   ["203.0.113.0", 24, "ipv4"],
@@ -93,6 +99,10 @@ for (const [network, prefix, type] of [
   ["::", 96, "ipv6"],
   ["::1", 128, "ipv6"],
   ["::ffff:0:0", 96, "ipv6"],
+  ["2001::", 23, "ipv6"],
+  ["2001:db8::", 32, "ipv6"],
+  ["2002::", 16, "ipv6"],
+  ["3fff::", 20, "ipv6"],
   ["2001:db8::", 32, "ipv6"],
   ["fc00::", 7, "ipv6"],
   ["fe80::", 10, "ipv6"],
@@ -110,6 +120,9 @@ function isNonPublicAddress(address) {
   }
 
   const type = version === 4 ? "ipv4" : "ipv6";
+  if (type === "ipv6" && !publicIpv6.check(normalized, "ipv6")) {
+    return true;
+  }
   return blockedAddresses[type].check(normalized, type);
 }
 
@@ -163,6 +176,38 @@ const forbiddenValuePatterns = policy.credentials.forbiddenValuePatterns.map(
   (pattern) => new RegExp(pattern, "i"),
 );
 
+function decodedPath(pathname) {
+  let current = pathname;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    let decoded;
+    try {
+      decoded = decodeURIComponent(current);
+    } catch {
+      return null;
+    }
+    if (decoded === current) {
+      return decoded;
+    }
+    current = decoded;
+  }
+  return current;
+}
+
+function isKnownWebhookUrl(value) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+
+  const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
+  const prefix = policy.credentials.webhookUrlPolicy.hosts[hostname];
+  const path = decodedPath(parsed.pathname);
+  return policy.credentials.webhookUrlPolicy.schemes.includes(parsed.protocol.slice(0, -1)) &&
+    typeof prefix === "string" && path !== null && path.startsWith(prefix);
+}
+
 function containsSecret(key, value) {
   const candidates = [value];
   if (policy.credentials.normalizeUrlsBeforeMatch) {
@@ -173,7 +218,8 @@ function containsSecret(key, value) {
     }
   }
 
-  return forbiddenKeyPatterns.some((pattern) => pattern.test(key)) || candidates.some((candidate) =>
+  return forbiddenKeyPatterns.some((pattern) => pattern.test(key)) || isKnownWebhookUrl(value) ||
+    candidates.some((candidate) =>
     forbiddenValuePatterns.some((pattern) => pattern.test(candidate)),
   );
 }
@@ -202,9 +248,14 @@ function validProvenance(provenance) {
   const canonicalSource = source.href === provenance.sourceUri &&
     (source.protocol !== "file:" ||
       (source.hostname === "" && source.pathname.startsWith("/") && provenance.sourceUri.startsWith("file:///")));
+  const percentTokens = provenance.sourceUri.match(/%[0-9a-fA-F]{2}/g) ?? [];
+  const canonicalPercentEncoding = percentTokens.every((token) => {
+    const decoded = String.fromCharCode(Number.parseInt(token.slice(1), 16));
+    return token === token.toUpperCase() && !/[A-Za-z0-9._~-]/.test(decoded);
+  });
 
   return /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/.test(provenance.sourceId) &&
-    canonicalSource && ["file:", "https:"].includes(source.protocol) &&
+    canonicalSource && canonicalPercentEncoding && ["file:", "https:"].includes(source.protocol) &&
     !source.username && !source.password && !source.hash &&
     trustTiers.includes(provenance.trustTier) && /^[a-f0-9]{64}$/i.test(provenance.sha256) &&
     exactTimestamp && (provenance.revision === undefined ||
@@ -212,7 +263,9 @@ function validProvenance(provenance) {
 }
 
 function validRuntime(runtime) {
-  return runtime && runtime.durationMs <= policy.healthChecks.maximumDurationMs &&
+  return runtime && Number.isSafeInteger(runtime.durationMs) && runtime.durationMs >= 0 &&
+    runtime.durationMs <= policy.healthChecks.maximumDurationMs &&
+    Number.isSafeInteger(runtime.responseBytes) && runtime.responseBytes >= 0 &&
     runtime.responseBytes <= policy.healthChecks.maximumResponseBytes &&
     runtime.hasStdin === false && Array.isArray(runtime.credentialNames) &&
     runtime.credentialNames.length === 0 &&

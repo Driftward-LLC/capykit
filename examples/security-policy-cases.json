@@ -63,6 +63,37 @@
       "expected": true
     },
     {
+      "name": "IPv6 translation-local address is rejected",
+      "url": "https://registry.example.com/capykit/registry.json",
+      "resolvedAddresses": [
+        "64:ff9b:1::1"
+      ],
+      "redirects": [],
+      "usesAmbientProxy": false,
+      "durationMs": 250,
+      "responseBytes": 4096,
+      "expected": false
+    },
+    {
+      "name": "redirect to IPv6 discard-only address is rejected",
+      "url": "https://registry.example.com/capykit/registry.json",
+      "resolvedAddresses": [
+        "2606:4700:4700::1111"
+      ],
+      "redirects": [
+        {
+          "url": "https://registry.example.com/next.json",
+          "resolvedAddresses": [
+            "100::1"
+          ]
+        }
+      ],
+      "usesAmbientProxy": false,
+      "durationMs": 250,
+      "responseBytes": 4096,
+      "expected": false
+    },
+    {
       "name": "same-origin redirect is revalidated",
       "url": "https://registry.example.com/capykit/latest",
       "resolvedAddresses": [
@@ -373,6 +404,24 @@
       "expected": true
     },
     {
+      "name": "Discord webhook with trailing-dot host is rejected",
+      "key": "url",
+      "value": "https://discord.com./api/webhooks/123456789/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Discord webhook with encoded path is rejected",
+      "key": "url",
+      "value": "https://discord.com/api/%77ebhooks/123456789/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Discord webhook with user information is rejected",
+      "key": "url",
+      "value": "https://user@discord.com/api/webhooks/123456789/synthetic-value",
+      "expected": true
+    },
+    {
       "name": "Slack webhook is rejected",
       "key": "url",
       "value": "https://hooks.slack.com/services/T00000000/B00000000/synthetic-value",
@@ -388,6 +437,24 @@
       "name": "Slack webhook with zero-padded HTTPS port is rejected",
       "key": "url",
       "value": "https://hooks.slack.com:0443/services/T00000000/B00000000/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Slack webhook with trailing-dot host is rejected",
+      "key": "url",
+      "value": "https://hooks.slack.com./services/T00000000/B00000000/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Slack webhook with encoded path is rejected",
+      "key": "url",
+      "value": "https://hooks.slack.com/%73ervices/T00000000/B00000000/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Slack webhook with user information is rejected",
+      "key": "url",
+      "value": "https://user@hooks.slack.com/services/T00000000/B00000000/synthetic-value",
       "expected": true
     }
   ],
@@ -466,6 +533,17 @@
         "trustTier": "operator-approved",
         "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "fetchedAt": "2026-02-31T00:00:00Z"
+      },
+      "expected": false
+    },
+    {
+      "name": "percent-encoded unreserved source URI is rejected",
+      "provenance": {
+        "sourceId": "encoded-source",
+        "sourceUri": "https://registry.example.com/%72egistry.json",
+        "trustTier": "operator-approved",
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "fetchedAt": "2026-08-03T00:00:00Z"
       },
       "expected": false
     }
@@ -988,6 +1066,72 @@
       "runtime": {
         "durationMs": 5001,
         "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "health runtime rejects null numeric bounds",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": null,
+        "responseBytes": null,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "health runtime rejects string numeric bounds",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": "20",
+        "responseBytes": "0",
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "health runtime rejects negative numeric bounds",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": -1,
+        "responseBytes": -1,
         "hasStdin": false,
         "credentialNames": [],
         "hasAmbientEnvironment": false,
