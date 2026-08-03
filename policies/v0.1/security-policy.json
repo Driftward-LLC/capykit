@@ -88,6 +88,7 @@
       "provider",
       "oauth-issuer"
     ],
+    "normalizeUrlsBeforeMatch": true,
     "forbiddenKeyPatterns": [
       "(^|[_-])(api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|refresh[_-]?token|session[_-]?(cookie|token)|private[_-]?key|token|secret|password|passwd|cookie|authorization)([_-].*|$)"
     ],
@@ -95,8 +96,8 @@
       "-----BEGIN [A-Z ]*PRIVATE KEY-----",
       "(^|\\s)(Bearer|Basic)\\s+\\S+",
       "(^|[^A-Za-z0-9])(gh[pousr]_|github_pat_|sk-|xox[baprs]-|AKIA|ASIA)[A-Za-z0-9_-]+",
-      "https://(discord(app)?\\.com)(:443)?/api/webhooks/[0-9]+/[^\\s]+",
-      "https://hooks\\.slack\\.com(:443)?/services/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+"
+      "https://(discord(app)?\\.com)(:0*443)?/api/webhooks/[0-9]+/[^\\s]+",
+      "https://hooks\\.slack\\.com(:0*443)?/services/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+"
     ],
     "redaction": "[REDACTED]"
   },

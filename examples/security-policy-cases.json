@@ -367,6 +367,12 @@
       "expected": true
     },
     {
+      "name": "Discord webhook with zero-padded HTTPS port is rejected",
+      "key": "url",
+      "value": "https://discord.com:0443/api/webhooks/123456789/synthetic-value",
+      "expected": true
+    },
+    {
       "name": "Slack webhook is rejected",
       "key": "url",
       "value": "https://hooks.slack.com/services/T00000000/B00000000/synthetic-value",
@@ -376,6 +382,12 @@
       "name": "Slack webhook with explicit HTTPS port is rejected",
       "key": "url",
       "value": "https://hooks.slack.com:443/services/T00000000/B00000000/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Slack webhook with zero-padded HTTPS port is rejected",
+      "key": "url",
+      "value": "https://hooks.slack.com:0443/services/T00000000/B00000000/synthetic-value",
       "expected": true
     }
   ],
@@ -475,7 +487,9 @@
         "durationMs": 20,
         "responseBytes": 0,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": true
     },
@@ -495,7 +509,9 @@
         "durationMs": 20,
         "responseBytes": 0,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     },
@@ -518,7 +534,9 @@
         "durationMs": 20,
         "responseBytes": 0,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     },
@@ -541,7 +559,9 @@
         "durationMs": 100,
         "responseBytes": 128,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": true
     },
@@ -566,7 +586,9 @@
         "durationMs": 100,
         "responseBytes": 128,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     },
@@ -588,7 +610,9 @@
         "durationMs": 100,
         "responseBytes": 128,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     },
@@ -616,7 +640,9 @@
         "durationMs": 500,
         "responseBytes": 512,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": true
     },
@@ -644,7 +670,9 @@
         "durationMs": 500,
         "responseBytes": 512,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     },
@@ -679,7 +707,9 @@
         "durationMs": 500,
         "responseBytes": 512,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     },
@@ -697,7 +727,9 @@
         "durationMs": 5,
         "responseBytes": 0,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": true
     },
@@ -715,7 +747,9 @@
         "durationMs": 5,
         "responseBytes": 0,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     },
@@ -733,7 +767,9 @@
         "durationMs": 5,
         "responseBytes": 0,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     },
@@ -751,7 +787,9 @@
         "durationMs": 5,
         "responseBytes": 0,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     },
@@ -772,7 +810,9 @@
         "durationMs": 5,
         "responseBytes": 0,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     },
@@ -793,7 +833,9 @@
         "durationMs": 5,
         "responseBytes": 0,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     },
@@ -813,7 +855,9 @@
         "durationMs": 10,
         "responseBytes": 64,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": true
     },
@@ -835,7 +879,9 @@
         "hasStdin": false,
         "credentialNames": [
           "GITHUB_TOKEN"
-        ]
+        ],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     },
@@ -856,7 +902,52 @@
         "responseBytes": 0,
         "hasStdin": false,
         "credentialNames": [],
-        "hasAmbientEnvironment": true
+        "hasAmbientEnvironment": true,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "health check rejects non-boolean ambient environment flag",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": "yes",
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "health check rejects ambient PATH source",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "ambient"
       },
       "expected": false
     },
@@ -877,7 +968,8 @@
         "responseBytes": 0,
         "hasStdin": false,
         "credentialNames": [],
-        "pathSource": "registry"
+        "pathSource": "registry",
+        "hasAmbientEnvironment": false
       },
       "expected": false
     },
@@ -897,7 +989,9 @@
         "durationMs": 5001,
         "responseBytes": 0,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     },
@@ -912,7 +1006,9 @@
         "durationMs": 10,
         "responseBytes": 0,
         "hasStdin": false,
-        "credentialNames": []
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
       },
       "expected": false
     }

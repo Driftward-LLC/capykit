@@ -164,8 +164,18 @@ const forbiddenValuePatterns = policy.credentials.forbiddenValuePatterns.map(
 );
 
 function containsSecret(key, value) {
-  return forbiddenKeyPatterns.some((pattern) => pattern.test(key)) ||
-    forbiddenValuePatterns.some((pattern) => pattern.test(value));
+  const candidates = [value];
+  if (policy.credentials.normalizeUrlsBeforeMatch) {
+    try {
+      candidates.push(new URL(value).href);
+    } catch {
+      // Non-URL values still use the raw detectors.
+    }
+  }
+
+  return forbiddenKeyPatterns.some((pattern) => pattern.test(key)) || candidates.some((candidate) =>
+    forbiddenValuePatterns.some((pattern) => pattern.test(candidate)),
+  );
 }
 
 function validProvenance(provenance) {
@@ -205,8 +215,9 @@ function validRuntime(runtime) {
   return runtime && runtime.durationMs <= policy.healthChecks.maximumDurationMs &&
     runtime.responseBytes <= policy.healthChecks.maximumResponseBytes &&
     runtime.hasStdin === false && Array.isArray(runtime.credentialNames) &&
-    runtime.credentialNames.length === 0 && runtime.hasAmbientEnvironment !== true &&
-    runtime.pathSource !== "registry";
+    runtime.credentialNames.length === 0 &&
+    runtime.hasAmbientEnvironment === policy.healthChecks.inheritEnvironment &&
+    runtime.pathSource === policy.healthChecks.pathSource;
 }
 
 function safeReadablePath(declaredPath, context) {
