@@ -1,0 +1,776 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Driftward-LLC/capykit/schemas/v0.1/registry.schema.json",
+  "title": "Capykit registry",
+  "description": "A versioned catalog of tools and their agent-usable interfaces.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "registry", "tools"],
+  "properties": {
+    "schemaVersion": {
+      "const": "0.1.0",
+      "description": "The Capykit schema contract used by this document."
+    },
+    "registry": {
+      "$ref": "#/$defs/registryIdentity"
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/tool"
+      }
+    },
+    "extensions": {
+      "$ref": "#/$defs/extensions"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Namespaced scalar metadata. Extension keys must start with x-.",
+      "patternProperties": {
+        "^x-(?!.*(?:token|secret|password|cookie|credential|api-key))[a-z0-9]+(?:-[a-z0-9]+)*$": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "registryIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "description": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "homepage": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "url": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["visibility", "audiences", "platforms"],
+      "properties": {
+        "visibility": {
+          "enum": ["public", "organization", "team", "personal", "host"]
+        },
+        "audiences": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["human", "agent"]
+          }
+        },
+        "platforms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["linux", "macos", "windows", "container", "web"]
+          }
+        },
+        "contexts": {
+          "description": "Organization, team, user, or host IDs used for non-public filtering.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "visibility": {
+            "not": {
+              "const": "public"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "contexts": {}
+        },
+        "required": ["contexts"]
+      }
+    },
+    "authenticationReference": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name"],
+          "properties": {
+            "kind": {
+              "const": "environment"
+            },
+            "name": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "path"],
+          "properties": {
+            "kind": {
+              "const": "file"
+            },
+            "path": {
+              "$ref": "#/$defs/nonEmptyString"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name"],
+          "properties": {
+            "kind": {
+              "const": "provider"
+            },
+            "name": {
+              "$ref": "#/$defs/identifier"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "issuer"],
+          "properties": {
+            "kind": {
+              "const": "oauth-issuer"
+            },
+            "issuer": {
+              "$ref": "#/$defs/nonEmptyString"
+            }
+          }
+        }
+      ]
+    },
+    "authenticationRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "references"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "type": {
+          "enum": ["api-key", "oauth", "session", "basic", "certificate", "other"]
+        },
+        "description": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "references": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/authenticationReference"
+          }
+        }
+      }
+    },
+    "authentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "requirements"],
+      "properties": {
+        "mode": {
+          "enum": ["none", "optional", "required"]
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/authenticationRequirement"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": ["optional", "required"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "requirements": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "none"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "requirements": {
+                "type": "array",
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["risk", "approval"],
+      "properties": {
+        "risk": {
+          "enum": ["read-only", "writes-data", "executes-code", "destructive"]
+        },
+        "approval": {
+          "enum": ["never", "on-write", "always"]
+        },
+        "notes": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "enum": ["experimental", "active", "deprecated", "retired"]
+        },
+        "version": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "sunsetDate": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "replacement": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "documentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "url"],
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "url": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "target"],
+      "properties": {
+        "type": {
+          "enum": ["requires", "provides", "replaces", "related-to"]
+        },
+        "target": {
+          "$ref": "#/$defs/identifier"
+        },
+        "description": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "example": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "interfaceId", "usage"],
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "interfaceId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "usage": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "summary"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/identifier"
+        },
+        "summary": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "usage": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "cliInterface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "command", "capabilities"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "type": {
+          "const": "cli"
+        },
+        "command": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/capability"
+          }
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "mcpInterface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "transport", "serverName", "capabilities"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "type": {
+          "const": "mcp"
+        },
+        "transport": {
+          "enum": ["stdio", "http"]
+        },
+        "serverName": {
+          "$ref": "#/$defs/identifier"
+        },
+        "command": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "url": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/capability"
+          }
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "transport": {
+              "const": "stdio"
+            },
+            "command": {}
+          },
+          "required": ["command"],
+          "not": {
+            "properties": {
+              "url": {}
+            },
+            "required": ["url"]
+          }
+        },
+        {
+          "properties": {
+            "transport": {
+              "const": "http"
+            },
+            "url": {}
+          },
+          "required": ["url"],
+          "not": {
+            "properties": {
+              "command": {}
+            },
+            "required": ["command"]
+          }
+        }
+      ]
+    },
+    "apiOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "method", "path", "summary"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "method": {
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "summary": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "apiInterface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "protocol", "baseUrl", "operations"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "type": {
+          "const": "api"
+        },
+        "protocol": {
+          "enum": ["http", "https"]
+        },
+        "baseUrl": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/apiOperation"
+          }
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "serviceInterface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "manager", "serviceName", "capabilities"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "type": {
+          "const": "service"
+        },
+        "manager": {
+          "enum": ["systemd", "docker", "docker-compose", "kubernetes", "other"]
+        },
+        "serviceName": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "endpoint": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/capability"
+          }
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "skillInterface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "format", "location", "capabilities"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "type": {
+          "const": "skill"
+        },
+        "format": {
+          "enum": ["agents-skill", "prompt", "other"]
+        },
+        "location": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/capability"
+          }
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "interface": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/cliInterface"
+        },
+        {
+          "$ref": "#/$defs/mcpInterface"
+        },
+        {
+          "$ref": "#/$defs/apiInterface"
+        },
+        {
+          "$ref": "#/$defs/serviceInterface"
+        },
+        {
+          "$ref": "#/$defs/skillInterface"
+        }
+      ]
+    },
+    "healthCheck": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "kind", "command"],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/identifier"
+            },
+            "kind": {
+              "const": "command-available"
+            },
+            "command": {
+              "$ref": "#/$defs/nonEmptyString"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "kind", "url"],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/identifier"
+            },
+            "kind": {
+              "const": "http-get"
+            },
+            "url": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "expectedStatus": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "kind", "interfaceId"],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/identifier"
+            },
+            "kind": {
+              "const": "mcp-initialize"
+            },
+            "interfaceId": {
+              "$ref": "#/$defs/identifier"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "kind", "interfaceId"],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/identifier"
+            },
+            "kind": {
+              "const": "service-active"
+            },
+            "interfaceId": {
+              "$ref": "#/$defs/identifier"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "kind", "path"],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/identifier"
+            },
+            "kind": {
+              "const": "file-readable"
+            },
+            "path": {
+              "$ref": "#/$defs/nonEmptyString"
+            }
+          }
+        }
+      ]
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "summary",
+        "owners",
+        "interfaces",
+        "scope",
+        "authentication",
+        "safety",
+        "lifecycle",
+        "healthChecks",
+        "documentation",
+        "relationships",
+        "examples"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "summary": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "description": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "owners": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/owner"
+          }
+        },
+        "interfaces": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/interface"
+          }
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "authentication": {
+          "$ref": "#/$defs/authentication"
+        },
+        "safety": {
+          "$ref": "#/$defs/safety"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        },
+        "healthChecks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/healthCheck"
+          }
+        },
+        "documentation": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/documentation"
+          }
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relationship"
+          }
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/example"
+          }
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    }
+  }
+}

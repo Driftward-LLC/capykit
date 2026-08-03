@@ -24,3 +24,16 @@ and ownership boundaries are recorded in
 
 Canonical planning lives in the
 [Capykit Linear project](https://linear.app/driftward/project/capykit-72e4a9e54d52).
+
+## Capability schema
+
+The versioned registry contract is documented in
+[`docs/schema-v0.1.md`](docs/schema-v0.1.md). A public example covering CLI,
+MCP, API, service, and skill interfaces lives at
+[`examples/all-interfaces.registry.json`](examples/all-interfaces.registry.json).
+
+Run the schema contract tests with Node.js 22 or newer:
+
+```bash
+node scripts/test-schema.mjs
+```
