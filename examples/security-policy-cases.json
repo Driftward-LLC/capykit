@@ -1,0 +1,1182 @@
+{
+  "pathCases": [
+    {
+      "name": "relative registry inside configured root",
+      "input": "team/tools.registry.json",
+      "setup": "regular-file",
+      "expected": true
+    },
+    {
+      "name": "absolute registry inside configured root",
+      "input": "company.registry.json",
+      "setup": "absolute-regular-file",
+      "expected": true
+    },
+    {
+      "name": "parent traversal is rejected",
+      "input": "../credentials.json",
+      "setup": "outside-regular-file",
+      "expected": false
+    },
+    {
+      "name": "symlink escape is rejected after canonicalization",
+      "input": "linked.registry.json",
+      "setup": "symlink-outside",
+      "expected": false
+    },
+    {
+      "name": "directory is not a registry document",
+      "input": "team",
+      "setup": "directory",
+      "expected": false
+    },
+    {
+      "name": "null byte is rejected",
+      "input": "safe.json\u0000private",
+      "setup": "regular-file",
+      "expected": false
+    }
+  ],
+  "urlCases": [
+    {
+      "name": "public HTTPS registry",
+      "url": "https://registry.example.com/capykit/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "redirects": [],
+      "usesAmbientProxy": false,
+      "durationMs": 250,
+      "responseBytes": 4096,
+      "expected": true
+    },
+    {
+      "name": "public IPv6 resolution is allowed",
+      "url": "https://registry.example.com/capykit/registry.json",
+      "resolvedAddresses": [
+        "2606:4700:4700::1111"
+      ],
+      "redirects": [],
+      "usesAmbientProxy": false,
+      "durationMs": 250,
+      "responseBytes": 4096,
+      "expected": true
+    },
+    {
+      "name": "IPv6 translation-local address is rejected",
+      "url": "https://registry.example.com/capykit/registry.json",
+      "resolvedAddresses": [
+        "64:ff9b:1::1"
+      ],
+      "redirects": [],
+      "usesAmbientProxy": false,
+      "durationMs": 250,
+      "responseBytes": 4096,
+      "expected": false
+    },
+    {
+      "name": "redirect to IPv6 discard-only address is rejected",
+      "url": "https://registry.example.com/capykit/registry.json",
+      "resolvedAddresses": [
+        "2606:4700:4700::1111"
+      ],
+      "redirects": [
+        {
+          "url": "https://registry.example.com/next.json",
+          "resolvedAddresses": [
+            "100::1"
+          ]
+        }
+      ],
+      "usesAmbientProxy": false,
+      "durationMs": 250,
+      "responseBytes": 4096,
+      "expected": false
+    },
+    {
+      "name": "same-origin redirect is revalidated",
+      "url": "https://registry.example.com/capykit/latest",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "redirects": [
+        {
+          "url": "https://registry.example.com/capykit/registry.json",
+          "resolvedAddresses": [
+            "93.184.216.35"
+          ]
+        }
+      ],
+      "usesAmbientProxy": false,
+      "durationMs": 300,
+      "responseBytes": 4096,
+      "expected": true
+    },
+    {
+      "name": "HTTP is rejected",
+      "url": "http://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "expected": false
+    },
+    {
+      "name": "URL credentials are rejected",
+      "url": "https://user:synthetic-password@registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "expected": false
+    },
+    {
+      "name": "fragments are rejected",
+      "url": "https://registry.example.com/registry.json#private",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "expected": false
+    },
+    {
+      "name": "localhost is rejected",
+      "url": "https://localhost/registry.json",
+      "resolvedAddresses": [
+        "127.0.0.1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "private IPv4 is rejected",
+      "url": "https://192.168.1.2/registry.json",
+      "resolvedAddresses": [
+        "192.168.1.2"
+      ],
+      "expected": false
+    },
+    {
+      "name": "cloud metadata address is rejected",
+      "url": "https://169.254.169.254/latest/meta-data/",
+      "resolvedAddresses": [
+        "169.254.169.254"
+      ],
+      "expected": false
+    },
+    {
+      "name": "IPv6 loopback is rejected",
+      "url": "https://[::1]/registry.json",
+      "resolvedAddresses": [
+        "::1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "DNS resolution to a private address is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "10.0.0.8"
+      ],
+      "expected": false
+    },
+    {
+      "name": "cross-origin redirect is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "redirects": [
+        {
+          "url": "https://other.example.net/registry.json",
+          "resolvedAddresses": [
+            "93.184.216.35"
+          ]
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "redirect rebinding to private address is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "redirects": [
+        {
+          "url": "https://registry.example.com/next.json",
+          "resolvedAddresses": [
+            "10.0.0.9"
+          ]
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "IPv6 multicast is rejected",
+      "url": "https://[ff02::1]/registry.json",
+      "resolvedAddresses": [
+        "ff02::1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "deprecated IPv6 site-local address is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "fec0::1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "reserved high IPv4 range is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "240.0.0.1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "limited broadcast address is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "255.255.255.255"
+      ],
+      "expected": false
+    },
+    {
+      "name": "redirect to reserved high IPv4 range is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "redirects": [
+        {
+          "url": "https://registry.example.com/next.json",
+          "resolvedAddresses": [
+            "240.0.0.1"
+          ]
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "IPv4-mapped loopback is rejected",
+      "url": "https://[::ffff:127.0.0.1]/registry.json",
+      "resolvedAddresses": [
+        "::ffff:127.0.0.1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "hexadecimal IPv4-mapped loopback is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "::ffff:7f00:1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "expanded IPv6 loopback is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "0:0:0:0:0:0:0:1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "redirect to mapped loopback is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "redirects": [
+        {
+          "url": "https://registry.example.com/next.json",
+          "resolvedAddresses": [
+            "::ffff:7f00:1"
+          ]
+        }
+      ],
+      "expected": false
+    },
+    {
+      "name": "ambient proxy use is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "usesAmbientProxy": true,
+      "expected": false
+    },
+    {
+      "name": "response size is bounded",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "responseBytes": 65537,
+      "expected": false
+    },
+    {
+      "name": "request duration is bounded",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "durationMs": 5001,
+      "expected": false
+    }
+  ],
+  "secretCases": [
+    {
+      "name": "ordinary discovery text",
+      "key": "summary",
+      "value": "Uses an OAuth issuer and an environment reference.",
+      "expected": false
+    },
+    {
+      "name": "credential reference name is metadata",
+      "key": "name",
+      "value": "LINEAR_API_KEY",
+      "expected": false
+    },
+    {
+      "name": "credential-like key is rejected",
+      "key": "api_token",
+      "value": "synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "camel-case access token key is rejected",
+      "key": "accessToken",
+      "value": "synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "authorization value is rejected",
+      "key": "description",
+      "value": "Bearer synthetic-token-value",
+      "expected": true
+    },
+    {
+      "name": "recognized token prefix in prose is rejected",
+      "key": "description",
+      "value": "The accidental value was ghp_syntheticvalue in this sentence.",
+      "expected": true
+    },
+    {
+      "name": "fine-grained GitHub token prefix is rejected",
+      "key": "description",
+      "value": "The accidental value was github_pat_syntheticvalue.",
+      "expected": true
+    },
+    {
+      "name": "AWS temporary key prefix is rejected",
+      "key": "description",
+      "value": "ASIASYNTHETICVALUE",
+      "expected": true
+    },
+    {
+      "name": "private key block is rejected",
+      "key": "description",
+      "value": "-----BEGIN PRIVATE KEY-----",
+      "expected": true
+    },
+    {
+      "name": "Discord webhook is rejected",
+      "key": "url",
+      "value": "https://discord.com/api/webhooks/123456789/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Discord webhook with query is rejected",
+      "key": "url",
+      "value": "https://discord.com/api/webhooks/123456789/synthetic-value?wait=true",
+      "expected": true
+    },
+    {
+      "name": "Discord webhook with explicit HTTPS port is rejected",
+      "key": "url",
+      "value": "https://discord.com:443/api/webhooks/123456789/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Discord webhook with zero-padded HTTPS port is rejected",
+      "key": "url",
+      "value": "https://discord.com:0443/api/webhooks/123456789/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Discord webhook with trailing-dot host is rejected",
+      "key": "url",
+      "value": "https://discord.com./api/webhooks/123456789/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Discord webhook with encoded path is rejected",
+      "key": "url",
+      "value": "https://discord.com/api/%77ebhooks/123456789/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Discord webhook with user information is rejected",
+      "key": "url",
+      "value": "https://user@discord.com/api/webhooks/123456789/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Slack webhook is rejected",
+      "key": "url",
+      "value": "https://hooks.slack.com/services/T00000000/B00000000/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Slack webhook with explicit HTTPS port is rejected",
+      "key": "url",
+      "value": "https://hooks.slack.com:443/services/T00000000/B00000000/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Slack webhook with zero-padded HTTPS port is rejected",
+      "key": "url",
+      "value": "https://hooks.slack.com:0443/services/T00000000/B00000000/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Slack webhook with trailing-dot host is rejected",
+      "key": "url",
+      "value": "https://hooks.slack.com./services/T00000000/B00000000/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Slack webhook with encoded path is rejected",
+      "key": "url",
+      "value": "https://hooks.slack.com/%73ervices/T00000000/B00000000/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Slack webhook with user information is rejected",
+      "key": "url",
+      "value": "https://user@hooks.slack.com/services/T00000000/B00000000/synthetic-value",
+      "expected": true
+    }
+  ],
+  "provenanceCases": [
+    {
+      "name": "local source uses digest as revision fallback",
+      "provenance": {
+        "sourceId": "local-company",
+        "sourceUri": "file:///etc/capykit/registries/company.json",
+        "trustTier": "operator-approved",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "fetchedAt": "2026-08-03T00:00:00Z"
+      },
+      "expected": true
+    },
+    {
+      "name": "remote source may record immutable revision",
+      "provenance": {
+        "sourceId": "public-release",
+        "sourceUri": "https://registry.example.com/registry.json",
+        "trustTier": "bundled",
+        "revision": "v0.1.0",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "fetchedAt": "2026-08-03T00:00:00Z"
+      },
+      "expected": true
+    },
+    {
+      "name": "digest is always required",
+      "provenance": {
+        "sourceId": "missing-digest",
+        "sourceUri": "file:///etc/capykit/registries/company.json",
+        "trustTier": "operator-approved",
+        "fetchedAt": "2026-08-03T00:00:00Z"
+      },
+      "expected": false
+    },
+    {
+      "name": "provenance fields must use canonical formats",
+      "provenance": {
+        "sourceId": "Invalid Source",
+        "sourceUri": "not a URI",
+        "trustTier": "self-approved",
+        "sha256": "x",
+        "fetchedAt": "never"
+      },
+      "expected": false
+    },
+    {
+      "name": "relative file URI is rejected",
+      "provenance": {
+        "sourceId": "relative-file",
+        "sourceUri": "file:relative.json",
+        "trustTier": "operator-approved",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "fetchedAt": "2026-08-03T00:00:00Z"
+      },
+      "expected": false
+    },
+    {
+      "name": "normalizable noncanonical HTTPS URI is rejected",
+      "provenance": {
+        "sourceId": "noncanonical-https",
+        "sourceUri": "https://REGISTRY.example.com:443/a/../registry.json",
+        "trustTier": "operator-approved",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "fetchedAt": "2026-08-03T00:00:00Z"
+      },
+      "expected": false
+    },
+    {
+      "name": "impossible calendar timestamp is rejected",
+      "provenance": {
+        "sourceId": "impossible-date",
+        "sourceUri": "file:///etc/capykit/registries/company.json",
+        "trustTier": "operator-approved",
+        "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "fetchedAt": "2026-02-31T00:00:00Z"
+      },
+      "expected": false
+    },
+    {
+      "name": "percent-encoded unreserved source URI is rejected",
+      "provenance": {
+        "sourceId": "encoded-source",
+        "sourceUri": "https://registry.example.com/%72egistry.json",
+        "trustTier": "operator-approved",
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "fetchedAt": "2026-08-03T00:00:00Z"
+      },
+      "expected": false
+    }
+  ],
+  "healthCheckCases": [
+    {
+      "name": "single executable lookup",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": true
+    },
+    {
+      "name": "command arguments are rejected",
+      "check": {
+        "id": "git-version",
+        "kind": "command-available",
+        "command": "git --version"
+      },
+      "context": {
+        "approvedCommands": [
+          "git --version"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "argument field is rejected",
+      "check": {
+        "id": "git-version",
+        "kind": "command-available",
+        "command": "git",
+        "arguments": [
+          "--version"
+        ]
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "public unauthenticated HTTP GET",
+      "check": {
+        "id": "public-status",
+        "kind": "http-get",
+        "url": "https://status.example.com/health",
+        "expectedStatus": 200
+      },
+      "network": {
+        "resolvedAddresses": [
+          "93.184.216.34"
+        ],
+        "redirects": [],
+        "usesAmbientProxy": false
+      },
+      "runtime": {
+        "durationMs": 100,
+        "responseBytes": 128,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": true
+    },
+    {
+      "name": "HTTP headers are rejected",
+      "check": {
+        "id": "private-status",
+        "kind": "http-get",
+        "url": "https://status.example.com/health",
+        "headers": {
+          "Authorization": "synthetic-value"
+        }
+      },
+      "network": {
+        "resolvedAddresses": [
+          "93.184.216.34"
+        ],
+        "redirects": [],
+        "usesAmbientProxy": false
+      },
+      "runtime": {
+        "durationMs": 100,
+        "responseBytes": 128,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "private network HTTP target is rejected",
+      "check": {
+        "id": "private-status",
+        "kind": "http-get",
+        "url": "https://10.0.0.4/health"
+      },
+      "network": {
+        "resolvedAddresses": [
+          "10.0.0.4"
+        ],
+        "redirects": [],
+        "usesAmbientProxy": false
+      },
+      "runtime": {
+        "durationMs": 100,
+        "responseBytes": 128,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "MCP initialize references an interface",
+      "check": {
+        "id": "mcp-ready",
+        "kind": "mcp-initialize",
+        "interfaceId": "catalog-mcp"
+      },
+      "context": {
+        "interfaces": [
+          {
+            "id": "catalog-mcp",
+            "type": "mcp",
+            "transport": "stdio",
+            "command": "capykit-mcp"
+          }
+        ],
+        "approvedMcpTransports": [
+          "catalog-mcp:stdio:capykit-mcp"
+        ]
+      },
+      "runtime": {
+        "durationMs": 500,
+        "responseBytes": 512,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": true
+    },
+    {
+      "name": "registry cannot substitute MCP executable after approval",
+      "check": {
+        "id": "mcp-ready",
+        "kind": "mcp-initialize",
+        "interfaceId": "catalog-mcp"
+      },
+      "context": {
+        "interfaces": [
+          {
+            "id": "catalog-mcp",
+            "type": "mcp",
+            "transport": "stdio",
+            "command": "substituted-mcp"
+          }
+        ],
+        "approvedMcpTransports": [
+          "catalog-mcp:stdio:capykit-mcp"
+        ]
+      },
+      "runtime": {
+        "durationMs": 500,
+        "responseBytes": 512,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "approved HTTP MCP transport still applies URL safety",
+      "check": {
+        "id": "remote-mcp-ready",
+        "kind": "mcp-initialize",
+        "interfaceId": "remote-mcp"
+      },
+      "context": {
+        "interfaces": [
+          {
+            "id": "remote-mcp",
+            "type": "mcp",
+            "transport": "http",
+            "url": "https://mcp.example.com/mcp"
+          }
+        ],
+        "approvedMcpTransports": [
+          "remote-mcp:http:https://mcp.example.com/mcp"
+        ],
+        "mcpNetwork": {
+          "resolvedAddresses": [
+            "10.0.0.10"
+          ],
+          "redirects": [],
+          "usesAmbientProxy": false
+        }
+      },
+      "runtime": {
+        "durationMs": 500,
+        "responseBytes": 512,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "relative file check resolves inside approved root",
+      "check": {
+        "id": "config-present",
+        "kind": "file-readable",
+        "path": "skills/research/SKILL.md"
+      },
+      "context": {
+        "fileSetup": "regular-file"
+      },
+      "runtime": {
+        "durationMs": 5,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": true
+    },
+    {
+      "name": "relative file check is rejected",
+      "check": {
+        "id": "config-present",
+        "kind": "file-readable",
+        "path": "../private/config.json"
+      },
+      "context": {
+        "fileSetup": "regular-file"
+      },
+      "runtime": {
+        "durationMs": 5,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "declared file cannot be replaced by unrelated approved path",
+      "check": {
+        "id": "sensitive-file",
+        "kind": "file-readable",
+        "path": "/etc/shadow"
+      },
+      "context": {
+        "fileSetup": "regular-file"
+      },
+      "runtime": {
+        "durationMs": 5,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "file check rejects symlink escape",
+      "check": {
+        "id": "linked-file",
+        "kind": "file-readable",
+        "path": "links/outside"
+      },
+      "context": {
+        "fileSetup": "symlink-outside"
+      },
+      "runtime": {
+        "durationMs": 5,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "file check cannot target authentication reference",
+      "check": {
+        "id": "credential-file",
+        "kind": "file-readable",
+        "path": "auth/token"
+      },
+      "context": {
+        "fileSetup": "regular-file",
+        "authenticationReferencePaths": [
+          "auth/./token"
+        ]
+      },
+      "runtime": {
+        "durationMs": 5,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "file check cannot reach authentication reference through symlink alias",
+      "check": {
+        "id": "credential-alias",
+        "kind": "file-readable",
+        "path": "aliases/token"
+      },
+      "context": {
+        "fileSetup": "symlink-auth-reference",
+        "authenticationReferencePaths": [
+          "auth/token"
+        ]
+      },
+      "runtime": {
+        "durationMs": 5,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "service status requires explicit interface approval",
+      "check": {
+        "id": "service-ready",
+        "kind": "service-active",
+        "interfaceId": "catalog-service"
+      },
+      "context": {
+        "approvedServiceInterfaces": [
+          "catalog-service"
+        ]
+      },
+      "runtime": {
+        "durationMs": 10,
+        "responseBytes": 64,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": true
+    },
+    {
+      "name": "health check cannot inherit credentials",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [
+          "GITHUB_TOKEN"
+        ],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "health check cannot inherit ambient environment",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": true,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "health check rejects non-boolean ambient environment flag",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": "yes",
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "health check rejects ambient PATH source",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "ambient"
+      },
+      "expected": false
+    },
+    {
+      "name": "registry cannot control health-check PATH",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "pathSource": "registry",
+        "hasAmbientEnvironment": false
+      },
+      "expected": false
+    },
+    {
+      "name": "health check timeout is bounded",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 5001,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "health runtime rejects null numeric bounds",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": null,
+        "responseBytes": null,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "health runtime rejects string numeric bounds",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": "20",
+        "responseBytes": "0",
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "health runtime rejects negative numeric bounds",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": -1,
+        "responseBytes": -1,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    },
+    {
+      "name": "generic command execution kind is rejected",
+      "check": {
+        "id": "generic-command",
+        "kind": "command",
+        "command": "true"
+      },
+      "runtime": {
+        "durationMs": 10,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": false,
+        "pathSource": "operator"
+      },
+      "expected": false
+    }
+  ],
+  "mcpToolCases": [
+    {
+      "name": "search is read-only",
+      "tool": "search_capabilities",
+      "expected": true
+    },
+    {
+      "name": "validation is read-only",
+      "tool": "validate_registry",
+      "expected": true
+    },
+    {
+      "name": "source sync mutates local state",
+      "tool": "sync_sources",
+      "expected": false
+    },
+    {
+      "name": "generic execution is forbidden",
+      "tool": "execute_command",
+      "expected": false
+    }
+  ]
+}

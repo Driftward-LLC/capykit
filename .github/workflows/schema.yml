@@ -25,5 +25,8 @@ jobs:
       - name: Validate schema contract
         run: node scripts/test-schema.mjs
 
+      - name: Validate security policy contract
+        run: node scripts/test-security-policy.mjs
+
       - name: Lint Markdown
         run: npx --yes markdownlint-cli2@0.23.2 README.md "docs/**/*.md"

@@ -1,0 +1,202 @@
+{
+  "policyVersion": "0.1.0",
+  "registryTrust": {
+    "precedence": [
+      "operator-approved",
+      "bundled",
+      "untrusted"
+    ],
+    "tiers": [
+      {
+        "id": "operator-approved",
+        "activation": "explicit",
+        "updateMode": "manual",
+        "mayOverride": [
+          "operator-approved",
+          "bundled",
+          "untrusted"
+        ]
+      },
+      {
+        "id": "bundled",
+        "activation": "release",
+        "updateMode": "package-release",
+        "mayOverride": [
+          "bundled",
+          "untrusted"
+        ]
+      },
+      {
+        "id": "untrusted",
+        "activation": "quarantine",
+        "updateMode": "none",
+        "mayOverride": []
+      }
+    ],
+    "updates": {
+      "defaultMode": "manual",
+      "remoteSchemes": [
+        "https"
+      ],
+      "redirectPolicy": "same-origin",
+      "maximumRedirects": 3,
+      "requireAtomicReplace": true,
+      "retainLastKnownGood": true,
+      "validateBeforeActivation": true,
+      "requiredProvenance": [
+        "sourceId",
+        "sourceUri",
+        "trustTier",
+        "sha256",
+        "fetchedAt"
+      ],
+      "optionalProvenance": [
+        "revision"
+      ],
+      "revisionFallback": "sha256",
+      "canonicalSourceUri": {
+        "serialization": "whatwg",
+        "rejectPercentEncodedUnreserved": true,
+        "requireUppercasePercentHex": true
+      }
+    }
+  },
+  "sourceSafety": {
+    "paths": {
+      "resolveAgainstConfiguredRoot": true,
+      "canonicalizeBeforeOpen": true,
+      "requireRegularFile": true,
+      "rejectTraversalSegments": true,
+      "rejectSymlinkEscape": true,
+      "rejectNullBytes": true,
+      "verifyOpenedDescriptor": true
+    },
+    "urls": {
+      "schemes": [
+        "https"
+      ],
+      "allowUserInfo": false,
+      "allowFragments": false,
+      "allowPrivateNetworks": false,
+      "allowAmbientProxy": false,
+      "resolveAndValidateEveryConnection": true,
+      "redirectPolicy": "same-origin",
+      "maximumDurationMs": 5000,
+      "maximumResponseBytes": 65536
+    }
+  },
+  "credentials": {
+    "dereferenceDuring": [],
+    "referenceKinds": [
+      "environment",
+      "file",
+      "provider",
+      "oauth-issuer"
+    ],
+    "normalizeUrlsBeforeMatch": true,
+    "webhookUrlPolicy": {
+      "schemes": [
+        "https"
+      ],
+      "decodePathBeforeMatch": true,
+      "hosts": {
+        "discord.com": "/api/webhooks/",
+        "discordapp.com": "/api/webhooks/",
+        "hooks.slack.com": "/services/"
+      }
+    },
+    "forbiddenKeyPatterns": [
+      "(^|[_-])(api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|refresh[_-]?token|session[_-]?(cookie|token)|private[_-]?key|token|secret|password|passwd|cookie|authorization)([_-].*|$)"
+    ],
+    "forbiddenValuePatterns": [
+      "-----BEGIN [A-Z ]*PRIVATE KEY-----",
+      "(^|\\s)(Bearer|Basic)\\s+\\S+",
+      "(^|[^A-Za-z0-9])(gh[pousr]_|github_pat_|sk-|xox[baprs]-|AKIA|ASIA)[A-Za-z0-9_-]+",
+      "https://(discord(app)?\\.com)(:0*443)?/api/webhooks/[0-9]+/[^\\s]+",
+      "https://hooks\\.slack\\.com(:0*443)?/services/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+"
+    ],
+    "redaction": "[REDACTED]"
+  },
+  "healthChecks": {
+    "maximumDurationMs": 5000,
+    "maximumResponseBytes": 65536,
+    "inheritStdin": false,
+    "inheritEnvironment": false,
+    "pathSource": "operator",
+    "forbiddenFields": [
+      "arguments",
+      "body",
+      "cwd",
+      "environment",
+      "headers",
+      "method",
+      "script",
+      "shell",
+      "stdin"
+    ],
+    "kinds": {
+      "command-available": {
+        "fields": [
+          "id",
+          "kind",
+          "command"
+        ],
+        "executablePattern": "^[A-Za-z0-9][A-Za-z0-9._+-]*$",
+        "operation": "path-lookup",
+        "requiresOperatorAllowlist": true
+      },
+      "http-get": {
+        "fields": [
+          "id",
+          "kind",
+          "url",
+          "expectedStatus"
+        ],
+        "operation": "unauthenticated-get"
+      },
+      "mcp-initialize": {
+        "fields": [
+          "id",
+          "kind",
+          "interfaceId"
+        ],
+        "operation": "initialize-only",
+        "requiresApprovedTransportFingerprint": true,
+        "httpTransportUsesSourceUrlPolicy": true
+      },
+      "service-active": {
+        "fields": [
+          "id",
+          "kind",
+          "interfaceId"
+        ],
+        "operation": "manager-status",
+        "requiresOperatorAllowlist": true
+      },
+      "file-readable": {
+        "fields": [
+          "id",
+          "kind",
+          "path"
+        ],
+        "operation": "metadata-only",
+        "requiresApprovedRoot": true
+      }
+    }
+  },
+  "mcp": {
+    "mode": "read-only",
+    "tools": [
+      "list_capabilities",
+      "search_capabilities",
+      "get_capability",
+      "list_sources",
+      "get_source",
+      "validate_registry"
+    ],
+    "forbiddenNamePatterns": [
+      "(^|_)(add|delete|execute|install|invoke|remove|run|shell|sync|update|write)($|_)"
+    ],
+    "genericRemoteExecution": false
+  }
+}
