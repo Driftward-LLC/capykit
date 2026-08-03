@@ -51,6 +51,18 @@
       "expected": true
     },
     {
+      "name": "public IPv6 resolution is allowed",
+      "url": "https://registry.example.com/capykit/registry.json",
+      "resolvedAddresses": [
+        "2606:4700:4700::1111"
+      ],
+      "redirects": [],
+      "usesAmbientProxy": false,
+      "durationMs": 250,
+      "responseBytes": 4096,
+      "expected": true
+    },
+    {
       "name": "same-origin redirect is revalidated",
       "url": "https://registry.example.com/capykit/latest",
       "resolvedAddresses": [
@@ -182,6 +194,38 @@
       "expected": false
     },
     {
+      "name": "hexadecimal IPv4-mapped loopback is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "::ffff:7f00:1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "expanded IPv6 loopback is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "0:0:0:0:0:0:0:1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "redirect to mapped loopback is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "redirects": [
+        {
+          "url": "https://registry.example.com/next.json",
+          "resolvedAddresses": [
+            "::ffff:7f00:1"
+          ]
+        }
+      ],
+      "expected": false
+    },
+    {
       "name": "ambient proxy use is rejected",
       "url": "https://registry.example.com/registry.json",
       "resolvedAddresses": [
@@ -247,6 +291,18 @@
       "expected": true
     },
     {
+      "name": "fine-grained GitHub token prefix is rejected",
+      "key": "description",
+      "value": "The accidental value was github_pat_syntheticvalue.",
+      "expected": true
+    },
+    {
+      "name": "AWS temporary key prefix is rejected",
+      "key": "description",
+      "value": "ASIASYNTHETICVALUE",
+      "expected": true
+    },
+    {
       "name": "private key block is rejected",
       "key": "description",
       "value": "-----BEGIN PRIVATE KEY-----",
@@ -262,6 +318,12 @@
       "name": "Discord webhook with query is rejected",
       "key": "url",
       "value": "https://discord.com/api/webhooks/123456789/synthetic-value?wait=true",
+      "expected": true
+    },
+    {
+      "name": "Slack webhook is rejected",
+      "key": "url",
+      "value": "https://hooks.slack.com/services/T00000000/B00000000/synthetic-value",
       "expected": true
     }
   ],
@@ -296,6 +358,17 @@
         "sourceUri": "file:///etc/capykit/registries/company.json",
         "trustTier": "operator-approved",
         "fetchedAt": "2026-08-03T00:00:00Z"
+      },
+      "expected": false
+    },
+    {
+      "name": "provenance fields must use canonical formats",
+      "provenance": {
+        "sourceId": "Invalid Source",
+        "sourceUri": "not a URI",
+        "trustTier": "self-approved",
+        "sha256": "x",
+        "fetchedAt": "never"
       },
       "expected": false
     }
@@ -533,10 +606,7 @@
         "path": "skills/research/SKILL.md"
       },
       "context": {
-        "approvedFileRoots": [
-          "/opt/capykit"
-        ],
-        "resolvedFilePath": "/opt/capykit/skills/research/SKILL.md"
+        "fileSetup": "regular-file"
       },
       "runtime": {
         "durationMs": 5,
@@ -554,10 +624,64 @@
         "path": "../private/config.json"
       },
       "context": {
-        "approvedFileRoots": [
-          "/opt/capykit"
-        ],
-        "resolvedFilePath": "/opt/private/config.json"
+        "fileSetup": "regular-file"
+      },
+      "runtime": {
+        "durationMs": 5,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": []
+      },
+      "expected": false
+    },
+    {
+      "name": "declared file cannot be replaced by unrelated approved path",
+      "check": {
+        "id": "sensitive-file",
+        "kind": "file-readable",
+        "path": "/etc/shadow"
+      },
+      "context": {
+        "fileSetup": "regular-file"
+      },
+      "runtime": {
+        "durationMs": 5,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": []
+      },
+      "expected": false
+    },
+    {
+      "name": "file check rejects symlink escape",
+      "check": {
+        "id": "linked-file",
+        "kind": "file-readable",
+        "path": "links/outside"
+      },
+      "context": {
+        "fileSetup": "symlink-outside"
+      },
+      "runtime": {
+        "durationMs": 5,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": []
+      },
+      "expected": false
+    },
+    {
+      "name": "file check cannot target authentication reference",
+      "check": {
+        "id": "credential-file",
+        "kind": "file-readable",
+        "path": "auth/token"
+      },
+      "context": {
+        "fileSetup": "regular-file",
+        "authenticationReferencePaths": [
+          "auth/./token"
+        ]
       },
       "runtime": {
         "durationMs": 5,
@@ -606,6 +730,48 @@
         "credentialNames": [
           "GITHUB_TOKEN"
         ]
+      },
+      "expected": false
+    },
+    {
+      "name": "health check cannot inherit ambient environment",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "hasAmbientEnvironment": true
+      },
+      "expected": false
+    },
+    {
+      "name": "registry cannot control health-check PATH",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "context": {
+        "approvedCommands": [
+          "git"
+        ]
+      },
+      "runtime": {
+        "durationMs": 20,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": [],
+        "pathSource": "registry"
       },
       "expected": false
     },

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import {
+  accessSync,
+  constants,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -9,6 +11,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { BlockList, isIP } from "node:net";
 import { tmpdir } from "node:os";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { dirname, join } from "node:path";
@@ -68,31 +71,44 @@ function safeRegistryPath(testCase) {
   }
 }
 
+const blockedAddresses = {
+  ipv4: new BlockList(),
+  ipv6: new BlockList(),
+};
+for (const [network, prefix, type] of [
+  ["0.0.0.0", 8, "ipv4"],
+  ["10.0.0.0", 8, "ipv4"],
+  ["100.64.0.0", 10, "ipv4"],
+  ["127.0.0.0", 8, "ipv4"],
+  ["169.254.0.0", 16, "ipv4"],
+  ["172.16.0.0", 12, "ipv4"],
+  ["192.0.0.0", 24, "ipv4"],
+  ["192.0.2.0", 24, "ipv4"],
+  ["192.168.0.0", 16, "ipv4"],
+  ["198.18.0.0", 15, "ipv4"],
+  ["198.51.100.0", 24, "ipv4"],
+  ["203.0.113.0", 24, "ipv4"],
+  ["224.0.0.0", 4, "ipv4"],
+  ["::", 96, "ipv6"],
+  ["::1", 128, "ipv6"],
+  ["::ffff:0:0", 96, "ipv6"],
+  ["2001:db8::", 32, "ipv6"],
+  ["fc00::", 7, "ipv6"],
+  ["fe80::", 10, "ipv6"],
+  ["ff00::", 8, "ipv6"],
+]) {
+  blockedAddresses[type].addSubnet(network, prefix, type);
+}
+
 function isNonPublicAddress(address) {
-  const normalized = address.replace(/^\[|\]$/g, "").toLowerCase();
-  const mapped = normalized.match(/^::ffff:([0-9]+(?:\.[0-9]+){3})$/);
-  if (mapped) {
-    return isNonPublicAddress(mapped[1]);
+  const normalized = address.replace(/^\[|\]$/g, "");
+  const version = isIP(normalized);
+  if (version === 0) {
+    return true;
   }
 
-  if (normalized.includes(":")) {
-    return normalized === "::" || normalized === "::1" || normalized.startsWith("fc") ||
-      normalized.startsWith("fd") || normalized.startsWith("fe8") || normalized.startsWith("fe9") ||
-      normalized.startsWith("fea") || normalized.startsWith("feb") || normalized.startsWith("ff");
-  }
-
-  const octets = normalized.split(".").map(Number);
-  if (octets.length !== 4 || octets.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
-    return false;
-  }
-
-  return octets[0] === 0 || octets[0] === 10 || octets[0] === 127 ||
-    (octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127) ||
-    (octets[0] === 169 && octets[1] === 254) ||
-    (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
-    (octets[0] === 192 && octets[1] === 168) ||
-    (octets[0] === 198 && (octets[1] === 18 || octets[1] === 19)) ||
-    octets[0] >= 224;
+  const type = version === 4 ? "ipv4" : "ipv6";
+  return blockedAddresses[type].check(normalized, type);
 }
 
 function parseSafeUrl(value) {
@@ -156,15 +172,76 @@ function validProvenance(provenance) {
     return false;
   }
 
-  return provenance.revision === undefined ||
-    (typeof provenance.revision === "string" && provenance.revision.length > 0);
+  let source;
+  try {
+    source = new URL(provenance.sourceUri);
+  } catch {
+    return false;
+  }
+
+  const trustTiers = policy.registryTrust.tiers.map((tier) => tier.id);
+  const validTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(
+    provenance.fetchedAt,
+  ) && !Number.isNaN(Date.parse(provenance.fetchedAt));
+
+  return /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/.test(provenance.sourceId) &&
+    ["file:", "https:"].includes(source.protocol) && !source.username && !source.password && !source.hash &&
+    trustTiers.includes(provenance.trustTier) && /^[a-f0-9]{64}$/i.test(provenance.sha256) &&
+    validTimestamp && (provenance.revision === undefined ||
+      (typeof provenance.revision === "string" && provenance.revision.length > 0));
 }
 
 function validRuntime(runtime) {
   return runtime && runtime.durationMs <= policy.healthChecks.maximumDurationMs &&
     runtime.responseBytes <= policy.healthChecks.maximumResponseBytes &&
     runtime.hasStdin === false && Array.isArray(runtime.credentialNames) &&
-    runtime.credentialNames.length === 0;
+    runtime.credentialNames.length === 0 && runtime.hasAmbientEnvironment !== true &&
+    runtime.pathSource !== "registry";
+}
+
+function safeReadablePath(declaredPath, context) {
+  if (declaredPath.includes("\0") || declaredPath.split(/[\\/]/).includes("..")) {
+    return false;
+  }
+
+  const sandbox = mkdtempSync(join(tmpdir(), "capykit-health-path-"));
+  const approvedRoot = join(sandbox, "approved");
+  const outsideFile = join(sandbox, "outside");
+  mkdirSync(approvedRoot);
+  writeFileSync(outsideFile, "not registry data\n");
+
+  try {
+    const candidate = isAbsolute(declaredPath) ? declaredPath : resolve(approvedRoot, declaredPath);
+    if (!isWithin(candidate, approvedRoot)) {
+      return false;
+    }
+
+    const credentialPaths = (context.authenticationReferencePaths ?? []).map((path) =>
+      isAbsolute(path) ? resolve(path) : resolve(approvedRoot, path),
+    );
+    if (credentialPaths.includes(candidate)) {
+      return false;
+    }
+
+    if (context.fileSetup === "regular-file") {
+      mkdirSync(dirname(candidate), { recursive: true });
+      writeFileSync(candidate, "fixture\n");
+    } else if (context.fileSetup === "symlink-outside") {
+      mkdirSync(dirname(candidate), { recursive: true });
+      symlinkSync(outsideFile, candidate);
+    }
+
+    const canonical = realpathSync(candidate);
+    if (!isWithin(canonical, approvedRoot) || !statSync(canonical).isFile()) {
+      return false;
+    }
+    accessSync(canonical, constants.R_OK);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+  }
 }
 
 function validHealthCheck(testCase) {
@@ -202,10 +279,7 @@ function validHealthCheck(testCase) {
   }
 
   if (check.kind === "file-readable") {
-    return !check.path.includes("\0") && !check.path.split(/[\\/]/).includes("..") &&
-      isAbsolute(context.resolvedFilePath ?? "") &&
-      Array.isArray(context.approvedFileRoots) &&
-      context.approvedFileRoots.some((rootPath) => isWithin(context.resolvedFilePath, rootPath));
+    return safeReadablePath(check.path, context);
   }
 
   if (check.kind === "service-active") {
@@ -253,6 +327,8 @@ assert.equal(policy.registryTrust.updates.revisionFallback, "sha256");
 assert.equal(policy.credentials.dereferenceDuring.length, 0);
 assert.equal(policy.sourceSafety.paths.verifyOpenedDescriptor, true);
 assert.equal(policy.sourceSafety.urls.allowAmbientProxy, false);
+assert.equal(policy.healthChecks.inheritEnvironment, false);
+assert.equal(policy.healthChecks.pathSource, "operator");
 assert.equal(policy.mcp.mode, "read-only");
 assert.equal(policy.mcp.genericRemoteExecution, false);
 
