@@ -1,0 +1,19 @@
+{
+  "name": "@driftward/capykit",
+  "version": "0.0.0",
+  "description": "Portable capability registry for people and agents",
+  "type": "module",
+  "publishConfig": { "access": "public", "provenance": true },
+  "engines": { "node": ">=22" },
+  "bin": { "capykit": "./dist/cli.js", "capykit-mcp": "./dist/mcp.js" },
+  "exports": { ".": "./dist/core.js", "./core": "./dist/core.js", "./schemas": "./dist/schemas.js", "./mcp": "./dist/mcp.js" },
+  "files": ["dist", "schemas", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsup", "lint": "eslint .", "typecheck": "tsc --noEmit", "test": "vitest run",
+    "check:schema": "node scripts/test-schema.mjs && node scripts/test-security-policy.mjs",
+    "check:secrets": "node scripts/check-public-repository.mjs",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build && npm run check:schema && npm run check:secrets"
+  },
+  "dependencies": { "@modelcontextprotocol/sdk": "^1.17.4" },
+  "devDependencies": { "@eslint/js": "^9.33.0", "@types/node": "^22.17.2", "eslint": "^9.33.0", "tsup": "^8.5.0", "typescript": "^5.9.2", "typescript-eslint": "^8.40.0", "vitest": "^3.2.4" }
+}
