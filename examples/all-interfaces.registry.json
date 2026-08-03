@@ -1,0 +1,376 @@
+{
+  "schemaVersion": "0.1.0",
+  "registry": {
+    "id": "capykit-examples",
+    "name": "Capykit examples",
+    "description": "Public fixtures covering every v0.1 interface type.",
+    "homepage": "https://github.com/Driftward-LLC/capykit"
+  },
+  "tools": [
+    {
+      "id": "jq",
+      "name": "jq",
+      "summary": "Transform JSON from the command line.",
+      "owners": [
+        {
+          "id": "jqlang",
+          "name": "jqlang",
+          "url": "https://github.com/jqlang"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "jq-cli",
+          "type": "cli",
+          "command": "jq",
+          "capabilities": [
+            {
+              "name": "transform-json",
+              "summary": "Filter or transform a JSON document.",
+              "usage": "jq '.items[]' input.json"
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "public",
+        "audiences": ["human", "agent"],
+        "platforms": ["linux", "macos", "windows"]
+      },
+      "authentication": {
+        "mode": "optional",
+        "requirements": [
+          {
+            "id": "status-rate-limit",
+            "type": "api-key",
+            "description": "Optional authentication provides a higher rate limit.",
+            "references": [
+              {
+                "kind": "environment",
+                "name": "EXAMPLE_STATUS_API_KEY"
+              }
+            ]
+          }
+        ]
+      },
+      "safety": {
+        "risk": "read-only",
+        "approval": "never"
+      },
+      "lifecycle": {
+        "status": "active"
+      },
+      "healthChecks": [
+        {
+          "id": "jq-installed",
+          "kind": "command-available",
+          "command": "jq"
+        }
+      ],
+      "documentation": [
+        {
+          "label": "jq manual",
+          "url": "https://jqlang.org/manual/"
+        }
+      ],
+      "relationships": [],
+      "examples": [
+        {
+          "title": "List item names",
+          "interfaceId": "jq-cli",
+          "usage": "jq -r '.items[].name' input.json"
+        }
+      ]
+    },
+    {
+      "id": "example-filesystem-mcp",
+      "name": "Example filesystem MCP",
+      "summary": "Expose approved files through a read-only MCP server.",
+      "owners": [
+        {
+          "id": "example-org",
+          "name": "Example Org",
+          "url": "https://example.com"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "filesystem-mcp",
+          "type": "mcp",
+          "transport": "stdio",
+          "serverName": "example-filesystem",
+          "command": "example-filesystem-mcp",
+          "capabilities": [
+            {
+              "name": "read-file",
+              "summary": "Read an approved text file."
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "organization",
+        "audiences": ["agent"],
+        "platforms": ["linux", "macos", "windows"],
+        "contexts": ["example-org"]
+      },
+      "authentication": {
+        "mode": "required",
+        "requirements": [
+          {
+            "id": "filesystem-access",
+            "type": "api-key",
+            "description": "Access is supplied by the host environment.",
+            "references": [
+              {
+                "kind": "environment",
+                "name": "EXAMPLE_FILESYSTEM_API_KEY"
+              }
+            ]
+          }
+        ]
+      },
+      "safety": {
+        "risk": "read-only",
+        "approval": "never"
+      },
+      "lifecycle": {
+        "status": "experimental"
+      },
+      "healthChecks": [
+        {
+          "id": "filesystem-initialize",
+          "kind": "mcp-initialize",
+          "interfaceId": "filesystem-mcp"
+        }
+      ],
+      "documentation": [
+        {
+          "label": "Example MCP documentation",
+          "url": "https://example.com/filesystem-mcp"
+        }
+      ],
+      "relationships": [],
+      "examples": [
+        {
+          "title": "Read a text file",
+          "interfaceId": "filesystem-mcp",
+          "usage": "Call read_file with an approved path."
+        }
+      ],
+      "extensions": {
+        "x-example-tier": "sandbox"
+      }
+    },
+    {
+      "id": "example-status-api",
+      "name": "Example status API",
+      "summary": "Return public service status information.",
+      "owners": [
+        {
+          "id": "example-org",
+          "name": "Example Org",
+          "url": "https://example.com"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "status-api",
+          "type": "api",
+          "protocol": "https",
+          "baseUrl": "https://status.example.com",
+          "operations": [
+            {
+              "id": "get-status",
+              "method": "GET",
+              "path": "/api/status",
+              "summary": "Return current service status."
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "public",
+        "audiences": ["human", "agent"],
+        "platforms": ["web"]
+      },
+      "authentication": {
+        "mode": "none",
+        "requirements": []
+      },
+      "safety": {
+        "risk": "read-only",
+        "approval": "never"
+      },
+      "lifecycle": {
+        "status": "active",
+        "version": "1"
+      },
+      "healthChecks": [
+        {
+          "id": "status-endpoint",
+          "kind": "http-get",
+          "url": "https://status.example.com/api/status",
+          "expectedStatus": 200
+        }
+      ],
+      "documentation": [
+        {
+          "label": "Status API reference",
+          "url": "https://example.com/status-api"
+        }
+      ],
+      "relationships": [],
+      "examples": [
+        {
+          "title": "Get current status",
+          "interfaceId": "status-api",
+          "usage": "GET /api/status"
+        }
+      ]
+    },
+    {
+      "id": "example-indexer",
+      "name": "Example indexer",
+      "summary": "Maintain a local search index as a system service.",
+      "owners": [
+        {
+          "id": "example-org",
+          "name": "Example Org",
+          "url": "https://example.com"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "indexer-service",
+          "type": "service",
+          "manager": "systemd",
+          "serviceName": "example-indexer.service",
+          "endpoint": "http://127.0.0.1:8080",
+          "capabilities": [
+            {
+              "name": "index-documents",
+              "summary": "Maintain a local document index."
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "host",
+        "audiences": ["agent"],
+        "platforms": ["linux"],
+        "contexts": ["example-host"]
+      },
+      "authentication": {
+        "mode": "none",
+        "requirements": []
+      },
+      "safety": {
+        "risk": "writes-data",
+        "approval": "on-write",
+        "notes": "Index changes are limited to the service data directory."
+      },
+      "lifecycle": {
+        "status": "experimental"
+      },
+      "healthChecks": [
+        {
+          "id": "indexer-active",
+          "kind": "service-active",
+          "interfaceId": "indexer-service"
+        }
+      ],
+      "documentation": [
+        {
+          "label": "Indexer operations",
+          "url": "https://example.com/indexer"
+        }
+      ],
+      "relationships": [
+        {
+          "type": "related-to",
+          "target": "example-status-api"
+        }
+      ],
+      "examples": [
+        {
+          "title": "Inspect the service",
+          "interfaceId": "indexer-service",
+          "usage": "Query service status through the configured manager."
+        }
+      ]
+    },
+    {
+      "id": "example-research-skill",
+      "name": "Example research skill",
+      "summary": "Guide an agent through a repeatable research workflow.",
+      "owners": [
+        {
+          "id": "example-org",
+          "name": "Example Org",
+          "url": "https://example.com"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "research-skill",
+          "type": "skill",
+          "format": "agents-skill",
+          "location": "skills/research/SKILL.md",
+          "capabilities": [
+            {
+              "name": "research-topic",
+              "summary": "Collect and synthesize sources for a topic."
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "public",
+        "audiences": ["agent"],
+        "platforms": ["linux", "macos", "windows"]
+      },
+      "authentication": {
+        "mode": "none",
+        "requirements": []
+      },
+      "safety": {
+        "risk": "read-only",
+        "approval": "never"
+      },
+      "lifecycle": {
+        "status": "active"
+      },
+      "healthChecks": [
+        {
+          "id": "skill-readable",
+          "kind": "file-readable",
+          "path": "skills/research/SKILL.md"
+        }
+      ],
+      "documentation": [
+        {
+          "label": "Research skill guide",
+          "url": "https://example.com/research-skill"
+        }
+      ],
+      "relationships": [
+        {
+          "type": "requires",
+          "target": "jq",
+          "description": "Examples normalize JSON research output with jq."
+        }
+      ],
+      "examples": [
+        {
+          "title": "Research a topic",
+          "interfaceId": "research-skill",
+          "usage": "Load the skill and follow its source-verification workflow."
+        }
+      ]
+    }
+  ],
+  "extensions": {
+    "x-example-source": "public-fixture"
+  }
+}
