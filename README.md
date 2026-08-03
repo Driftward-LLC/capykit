@@ -32,8 +32,16 @@ The versioned registry contract is documented in
 MCP, API, service, and skill interfaces lives at
 [`examples/all-interfaces.registry.json`](examples/all-interfaces.registry.json).
 
+Registry ingestion, credential references, health checks, and the read-only MCP
+surface are constrained by
+[`docs/adr/0002-registry-trust-boundaries.md`](docs/adr/0002-registry-trust-boundaries.md).
+The corresponding machine-readable policy and positive/negative cases live in
+[`policies/v0.1/security-policy.json`](policies/v0.1/security-policy.json) and
+[`examples/security-policy-cases.json`](examples/security-policy-cases.json).
+
 Run the schema contract tests with Node.js 22 or newer:
 
 ```bash
 node scripts/test-schema.mjs
+node scripts/test-security-policy.mjs
 ```

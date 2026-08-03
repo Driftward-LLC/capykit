@@ -1,0 +1,265 @@
+{
+  "pathCases": [
+    {
+      "name": "relative registry inside configured root",
+      "input": "team/tools.registry.json",
+      "resolvedPath": "/srv/capykit/registries/team/tools.registry.json",
+      "allowedRoots": [
+        "/srv/capykit/registries"
+      ],
+      "regularFile": true,
+      "expected": true
+    },
+    {
+      "name": "absolute registry inside configured root",
+      "input": "/etc/capykit/registries/company.registry.json",
+      "resolvedPath": "/etc/capykit/registries/company.registry.json",
+      "allowedRoots": [
+        "/etc/capykit/registries"
+      ],
+      "regularFile": true,
+      "expected": true
+    },
+    {
+      "name": "parent traversal is rejected",
+      "input": "../credentials.json",
+      "resolvedPath": "/srv/capykit/credentials.json",
+      "allowedRoots": [
+        "/srv/capykit/registries"
+      ],
+      "regularFile": true,
+      "expected": false
+    },
+    {
+      "name": "symlink escape is rejected after canonicalization",
+      "input": "linked.registry.json",
+      "resolvedPath": "/root/private.registry.json",
+      "allowedRoots": [
+        "/srv/capykit/registries"
+      ],
+      "regularFile": true,
+      "expected": false
+    },
+    {
+      "name": "directory is not a registry document",
+      "input": "team",
+      "resolvedPath": "/srv/capykit/registries/team",
+      "allowedRoots": [
+        "/srv/capykit/registries"
+      ],
+      "regularFile": false,
+      "expected": false
+    },
+    {
+      "name": "null byte is rejected",
+      "input": "safe.json\u0000private",
+      "resolvedPath": "/srv/capykit/registries/safe.json",
+      "allowedRoots": [
+        "/srv/capykit/registries"
+      ],
+      "regularFile": true,
+      "expected": false
+    }
+  ],
+  "urlCases": [
+    {
+      "name": "public HTTPS registry",
+      "url": "https://registry.example.com/capykit/registry.json",
+      "expected": true
+    },
+    {
+      "name": "HTTP is rejected",
+      "url": "http://registry.example.com/registry.json",
+      "expected": false
+    },
+    {
+      "name": "URL credentials are rejected",
+      "url": "https://user:synthetic-password@registry.example.com/registry.json",
+      "expected": false
+    },
+    {
+      "name": "fragments are rejected",
+      "url": "https://registry.example.com/registry.json#private",
+      "expected": false
+    },
+    {
+      "name": "localhost is rejected",
+      "url": "https://localhost/registry.json",
+      "expected": false
+    },
+    {
+      "name": "private IPv4 is rejected",
+      "url": "https://192.168.1.2/registry.json",
+      "expected": false
+    },
+    {
+      "name": "cloud metadata address is rejected",
+      "url": "https://169.254.169.254/latest/meta-data/",
+      "expected": false
+    },
+    {
+      "name": "IPv6 loopback is rejected",
+      "url": "https://[::1]/registry.json",
+      "expected": false
+    }
+  ],
+  "secretCases": [
+    {
+      "name": "ordinary discovery text",
+      "key": "summary",
+      "value": "Uses an OAuth issuer and an environment reference.",
+      "expected": false
+    },
+    {
+      "name": "credential reference name is metadata",
+      "key": "name",
+      "value": "LINEAR_API_KEY",
+      "expected": false
+    },
+    {
+      "name": "credential-like key is rejected",
+      "key": "api_token",
+      "value": "synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "authorization value is rejected",
+      "key": "description",
+      "value": "Bearer synthetic-token-value",
+      "expected": true
+    },
+    {
+      "name": "private key block is rejected",
+      "key": "description",
+      "value": "-----BEGIN PRIVATE KEY-----",
+      "expected": true
+    },
+    {
+      "name": "Discord webhook is rejected",
+      "key": "url",
+      "value": "https://discord.com/api/webhooks/123456789/synthetic-value",
+      "expected": true
+    }
+  ],
+  "healthCheckCases": [
+    {
+      "name": "single executable lookup",
+      "check": {
+        "id": "git-present",
+        "kind": "command-available",
+        "command": "git"
+      },
+      "expected": true
+    },
+    {
+      "name": "command arguments are rejected",
+      "check": {
+        "id": "git-version",
+        "kind": "command-available",
+        "command": "git --version"
+      },
+      "expected": false
+    },
+    {
+      "name": "argument field is rejected",
+      "check": {
+        "id": "git-version",
+        "kind": "command-available",
+        "command": "git",
+        "arguments": [
+          "--version"
+        ]
+      },
+      "expected": false
+    },
+    {
+      "name": "public unauthenticated HTTP GET",
+      "check": {
+        "id": "public-status",
+        "kind": "http-get",
+        "url": "https://status.example.com/health",
+        "expectedStatus": 200
+      },
+      "expected": true
+    },
+    {
+      "name": "HTTP headers are rejected",
+      "check": {
+        "id": "private-status",
+        "kind": "http-get",
+        "url": "https://status.example.com/health",
+        "headers": {
+          "Authorization": "synthetic-value"
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "private network HTTP target is rejected",
+      "check": {
+        "id": "private-status",
+        "kind": "http-get",
+        "url": "https://10.0.0.4/health"
+      },
+      "expected": false
+    },
+    {
+      "name": "MCP initialize references an interface",
+      "check": {
+        "id": "mcp-ready",
+        "kind": "mcp-initialize",
+        "interfaceId": "catalog-mcp"
+      },
+      "expected": true
+    },
+    {
+      "name": "file check is metadata-only",
+      "check": {
+        "id": "config-present",
+        "kind": "file-readable",
+        "path": "/etc/capykit/config.json"
+      },
+      "expected": true
+    },
+    {
+      "name": "relative file check is rejected",
+      "check": {
+        "id": "config-present",
+        "kind": "file-readable",
+        "path": "../private/config.json"
+      },
+      "expected": false
+    },
+    {
+      "name": "generic command execution kind is rejected",
+      "check": {
+        "id": "generic-command",
+        "kind": "command",
+        "command": "true"
+      },
+      "expected": false
+    }
+  ],
+  "mcpToolCases": [
+    {
+      "name": "search is read-only",
+      "tool": "search_capabilities",
+      "expected": true
+    },
+    {
+      "name": "validation is read-only",
+      "tool": "validate_registry",
+      "expected": true
+    },
+    {
+      "name": "source sync mutates local state",
+      "tool": "sync_sources",
+      "expected": false
+    },
+    {
+      "name": "generic execution is forbidden",
+      "tool": "execute_command",
+      "expected": false
+    }
+  ]
+}
