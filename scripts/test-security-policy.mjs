@@ -89,12 +89,14 @@ for (const [network, prefix, type] of [
   ["198.51.100.0", 24, "ipv4"],
   ["203.0.113.0", 24, "ipv4"],
   ["224.0.0.0", 4, "ipv4"],
+  ["240.0.0.0", 4, "ipv4"],
   ["::", 96, "ipv6"],
   ["::1", 128, "ipv6"],
   ["::ffff:0:0", 96, "ipv6"],
   ["2001:db8::", 32, "ipv6"],
   ["fc00::", 7, "ipv6"],
   ["fe80::", 10, "ipv6"],
+  ["fec0::", 10, "ipv6"],
   ["ff00::", 8, "ipv6"],
 ]) {
   blockedAddresses[type].addSubnet(network, prefix, type);
@@ -183,11 +185,19 @@ function validProvenance(provenance) {
   const validTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(
     provenance.fetchedAt,
   ) && !Number.isNaN(Date.parse(provenance.fetchedAt));
+  const normalizedTimestamp = provenance.fetchedAt.includes(".") ? provenance.fetchedAt :
+    provenance.fetchedAt.replace(/Z$/, ".000Z");
+  const exactTimestamp = validTimestamp &&
+    new Date(provenance.fetchedAt).toISOString() === normalizedTimestamp;
+  const canonicalSource = source.href === provenance.sourceUri &&
+    (source.protocol !== "file:" ||
+      (source.hostname === "" && source.pathname.startsWith("/") && provenance.sourceUri.startsWith("file:///")));
 
   return /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/.test(provenance.sourceId) &&
-    ["file:", "https:"].includes(source.protocol) && !source.username && !source.password && !source.hash &&
+    canonicalSource && ["file:", "https:"].includes(source.protocol) &&
+    !source.username && !source.password && !source.hash &&
     trustTiers.includes(provenance.trustTier) && /^[a-f0-9]{64}$/i.test(provenance.sha256) &&
-    validTimestamp && (provenance.revision === undefined ||
+    exactTimestamp && (provenance.revision === undefined ||
       (typeof provenance.revision === "string" && provenance.revision.length > 0));
 }
 
@@ -229,10 +239,26 @@ function safeReadablePath(declaredPath, context) {
     } else if (context.fileSetup === "symlink-outside") {
       mkdirSync(dirname(candidate), { recursive: true });
       symlinkSync(outsideFile, candidate);
+    } else if (context.fileSetup === "symlink-auth-reference") {
+      const credentialPath = resolve(approvedRoot, context.authenticationReferencePaths[0]);
+      mkdirSync(dirname(candidate), { recursive: true });
+      mkdirSync(dirname(credentialPath), { recursive: true });
+      writeFileSync(credentialPath, "synthetic credential\n");
+      symlinkSync(credentialPath, candidate);
     }
 
     const canonical = realpathSync(candidate);
     if (!isWithin(canonical, approvedRoot) || !statSync(canonical).isFile()) {
+      return false;
+    }
+    const canonicalCredentialPaths = credentialPaths.flatMap((path) => {
+      try {
+        return [realpathSync(path)];
+      } catch {
+        return [];
+      }
+    });
+    if (canonicalCredentialPaths.includes(canonical)) {
       return false;
     }
     accessSync(canonical, constants.R_OK);

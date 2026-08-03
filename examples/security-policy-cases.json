@@ -186,6 +186,46 @@
       "expected": false
     },
     {
+      "name": "deprecated IPv6 site-local address is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "fec0::1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "reserved high IPv4 range is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "240.0.0.1"
+      ],
+      "expected": false
+    },
+    {
+      "name": "limited broadcast address is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "255.255.255.255"
+      ],
+      "expected": false
+    },
+    {
+      "name": "redirect to reserved high IPv4 range is rejected",
+      "url": "https://registry.example.com/registry.json",
+      "resolvedAddresses": [
+        "93.184.216.34"
+      ],
+      "redirects": [
+        {
+          "url": "https://registry.example.com/next.json",
+          "resolvedAddresses": [
+            "240.0.0.1"
+          ]
+        }
+      ],
+      "expected": false
+    },
+    {
       "name": "IPv4-mapped loopback is rejected",
       "url": "https://[::ffff:127.0.0.1]/registry.json",
       "resolvedAddresses": [
@@ -321,9 +361,21 @@
       "expected": true
     },
     {
+      "name": "Discord webhook with explicit HTTPS port is rejected",
+      "key": "url",
+      "value": "https://discord.com:443/api/webhooks/123456789/synthetic-value",
+      "expected": true
+    },
+    {
       "name": "Slack webhook is rejected",
       "key": "url",
       "value": "https://hooks.slack.com/services/T00000000/B00000000/synthetic-value",
+      "expected": true
+    },
+    {
+      "name": "Slack webhook with explicit HTTPS port is rejected",
+      "key": "url",
+      "value": "https://hooks.slack.com:443/services/T00000000/B00000000/synthetic-value",
       "expected": true
     }
   ],
@@ -369,6 +421,39 @@
         "trustTier": "self-approved",
         "sha256": "x",
         "fetchedAt": "never"
+      },
+      "expected": false
+    },
+    {
+      "name": "relative file URI is rejected",
+      "provenance": {
+        "sourceId": "relative-file",
+        "sourceUri": "file:relative.json",
+        "trustTier": "operator-approved",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "fetchedAt": "2026-08-03T00:00:00Z"
+      },
+      "expected": false
+    },
+    {
+      "name": "normalizable noncanonical HTTPS URI is rejected",
+      "provenance": {
+        "sourceId": "noncanonical-https",
+        "sourceUri": "https://REGISTRY.example.com:443/a/../registry.json",
+        "trustTier": "operator-approved",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "fetchedAt": "2026-08-03T00:00:00Z"
+      },
+      "expected": false
+    },
+    {
+      "name": "impossible calendar timestamp is rejected",
+      "provenance": {
+        "sourceId": "impossible-date",
+        "sourceUri": "file:///etc/capykit/registries/company.json",
+        "trustTier": "operator-approved",
+        "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "fetchedAt": "2026-02-31T00:00:00Z"
       },
       "expected": false
     }
@@ -681,6 +766,27 @@
         "fileSetup": "regular-file",
         "authenticationReferencePaths": [
           "auth/./token"
+        ]
+      },
+      "runtime": {
+        "durationMs": 5,
+        "responseBytes": 0,
+        "hasStdin": false,
+        "credentialNames": []
+      },
+      "expected": false
+    },
+    {
+      "name": "file check cannot reach authentication reference through symlink alias",
+      "check": {
+        "id": "credential-alias",
+        "kind": "file-readable",
+        "path": "aliases/token"
+      },
+      "context": {
+        "fileSetup": "symlink-auth-reference",
+        "authenticationReferencePaths": [
+          "auth/token"
         ]
       },
       "runtime": {
