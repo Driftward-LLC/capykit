@@ -1,3 +1,5 @@
+export * from "./registry.js";
+
 export const CAPYKIT_VERSION = "0.0.0";
 export interface CapabilitySummary { readonly id: string; readonly name: string; readonly description: string; }
 export function normalizeQuery(query: string): string { return query.trim().toLocaleLowerCase("en-US"); }

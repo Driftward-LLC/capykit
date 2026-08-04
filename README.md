@@ -54,6 +54,9 @@ MCP, API, service, and skill interfaces lives at
 Registry ingestion, credential references, health checks, and the read-only MCP
 surface are constrained by
 [`docs/adr/0002-registry-trust-boundaries.md`](docs/adr/0002-registry-trust-boundaries.md).
+Deterministic source precedence, explicit override rules, provenance, and
+local-file/Git source configuration are documented in
+[`docs/registry-loading.md`](docs/registry-loading.md).
 The corresponding machine-readable policy and positive/negative cases live in
 [`policies/v0.1/security-policy.json`](policies/v0.1/security-policy.json) and
 [`examples/security-policy-cases.json`](examples/security-policy-cases.json).
