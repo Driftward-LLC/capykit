@@ -25,6 +25,25 @@ and ownership boundaries are recorded in
 Canonical planning lives in the
 [Capykit Linear project](https://linear.app/driftward/project/capykit-72e4a9e54d52).
 
+## Development
+
+The TypeScript application has explicit boundaries under `src/`: `core` owns
+catalog behavior, `cli` owns the `capykit` command, `mcp` owns the read-only
+`capykit-mcp` server, and `schemas` exposes the versioned registry contract.
+Tests mirror those boundaries and use public fixtures only.
+
+Use Node.js 22 or newer:
+
+```bash
+npm ci
+npm run check
+node dist/cli.js --help
+```
+
+CI runs lint, strict type checking, tests, builds, schema validation, and public
+repository safety checks. Tagged releases rerun the suite before publishing the
+npm package with provenance.
+
 ## Capability schema
 
 The versioned registry contract is documented in
