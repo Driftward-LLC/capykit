@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { constants } from "node:fs";
+import { constants, readFileSync } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
-import { isAbsolute, posix, relative, resolve, sep } from "node:path";
-import { pathToFileURL } from "node:url";
+import { basename, dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { Ajv2020, type AnySchema, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -106,6 +107,61 @@ function checksum(content: string): string {
   return `sha256:${createHash("sha256").update(content).digest("hex")}`;
 }
 
+interface RegistrySchemaValidator {
+  readonly schemaPath: string;
+  readonly validate: ValidateFunction;
+}
+
+let registrySchemaValidator: RegistrySchemaValidator | undefined;
+
+function registrySchemaPath(): string {
+  const moduleDirectory = dirname(fileURLToPath(import.meta.url));
+  if (basename(moduleDirectory) === "core" && basename(dirname(moduleDirectory)) === "src") {
+    return resolve(moduleDirectory, "../../schemas/v0.1/registry.schema.json");
+  }
+  return resolve(moduleDirectory, "../schemas/v0.1/registry.schema.json");
+}
+
+function loadRegistrySchemaValidator(): RegistrySchemaValidator {
+  if (registrySchemaValidator !== undefined) return registrySchemaValidator;
+
+  const schemaPath = registrySchemaPath();
+  try {
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8")) as AnySchema;
+    const ajv = new Ajv2020({ allErrors: true, strict: true });
+    registrySchemaValidator = { schemaPath, validate: ajv.compile(schema) };
+    return registrySchemaValidator;
+  } catch (error) {
+    throw new RegistryLoadError("Unable to load package-owned canonical registry schema schemas/v0.1/registry.schema.json.", { cause: error });
+  }
+}
+
+function documentPathForSchemaError(error: ErrorObject): string {
+  const missingProperty = typeof error.params.missingProperty === "string" ? error.params.missingProperty : undefined;
+  const additionalProperty = typeof error.params.additionalProperty === "string" ? error.params.additionalProperty : undefined;
+  if (missingProperty !== undefined) return `${error.instancePath}/${missingProperty}`.replaceAll(/\/+/gu, "/");
+  if (additionalProperty !== undefined) return `${error.instancePath}/${additionalProperty}`.replaceAll(/\/+/gu, "/");
+  return error.instancePath.length === 0 ? "/" : error.instancePath;
+}
+
+function summarizeSchemaError(error: ErrorObject): string {
+  const documentPath = documentPathForSchemaError(error);
+  const message = error.message ?? `failed ${error.keyword} validation`;
+  return `document path ${JSON.stringify(documentPath)} failed schema path ${JSON.stringify(error.schemaPath)}: ${message}`;
+}
+
+function validateAgainstCanonicalSchema(candidate: Record<string, unknown>, sourceId: string): void {
+  const { schemaPath, validate } = loadRegistrySchemaValidator();
+  if (validate(candidate)) return;
+
+  const errors = validate.errors ?? [];
+  const details = errors.slice(0, 3).map(summarizeSchemaError).join("; ");
+  const suffix = errors.length > 3 ? `; ${String(errors.length - 3)} more schema validation error(s) omitted` : "";
+  throw new RegistryLoadError(
+    `Registry source ${JSON.stringify(sourceId)} failed canonical schema validation against ${JSON.stringify(schemaPath)}: ${details}${suffix}. Registry values were redacted.`,
+  );
+}
+
 function requireAbsolutePath(path: string, label: string): void {
   if (!isAbsolute(path)) {
     throw new RegistryLoadError(`${label} must be absolute; received ${JSON.stringify(path)}. Relative paths are rejected so registry loading is independent of cwd.`);
@@ -160,34 +216,20 @@ function parseDocument(content: string, sourceId: string): RegistryDocument {
   }
 
   const candidate = value as Record<string, unknown>;
-  const registry = candidate.registry;
-  if (
-    candidate.schemaVersion !== "0.1.0" ||
-    typeof registry !== "object" ||
-    registry === null ||
-    Array.isArray(registry) ||
-    typeof (registry as Record<string, unknown>).id !== "string" ||
-    typeof (registry as Record<string, unknown>).name !== "string" ||
-    !Array.isArray(candidate.tools)
-  ) {
-    throw new RegistryLoadError(`Registry source ${JSON.stringify(sourceId)} must use schemaVersion "0.1.0" and contain registry identity and tools.`);
-  }
-
+  validateAgainstCanonicalSchema(candidate, sourceId);
   rejectCredentials(candidate, sourceId);
 
+  const document = candidate as unknown as RegistryDocument;
   const seen = new Set<string>();
-  for (const [index, tool] of candidate.tools.entries()) {
-    if (typeof tool !== "object" || tool === null || Array.isArray(tool) || typeof (tool as Record<string, unknown>).id !== "string") {
-      throw new RegistryLoadError(`Registry source ${JSON.stringify(sourceId)} has a tool without a stable string id at index ${String(index)}.`);
-    }
-    const id = (tool as Record<string, unknown>).id as string;
+  for (const tool of document.tools) {
+    const { id } = tool;
     if (seen.has(id)) {
       throw new RegistryConflictError(id, [sourceId], `Registry source ${JSON.stringify(sourceId)} declares tool ${JSON.stringify(id)} more than once; tool IDs must be unique within a source.`);
     }
     seen.add(id);
   }
 
-  return candidate as RegistryDocument;
+  return document;
 }
 
 async function loadSource(source: RegistrySource, fetchedAt: string): Promise<LoadedSource> {

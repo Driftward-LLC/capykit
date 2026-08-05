@@ -120,9 +120,9 @@ describe.sequential("layered registry loading", () => {
 
   it("rejects credential-like content without repeating the value", async () => {
     const sourcePath = join(temporaryDirectory, "credential.registry.json");
-    const secretValue = "example-secret-value-that-must-not-appear";
+    const secretValue = ["-----BEGIN", "PRIVATE KEY-----"].join(" ");
     const document = JSON.parse(await readFile(fixture("builtin"), "utf8")) as Record<string, unknown>;
-    document.api_key = secretValue;
+    document.registry = { id: "credential-fixture", name: "Credential fixture", homepage: secretValue };
     await writeFile(sourcePath, JSON.stringify(document), "utf8");
 
     try {
@@ -132,9 +132,67 @@ describe.sequential("layered registry loading", () => {
       throw new Error("credential-like content was accepted");
     } catch (error) {
       expect(error).toBeInstanceOf(RegistryLoadError);
-      expect(String(error)).toMatch(/forbidden credential-like key.*\$\/api_key.*redacted/u);
+      expect(String(error)).toMatch(/forbidden credential-like material.*\$\/registry\/homepage.*redacted/u);
       expect(String(error)).not.toContain(secretValue);
     }
+  });
+
+  it("rejects schema-invalid local registry documents before activation with redacted paths", async () => {
+    const sourcePath = join(temporaryDirectory, "missing-required.registry.json");
+    const document = JSON.parse(await readFile(fixture("builtin"), "utf8")) as Record<string, unknown>;
+    const tools = document.tools as Record<string, unknown>[];
+    delete tools[0]?.summary;
+    await writeFile(sourcePath, JSON.stringify(document), "utf8");
+
+    await expect(loadRegistryCatalog([
+      { id: "missing-required", layer: "builtin", type: "file", root: temporaryDirectory, path: "missing-required.registry.json" },
+    ])).rejects.toThrow(/missing-required.*registry\.schema\.json.*\/tools\/0\/summary.*required.*redacted/u);
+  });
+
+  it("rejects unknown unnamespaced registry properties before activation", async () => {
+    const sourcePath = join(temporaryDirectory, "unknown-property.registry.json");
+    const document = JSON.parse(await readFile(fixture("builtin"), "utf8")) as Record<string, unknown>;
+    document.notNamespaced = "must be rejected without echoing this value";
+    await writeFile(sourcePath, JSON.stringify(document), "utf8");
+
+    await expect(loadRegistryCatalog([
+      { id: "unknown-property", layer: "builtin", type: "file", root: temporaryDirectory, path: "unknown-property.registry.json" },
+    ])).rejects.toThrow(/unknown-property.*registry\.schema\.json.*\/notNamespaced.*additional properties.*redacted/u);
+    await expect(loadRegistryCatalog([
+      { id: "unknown-property", layer: "builtin", type: "file", root: temporaryDirectory, path: "unknown-property.registry.json" },
+    ])).rejects.not.toThrow(/must be rejected without echoing this value/u);
+  });
+
+  it("rejects unsupported health check kinds including shell", async () => {
+    const sourcePath = join(temporaryDirectory, "unsupported-health.registry.json");
+    const document = JSON.parse(await readFile(fixture("builtin"), "utf8")) as Record<string, unknown>;
+    const tools = document.tools as Record<string, unknown>[];
+    const firstTool = tools[0];
+    if (firstTool === undefined) throw new Error("fixture must include a tool");
+    firstTool.healthChecks = [{ id: "unsafe-shell", kind: "shell", command: "exit 0" }];
+    await writeFile(sourcePath, JSON.stringify(document), "utf8");
+
+    await expect(loadRegistryCatalog([
+      { id: "unsupported-health", layer: "builtin", type: "file", root: temporaryDirectory, path: "unsupported-health.registry.json" },
+    ])).rejects.toThrow(/unsupported-health.*registry\.schema\.json.*\/tools\/0\/healthChecks\/0.*redacted/u);
+  });
+
+  it("rejects schema-invalid Git registry documents before activation", async () => {
+    const document = JSON.parse(await readFile(fixture("user"), "utf8")) as Record<string, unknown>;
+    const tools = document.tools as Record<string, unknown>[];
+    delete tools[0]?.owners;
+    await writeFile(join(gitRepository, "invalid.registry.json"), JSON.stringify(document), "utf8");
+    await execFileAsync("git", ["-C", gitRepository, "add", "invalid.registry.json"]);
+    await execFileAsync("git", [
+      "-C", gitRepository,
+      "-c", "user.name=Capykit tests",
+      "-c", "user.email=capykit-tests@example.invalid",
+      "commit", "--quiet", "-m", "Add schema-invalid registry fixture",
+    ]);
+
+    await expect(loadRegistryCatalog([
+      { id: "invalid-git", layer: "user", type: "git", repository: gitRepository, revision: "HEAD", path: "invalid.registry.json" },
+    ])).rejects.toThrow(/invalid-git.*registry\.schema\.json.*\/tools\/0\/owners.*required.*redacted/u);
   });
 
   it("rejects malformed source metadata at the loader boundary", async () => {

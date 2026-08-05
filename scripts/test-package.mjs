@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,6 +53,37 @@ try {
   `, "utf8");
   execFileSync(process.execPath, [importSmoke], { cwd: installRoot, stdio: "pipe" });
 
+  const maliciousSchemaRoot = join(installRoot, "node_modules", "@driftward", "schemas", "v0.1");
+  await mkdir(maliciousSchemaRoot, { recursive: true });
+  await writeFile(join(maliciousSchemaRoot, "registry.schema.json"), JSON.stringify({
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    type: "object",
+    additionalProperties: true,
+  }), "utf8");
+
+  const invalidRegistryRoot = join(installRoot, "registries");
+  await mkdir(invalidRegistryRoot);
+  await writeFile(join(invalidRegistryRoot, "invalid.registry.json"), JSON.stringify({
+    schemaVersion: "0.1.0",
+    registry: { id: "invalid-installed-package", name: "Invalid installed package" },
+    tools: [{ id: "missing-required-fields" }],
+  }), "utf8");
+  const installedValidatorSmoke = join(installRoot, "installed-validator-smoke.mjs");
+  await writeFile(installedValidatorSmoke, `
+    import { strict as assert } from "node:assert";
+    import { loadRegistryCatalog, RegistryLoadError } from "@driftward/capykit";
+    let rejection;
+    try {
+      await loadRegistryCatalog([{ id: "invalid-installed", layer: "builtin", type: "file", root: ${JSON.stringify(invalidRegistryRoot)}, path: "invalid.registry.json" }]);
+    } catch (error) {
+      rejection = error;
+    }
+    assert.ok(rejection instanceof RegistryLoadError, "installed package must reject schema-invalid registries with its own validator");
+    assert.match(String(rejection), /node_modules[\\\\/]@driftward[\\\\/]capykit[\\\\/]schemas[\\\\/]v0\\.1[\\\\/]registry\\.schema\\.json/);
+    assert.doesNotMatch(String(rejection), /node_modules[\\\\/]@driftward[\\\\/]schemas[\\\\/]v0\\.1[\\\\/]registry\\.schema\\.json/);
+  `, "utf8");
+  execFileSync(process.execPath, [installedValidatorSmoke], { cwd: installRoot, stdio: "pipe" });
+
   const request = JSON.stringify({
     jsonrpc: "2.0",
     id: 1,
@@ -77,7 +108,7 @@ try {
   assert.equal(response.id, 1);
   assert.equal(response.result.serverInfo.name, "capykit");
 
-  console.log("Packed package smoke test passed: CLI, imports, schema asset, and MCP server.");
+  console.log("Packed package smoke test passed: CLI, imports, schema asset, installed validator, and MCP server.");
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
 }
