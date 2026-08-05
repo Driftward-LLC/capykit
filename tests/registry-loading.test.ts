@@ -145,4 +145,31 @@ describe.sequential("layered registry loading", () => {
       { id: "invalid-type", layer: "builtin", type: "https" } as unknown as RegistrySource,
     ])).rejects.toThrow(/unsupported type/u);
   });
+
+  it("enforces semantic references after sources are combined", async () => {
+    const sourcePath = join(temporaryDirectory, "semantic.registry.json");
+    const document = JSON.parse(await readFile(fixture("builtin"), "utf8")) as Record<string, unknown>;
+    const tools = document.tools as Record<string, unknown>[];
+    const tool = tools[0] as Record<string, unknown>;
+    tool.relationships = [{ type: "related-to", target: "missing-tool" }];
+    await writeFile(sourcePath, JSON.stringify(document), "utf8");
+
+    await expect(loadRegistryCatalog([
+      { id: "semantic", layer: "builtin", type: "file", root: temporaryDirectory, path: "semantic.registry.json" },
+    ])).rejects.toThrow(/relationship.*missing catalog tool/u);
+  });
+
+  it("rejects duplicate interface IDs within one tool", async () => {
+    const sourcePath = join(temporaryDirectory, "duplicate-interface.registry.json");
+    const document = JSON.parse(await readFile(fixture("builtin"), "utf8")) as Record<string, unknown>;
+    const tools = document.tools as Record<string, unknown>[];
+    const tool = tools[0] as Record<string, unknown>;
+    const interfaces = tool.interfaces as Record<string, unknown>[];
+    tool.interfaces = [interfaces[0], { ...interfaces[0] }];
+    await writeFile(sourcePath, JSON.stringify(document), "utf8");
+
+    await expect(loadRegistryCatalog([
+      { id: "duplicate-interface", layer: "builtin", type: "file", root: temporaryDirectory, path: "duplicate-interface.registry.json" },
+    ])).rejects.toMatchObject({ name: "RegistryConflictError", toolId: "shared-tool" });
+  });
 });

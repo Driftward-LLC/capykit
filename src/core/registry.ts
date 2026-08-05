@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { open, realpath } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open, realpath } from "node:fs/promises";
 import { isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -204,13 +205,17 @@ async function loadSource(source: RegistrySource, fetchedAt: string): Promise<Lo
       if (containedPath === ".." || containedPath.startsWith(`..${sep}`) || isAbsolute(containedPath)) {
         throw new RegistryLoadError(`Registry source ${JSON.stringify(source.id)} resolves outside its configured root.`);
       }
-      const handle = await open(canonicalPath, "r");
+      const before = await lstat(canonicalPath);
+      if (!before.isFile()) throw new RegistryLoadError(`Registry source ${JSON.stringify(source.id)} must resolve to a regular file.`);
+      const handle = await open(canonicalPath, constants.O_RDONLY | constants.O_NOFOLLOW);
       try {
-        const before = await handle.stat();
-        if (!before.isFile()) throw new RegistryLoadError(`Registry source ${JSON.stringify(source.id)} must resolve to a regular file.`);
+        const opened = await handle.stat();
+        if (!opened.isFile() || opened.dev !== before.dev || opened.ino !== before.ino) {
+          throw new RegistryLoadError(`Registry source ${JSON.stringify(source.id)} changed or escaped its configured root while it was being opened; retry with stable source bytes.`);
+        }
         content = await handle.readFile("utf8");
         const after = await handle.stat();
-        if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs) {
+        if (opened.dev !== after.dev || opened.ino !== after.ino || opened.size !== after.size || opened.mtimeMs !== after.mtimeMs) {
           throw new RegistryLoadError(`Registry source ${JSON.stringify(source.id)} changed while it was being read; retry with stable source bytes.`);
         }
       } finally {
@@ -277,6 +282,67 @@ function validateSources(sources: readonly RegistrySource[]): void {
   }
 }
 
+function validateToolSemantics(tool: RegistryTool, sourceId: string): void {
+  const interfaces = Array.isArray(tool.interfaces) ? tool.interfaces : [];
+  const interfaceIds = new Set<string>();
+  for (const iface of interfaces) {
+    const id = typeof iface === "object" && iface !== null && !Array.isArray(iface) ? (iface as Record<string, unknown>).id : undefined;
+    if (typeof id !== "string") continue;
+    if (interfaceIds.has(id)) {
+      throw new RegistryConflictError(tool.id, [sourceId], `Registry source ${JSON.stringify(sourceId)} declares duplicate interface ${JSON.stringify(id)} on tool ${JSON.stringify(tool.id)}; interface IDs must be unique within a tool.`);
+    }
+    interfaceIds.add(id);
+  }
+
+  const examples = Array.isArray(tool.examples) ? tool.examples : [];
+  for (const example of examples) {
+    if (typeof example !== "object" || example === null || Array.isArray(example)) continue;
+    const interfaceId = (example as Record<string, unknown>).interfaceId;
+    if (typeof interfaceId === "string" && !interfaceIds.has(interfaceId)) {
+      throw new RegistryLoadError(`Registry source ${JSON.stringify(sourceId)} example on tool ${JSON.stringify(tool.id)} references missing interface ${JSON.stringify(interfaceId)}.`);
+    }
+  }
+
+  const healthChecks = Array.isArray(tool.healthChecks) ? tool.healthChecks : [];
+  for (const healthCheck of healthChecks) {
+    if (typeof healthCheck !== "object" || healthCheck === null || Array.isArray(healthCheck)) continue;
+    const kind = (healthCheck as Record<string, unknown>).kind;
+    const interfaceId = (healthCheck as Record<string, unknown>).interfaceId;
+    if ((kind === "mcp-initialize" || kind === "service-active") && typeof interfaceId === "string" && !interfaceIds.has(interfaceId)) {
+      throw new RegistryLoadError(`Registry source ${JSON.stringify(sourceId)} health check on tool ${JSON.stringify(tool.id)} references missing interface ${JSON.stringify(interfaceId)}.`);
+    }
+  }
+}
+
+function validateCatalogSemantics(loadedSources: readonly LoadedSource[]): void {
+  const declaredToolIds = new Set<string>();
+  for (const loaded of loadedSources) {
+    for (const tool of loaded.document.tools) {
+      validateToolSemantics(tool, loaded.source.id);
+      declaredToolIds.add(tool.id);
+    }
+  }
+
+  for (const loaded of loadedSources) {
+    for (const tool of loaded.document.tools) {
+      const relationships = Array.isArray(tool.relationships) ? tool.relationships : [];
+      for (const relationship of relationships) {
+        if (typeof relationship !== "object" || relationship === null || Array.isArray(relationship)) continue;
+        const target = (relationship as Record<string, unknown>).target;
+        if (typeof target === "string" && !declaredToolIds.has(target)) {
+          throw new RegistryLoadError(`Registry source ${JSON.stringify(loaded.source.id)} relationship on tool ${JSON.stringify(tool.id)} references missing catalog tool ${JSON.stringify(target)}.`);
+        }
+      }
+
+      const lifecycle = typeof tool.lifecycle === "object" && tool.lifecycle !== null && !Array.isArray(tool.lifecycle) ? tool.lifecycle as Record<string, unknown> : undefined;
+      const replacement = lifecycle?.replacement;
+      if (typeof replacement === "string" && !declaredToolIds.has(replacement)) {
+        throw new RegistryLoadError(`Registry source ${JSON.stringify(loaded.source.id)} lifecycle replacement on tool ${JSON.stringify(tool.id)} references missing catalog tool ${JSON.stringify(replacement)}.`);
+      }
+    }
+  }
+}
+
 export interface RegistryLoadOptions {
   /** Injectable clock for reproducible catalogs and tests. */
   readonly now?: () => Date;
@@ -294,6 +360,7 @@ export async function loadRegistryCatalog(sources: readonly RegistrySource[], op
   const loadedSources: LoadedSource[] = [];
   const fetchedAt = (options.now?.() ?? new Date()).toISOString();
   for (const source of orderedSources) loadedSources.push(await loadSource(source, fetchedAt));
+  validateCatalogSemantics(loadedSources);
 
   const resolved = new Map<string, ResolvedRegistryTool>();
   for (const loaded of loadedSources) {
