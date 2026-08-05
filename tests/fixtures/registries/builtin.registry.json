@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "0.1.0",
+  "registry": { "id": "builtin-fixture", "name": "Builtin fixture" },
+  "tools": [{
+    "id": "shared-tool", "name": "Shared tool", "summary": "builtin definition",
+    "owners": [{ "id": "capykit", "name": "Capykit" }],
+    "interfaces": [{ "id": "shared-cli", "type": "cli", "command": "shared", "capabilities": [{ "name": "inspect", "summary": "Inspect the selected layer." }] }],
+    "scope": { "visibility": "public", "audiences": ["human", "agent"], "platforms": ["linux"] },
+    "authentication": { "mode": "none", "requirements": [] },
+    "safety": { "risk": "read-only", "approval": "never" },
+    "lifecycle": { "status": "active" },
+    "healthChecks": [],
+    "documentation": [{ "label": "Capykit", "url": "https://github.com/Driftward-LLC/capykit" }],
+    "relationships": [], "examples": []
+  }]
+}
