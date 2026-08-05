@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { constants, readFileSync } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
-import { dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { Ajv2020, type AnySchema, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
@@ -114,30 +114,26 @@ interface RegistrySchemaValidator {
 
 let registrySchemaValidator: RegistrySchemaValidator | undefined;
 
-function registrySchemaPathCandidates(): readonly string[] {
+function registrySchemaPath(): string {
   const moduleDirectory = dirname(fileURLToPath(import.meta.url));
-  return [
-    resolve(moduleDirectory, "../../schemas/v0.1/registry.schema.json"),
-    resolve(moduleDirectory, "../schemas/v0.1/registry.schema.json"),
-  ];
+  if (basename(moduleDirectory) === "core" && basename(dirname(moduleDirectory)) === "src") {
+    return resolve(moduleDirectory, "../../schemas/v0.1/registry.schema.json");
+  }
+  return resolve(moduleDirectory, "../schemas/v0.1/registry.schema.json");
 }
 
 function loadRegistrySchemaValidator(): RegistrySchemaValidator {
   if (registrySchemaValidator !== undefined) return registrySchemaValidator;
 
-  let lastError: unknown;
-  for (const schemaPath of registrySchemaPathCandidates()) {
-    try {
-      const schema = JSON.parse(readFileSync(schemaPath, "utf8")) as AnySchema;
-      const ajv = new Ajv2020({ allErrors: true, strict: true });
-      registrySchemaValidator = { schemaPath, validate: ajv.compile(schema) };
-      return registrySchemaValidator;
-    } catch (error) {
-      lastError = error;
-    }
+  const schemaPath = registrySchemaPath();
+  try {
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8")) as AnySchema;
+    const ajv = new Ajv2020({ allErrors: true, strict: true });
+    registrySchemaValidator = { schemaPath, validate: ajv.compile(schema) };
+    return registrySchemaValidator;
+  } catch (error) {
+    throw new RegistryLoadError("Unable to load package-owned canonical registry schema schemas/v0.1/registry.schema.json.", { cause: error });
   }
-
-  throw new RegistryLoadError("Unable to load canonical registry schema schemas/v0.1/registry.schema.json.", { cause: lastError });
 }
 
 function documentPathForSchemaError(error: ErrorObject): string {
