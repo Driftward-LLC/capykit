@@ -1,11 +1,12 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EXIT_NOT_FOUND, EXIT_SUCCESS, EXIT_USAGE, helpText, run } from "../src/cli/index.js";
 
-const fixture = new URL("./fixtures/registries/builtin.registry.json", import.meta.url).pathname;
-const examplesFixture = new URL("../examples/all-interfaces.registry.json", import.meta.url).pathname;
+const fixture = fileURLToPath(new URL("./fixtures/registries/builtin.registry.json", import.meta.url));
+const examplesFixture = fileURLToPath(new URL("../examples/all-interfaces.registry.json", import.meta.url));
 
 afterEach(() => vi.restoreAllMocks());
 

@@ -44,6 +44,37 @@ CI runs lint, strict type checking, tests, builds, schema validation, and public
 repository safety checks. Tagged releases rerun the suite before publishing the
 npm package with provenance.
 
+## Discovery CLI
+
+Build the package before invoking the local CLI from `dist/`:
+
+```bash
+npm run build
+node dist/cli.js list --registry /absolute/path/to/registry.json
+node dist/cli.js search jq --registry /absolute/path/to/registry.json --json
+node dist/cli.js show jq --registry /absolute/path/to/registry.json
+node dist/cli.js examples jq --registry /absolute/path/to/registry.json
+```
+
+All registry paths passed to `--registry` must be absolute so discovery is
+independent of the caller's current working directory. Every read command
+(`list`, `search`, `show`, and `examples`) supports deterministic human output
+and `--json` output. Search filters can be repeated and are combined with AND
+semantics:
+
+```bash
+node dist/cli.js search --registry /absolute/path/to/registry.json --field status=active
+node dist/cli.js search --registry /absolute/path/to/registry.json --tag interface:cli
+node dist/cli.js search --registry /absolute/path/to/registry.json --capability inspect
+```
+
+Exit codes are part of the CLI contract:
+
+- `0`: success
+- `1`: operational failure while loading registries
+- `2`: usage or validation error
+- `3`: successful command execution with no matching tool
+
 ## Capability schema
 
 The versioned registry contract is documented in
