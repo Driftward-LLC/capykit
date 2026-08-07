@@ -1,4 +1,5 @@
-import { CAPYKIT_VERSION, loadRegistryCatalog, RegistryLoadError, type RegistrySource, type RegistryTool, type ResolvedRegistryTool } from "../core/index.js";
+import { CAPYKIT_VERSION, REGISTRY_LAYERS, loadRegistryCatalog, RegistryLoadError, type RegistryLayer, type RegistrySource, type RegistryTool, type ResolvedRegistryTool } from "../core/index.js";
+import { createHash } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -105,18 +106,46 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
   return { command, positionals, json, registries, fields, tags, capabilities };
 }
 
+function isRegistryLayer(value: string): value is RegistryLayer {
+  return (REGISTRY_LAYERS as readonly string[]).includes(value);
+}
+
+function stableSourceId(layer: RegistryLayer, absolutePath: string): string {
+  const digest = createHash("sha256").update(absolutePath).digest("hex").slice(0, 16);
+  return `cli-${layer}-${digest}`;
+}
+
+function parseRegistrySpec(registry: string): { readonly id?: string; readonly layer: RegistryLayer; readonly path: string } {
+  const match = /^(?:(?<id>[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*)@)?(?<layer>builtin|organization|host|user)=(?<path>.+)$/u.exec(registry);
+  if (match?.groups !== undefined) {
+    const { id, layer, path } = match.groups;
+    if (layer === undefined || path === undefined || !isRegistryLayer(layer)) usage(`Unsupported registry layer in --registry source: ${registry}`);
+    return id === undefined ? { layer, path } : { id, layer, path };
+  }
+  return { layer: "user", path: registry };
+}
+
 function registrySources(registries: readonly string[]): RegistrySource[] {
-  return registries.map((registry, index) => {
-    if (!isAbsolute(registry)) usage(`Registry paths must be absolute for cwd-independent operation: ${registry}`);
-    const absolutePath = resolve(registry);
+  return registries.map((registry) => {
+    const parsed = parseRegistrySpec(registry);
+    if (!isAbsolute(parsed.path)) usage(`Registry paths must be absolute for cwd-independent operation: ${parsed.path}`);
+    const absolutePath = resolve(parsed.path);
     return {
-      id: `cli-${String(index + 1).padStart(3, "0")}`,
-      layer: "user",
+      id: parsed.id ?? stableSourceId(parsed.layer, absolutePath),
+      layer: parsed.layer,
       type: "file",
       root: dirname(absolutePath),
       path: absolutePath.split(/[\\/]/u).at(-1) ?? "registry.json",
     } satisfies RegistrySource;
   });
+}
+
+function validateCommand(parsed: ParsedArgs): void {
+  const searchOnlyFilters = parsed.fields.length > 0 || parsed.tags.length > 0 || parsed.capabilities.length > 0;
+  if (searchOnlyFilters && parsed.command !== "search") usage("--field, --tag, and --capability are only valid with the search command.");
+  if (parsed.command === "list" && parsed.positionals.length > 0) usage("list does not accept positional arguments.");
+  if (parsed.command === "show" && parsed.positionals.length !== 1) usage("show requires exactly one tool id.");
+  if (parsed.command === "examples" && parsed.positionals.length !== 1) usage("examples requires exactly one tool id.");
 }
 
 async function loadTools(parsed: ParsedArgs): Promise<readonly OutputTool[]> {
@@ -221,9 +250,43 @@ function writeList(tools: readonly OutputTool[], json: boolean): void {
   for (const tool of tools) process.stdout.write(`${tool.id}\t${String(tool.record.name)}\t${String(tool.record.summary)}\n`);
 }
 
+function formatScalarList(values: readonly unknown[]): string {
+  return values.map((value) => String(value)).sort((left, right) => left.localeCompare(right, "en-US")).join(", ");
+}
+
+function formatRecord(value: unknown): string {
+  return JSON.stringify(value, null, 2).replaceAll("\n", "\n    ");
+}
+
 function writeTool(tool: OutputTool, json: boolean): void {
   if (json) { writeJson(tool); return; }
-  process.stdout.write(`${tool.id}\n  name: ${String(tool.record.name)}\n  summary: ${String(tool.record.summary)}\n  tags: ${toolTags(tool.record).join(", ")}\n`);
+  const record = tool.record;
+  const lines: string[] = [
+    tool.id,
+    `  name: ${String(record.name)}`,
+    `  summary: ${String(record.summary)}`,
+    `  owners: ${formatScalarList(readPath(record, "owners.name"))}`,
+    `  scope: ${formatRecord(record.scope)}`,
+    `  authentication: ${formatRecord(record.authentication)}`,
+    `  safety: ${formatRecord(record.safety)}`,
+    `  lifecycle: ${formatRecord(record.lifecycle)}`,
+    "  interfaces:",
+  ];
+  const interfaces = Array.isArray(record.interfaces) ? record.interfaces : [];
+  for (const iface of interfaces) lines.push(`    - ${formatRecord(iface)}`);
+  lines.push("  documentation:");
+  const documents = Array.isArray(record.documentation) ? record.documentation : [];
+  for (const document of documents) lines.push(`    - ${formatRecord(document)}`);
+  lines.push("  provenance:");
+  lines.push(`    sourceId: ${tool.provenance.sourceId}`);
+  lines.push(`    layer: ${tool.provenance.layer}`);
+  lines.push(`    registryId: ${tool.provenance.registryId}`);
+  lines.push(`    sourceUri: ${tool.provenance.sourceUri}`);
+  lines.push(`    revision: ${tool.provenance.revision}`);
+  lines.push(`    sha256: ${tool.provenance.sha256}`);
+  lines.push(`  overridden: ${tool.overridden.map((source) => source.sourceId).join(", ")}`);
+  lines.push(`  tags: ${toolTags(record).join(", ")}`);
+  process.stdout.write(`${lines.join("\n")}\n`);
 }
 
 function writeExamples(tool: OutputTool, json: boolean): void {
@@ -241,6 +304,7 @@ export async function run(argv: readonly string[]): Promise<number> {
   if (["help", "--help", "-h"].includes(parsed.command)) { process.stdout.write(helpText()); return EXIT_SUCCESS; }
   if (["version", "--version", "-v"].includes(parsed.command)) { process.stdout.write(`${CAPYKIT_VERSION}\n`); return EXIT_SUCCESS; }
   if (!["list", "search", "show", "examples"].includes(parsed.command)) usage(`Unknown command: ${parsed.command}`);
+  validateCommand(parsed);
 
   const tools = await loadTools(parsed);
   if (parsed.command === "list") {

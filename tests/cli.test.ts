@@ -29,8 +29,11 @@ describe("discovery CLI", () => {
     expect(helpText()).toContain("3 requested command completed but found no matching tool");
   });
 
-  it("rejects unknown commands and cwd-dependent registry paths", async () => {
+  it("rejects unknown commands, invalid arity, command-specific filters, and cwd-dependent registry paths", async () => {
     await expect(run(["missing"])).rejects.toMatchObject({ exitCode: EXIT_USAGE });
+    await expect(run(["list", "unexpected-tool-id"])).rejects.toMatchObject({ exitCode: EXIT_USAGE });
+    await expect(run(["show", "shared-tool", "extra-tool-id"])).rejects.toMatchObject({ exitCode: EXIT_USAGE });
+    await expect(run(["examples", "shared-tool", "--tag", "interface:cli"])).rejects.toMatchObject({ exitCode: EXIT_USAGE });
     await expect(run(["list", "--registry", "relative.registry.json"])).rejects.toMatchObject({ exitCode: EXIT_USAGE });
   });
 
@@ -47,17 +50,36 @@ describe("discovery CLI", () => {
       const json = capture();
       await expect(run(["list", "--registry", fixture, "--json"])).resolves.toBe(EXIT_SUCCESS);
       const payload = parseJson(json.stdout());
-      expect(payload).toMatchObject([{ id: "shared-tool", name: "Shared tool", summary: "builtin definition", source: "cli-001" }]);
-      expect(Array.isArray(payload) && Array.isArray((payload[0] as { tags?: unknown }).tags) ? (payload[0] as { tags: string[] }).tags : []).toEqual(expect.arrayContaining(["interfaces.type:cli", "scope.platforms:linux", "capability:inspect"]));
+      expect(payload).toMatchObject([{ id: "shared-tool", name: "Shared tool", summary: "builtin definition" }]);
+      const first = Array.isArray(payload) ? payload[0] as { source?: unknown; tags?: unknown } : {};
+      expect(first.source).toMatch(/^cli-user-[a-f0-9]{16}$/u);
+      expect(Array.isArray(first.tags) ? first.tags : []).toEqual(expect.arrayContaining(["interfaces.type:cli", "scope.platforms:linux", "capability:inspect"]));
     } finally {
       process.chdir(originalCwd);
     }
+  });
+
+  it("derives stable source IDs and accepts explicit registry layers independent of argument order", async () => {
+    const firstOrder = capture();
+    await expect(run(["list", "--registry", `builtin=${fixture}`, "--registry", `user=${examplesFixture}`, "--json"])).resolves.toBe(EXIT_SUCCESS);
+    const firstPayload = parseJson(firstOrder.stdout());
+    vi.restoreAllMocks();
+
+    const secondOrder = capture();
+    await expect(run(["list", "--registry", `user=${examplesFixture}`, "--registry", `builtin=${fixture}`, "--json"])).resolves.toBe(EXIT_SUCCESS);
+    const secondPayload = parseJson(secondOrder.stdout());
+    expect(secondPayload).toEqual(firstPayload);
+    const shared = Array.isArray(firstPayload) ? firstPayload.find((tool) => (tool as { id?: string }).id === "shared-tool") as { source?: unknown } | undefined : undefined;
+    expect(shared?.source).toMatch(/^cli-builtin-[a-f0-9]{16}$/u);
   });
 
   it("shows one tool and returns not-found with JSON when absent", async () => {
     const shown = capture();
     await expect(run(["show", "shared-tool", "--registry", fixture])).resolves.toBe(EXIT_SUCCESS);
     expect(shown.stdout()).toContain("shared-tool\n  name: Shared tool");
+    expect(shown.stdout()).toContain("authentication:");
+    expect(shown.stdout()).toContain("capabilities");
+    expect(shown.stdout()).toContain("provenance:");
     vi.restoreAllMocks();
 
     const missing = capture();
