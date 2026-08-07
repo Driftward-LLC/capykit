@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EXIT_NOT_FOUND, EXIT_SUCCESS, EXIT_USAGE, helpText, run } from "../src/cli/index.js";
 
 const fixture = fileURLToPath(new URL("./fixtures/registries/builtin.registry.json", import.meta.url));
+const hostFixture = fileURLToPath(new URL("./fixtures/registries/host.registry.json", import.meta.url));
 const examplesFixture = fileURLToPath(new URL("../examples/all-interfaces.registry.json", import.meta.url));
 
 afterEach(() => vi.restoreAllMocks());
@@ -71,6 +72,23 @@ describe("discovery CLI", () => {
     expect(secondPayload).toEqual(firstPayload);
     const shared = Array.isArray(firstPayload) ? firstPayload.find((tool) => (tool as { id?: string }).id === "shared-tool") as { source?: unknown } | undefined : undefined;
     expect(shared?.source).toMatch(/^cli-builtin-[a-f0-9]{16}$/u);
+  });
+
+  it("requires and applies explicit source-spec overrides for layered replacements", async () => {
+    await expect(run(["list", "--registry", `builtin=${fixture}`, "--registry", `host=${hostFixture}`])).rejects.toMatchObject({
+      name: "RegistryConflictError",
+      toolId: "shared-tool",
+    });
+
+    const replaced = capture();
+    await expect(run(["show", "shared-tool", "--registry", `builtin=${fixture}`, "--registry", `host[overrides=shared-tool]=${hostFixture}`, "--json"])).resolves.toBe(EXIT_SUCCESS);
+    const payload = parseJson(replaced.stdout()) as { record?: { summary?: unknown }; overridden?: unknown[]; provenance?: { layer?: unknown } };
+    expect(payload.record?.summary).toBe("host definition");
+    expect(payload.provenance?.layer).toBe("host");
+    expect(Array.isArray(payload.overridden) ? payload.overridden.length : 0).toBe(1);
+    vi.restoreAllMocks();
+
+    await expect(run(["list", "--registry", `host[overrides=]=${hostFixture}`])).rejects.toMatchObject({ exitCode: EXIT_USAGE });
   });
 
   it("shows one tool and returns not-found with JSON when absent", async () => {

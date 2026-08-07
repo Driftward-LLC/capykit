@@ -57,10 +57,13 @@ node dist/cli.js examples jq --registry /absolute/path/to/registry.json
 ```
 
 All registry paths passed to `--registry` must be absolute so discovery is
-independent of the caller's current working directory. Every read command
-(`list`, `search`, `show`, and `examples`) supports deterministic human output
-and `--json` output. Search filters can be repeated and are combined with AND
-semantics:
+independent of the caller's current working directory. For layered catalogs,
+use `--registry '[id@]layer[overrides=tool-a,tool-b]=/absolute/registry.json'`
+where `layer` is `builtin`, `organization`, `host`, or `user`; `overrides` is
+required when a higher-precedence registry intentionally replaces a lower-layer
+tool with the same ID. Every read command (`list`, `search`, `show`, and
+`examples`) supports deterministic human output and `--json` output. Search
+filters can be repeated and are combined with AND semantics:
 
 ```bash
 node dist/cli.js search --registry /absolute/path/to/registry.json \

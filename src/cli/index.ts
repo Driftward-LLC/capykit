@@ -42,7 +42,7 @@ const fieldAliases = new Map<string, string>([
 ]);
 
 export function helpText(): string {
-  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command> [options]\n\nCommands:\n  list                  List discovered tools\n  search <query>        Search tools by id, name, summary, fields, tags, or capabilities\n  show <tool-id>        Show one tool\n  examples <tool-id>    Show examples for one tool\n  help                  Show this help\n  version               Print the version\n\nRead options:\n  --registry <path>     Absolute path to a registry JSON document (repeatable)\n  --json                Emit deterministic JSON\n\nSearch filters:\n  --field <path=value>  Match a dotted field path; ':' may replace '='\n  --tag <tag>           Match a derived tag such as interface:cli or platform:linux\n  --capability <query>  Match interface capability name, summary, or usage\n\nExit codes:\n  0 success\n  1 operational failure while reading registries\n  2 usage or validation error\n  3 requested command completed but found no matching tool\n`;
+  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command> [options]\n\nCommands:\n  list                  List discovered tools\n  search <query>        Search tools by id, name, summary, fields, tags, or capabilities\n  show <tool-id>        Show one tool\n  examples <tool-id>    Show examples for one tool\n  help                  Show this help\n  version               Print the version\n\nRead options:\n  --registry <source>   Absolute registry path, optionally [id@]layer[overrides=a,b]=/path\n  --json                Emit deterministic JSON\n\nSearch filters:\n  --field <path=value>  Match a dotted field path; ':' may replace '='\n  --tag <tag>           Match a derived tag such as interface:cli or platform:linux\n  --capability <query>  Match interface capability name, summary, or usage\n\nExit codes:\n  0 success\n  1 operational failure while reading registries\n  2 usage or validation error\n  3 requested command completed but found no matching tool\n`;
 }
 
 function normalize(value: unknown): string {
@@ -115,12 +115,19 @@ function stableSourceId(layer: RegistryLayer, absolutePath: string): string {
   return `cli-${layer}-${digest}`;
 }
 
-function parseRegistrySpec(registry: string): { readonly id?: string; readonly layer: RegistryLayer; readonly path: string } {
-  const match = /^(?:(?<id>[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*)@)?(?<layer>builtin|organization|host|user)=(?<path>.+)$/u.exec(registry);
+function parseRegistrySpec(registry: string): { readonly id?: string; readonly layer: RegistryLayer; readonly path: string; readonly overrides?: readonly string[] } {
+  const match = /^(?:(?<id>[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*)@)?(?<layer>builtin|organization|host|user)(?:\[overrides=(?<overrides>[^\]]*)\])?=(?<path>.+)$/u.exec(registry);
   if (match?.groups !== undefined) {
-    const { id, layer, path } = match.groups;
+    const { id, layer, overrides, path } = match.groups;
     if (layer === undefined || path === undefined || !isRegistryLayer(layer)) usage(`Unsupported registry layer in --registry source: ${registry}`);
-    return id === undefined ? { layer, path } : { id, layer, path };
+    const parsedOverrides = overrides === undefined ? undefined : overrides.split(",").map((override) => override.trim());
+    if (parsedOverrides?.some((override) => override.length === 0) === true) usage(`--registry overrides must be a comma-separated list of tool IDs: ${registry}`);
+    return {
+      ...(id === undefined ? {} : { id }),
+      layer,
+      path,
+      ...(parsedOverrides === undefined ? {} : { overrides: parsedOverrides }),
+    };
   }
   return { layer: "user", path: registry };
 }
@@ -136,6 +143,7 @@ function registrySources(registries: readonly string[]): RegistrySource[] {
       type: "file",
       root: dirname(absolutePath),
       path: absolutePath.split(/[\\/]/u).at(-1) ?? "registry.json",
+      ...(parsed.overrides === undefined ? {} : { overrides: parsed.overrides }),
     } satisfies RegistrySource;
   });
 }
