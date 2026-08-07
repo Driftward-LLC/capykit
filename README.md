@@ -63,9 +63,12 @@ and `--json` output. Search filters can be repeated and are combined with AND
 semantics:
 
 ```bash
-node dist/cli.js search --registry /absolute/path/to/registry.json --field status=active
-node dist/cli.js search --registry /absolute/path/to/registry.json --tag interface:cli
-node dist/cli.js search --registry /absolute/path/to/registry.json --capability inspect
+node dist/cli.js search --registry /absolute/path/to/registry.json \
+  --field status=active
+node dist/cli.js search --registry /absolute/path/to/registry.json \
+  --tag interface:cli
+node dist/cli.js search --registry /absolute/path/to/registry.json \
+  --capability inspect
 ```
 
 Exit codes are part of the CLI contract:
