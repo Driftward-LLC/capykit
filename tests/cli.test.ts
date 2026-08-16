@@ -25,4 +25,16 @@ describe("CLI scaffold", () => {
     expect(stdout).toHaveBeenCalledWith(`${CAPYKIT_VERSION}\n`);
     expect(stderr).not.toHaveBeenCalled();
   });
+
+  it("prints documented JSON usage for doctor", () => {
+    expect(helpText()).toContain("doctor <registry.json>");
+    expect(helpText()).toContain("capykit.registryDoctor.v0.1");
+  });
+
+  it("rejects doctor without a registry path", () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    expect(run(["doctor"])).toBe(2);
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining("Usage: capykit doctor <registry.json>"));
+  });
 });

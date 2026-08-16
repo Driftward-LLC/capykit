@@ -57,6 +57,8 @@ surface are constrained by
 Deterministic source precedence, explicit override rules, provenance, and
 local-file/Git source configuration are documented in
 [`docs/registry-loading.md`](docs/registry-loading.md).
+The registry doctor's redacted machine-readable report is documented in
+[`docs/registry-doctor.md`](docs/registry-doctor.md).
 The corresponding machine-readable policy and positive/negative cases live in
 [`policies/v0.1/security-policy.json`](policies/v0.1/security-policy.json) and
 [`examples/security-policy-cases.json`](examples/security-policy-cases.json).
