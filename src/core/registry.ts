@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { constants, readFileSync } from "node:fs";
-import { lstat, open, realpath } from "node:fs/promises";
-import { basename, dirname, isAbsolute, posix, relative, resolve, sep } from "node:path";
+import { access, lstat, open, realpath, stat } from "node:fs/promises";
+import { basename, delimiter, dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { Ajv2020, type AnySchema, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
@@ -390,6 +390,34 @@ export interface RegistryLoadOptions {
   readonly now?: () => Date;
 }
 
+export type RegistryDoctorSeverity = "info" | "warning" | "error";
+export type RegistryDoctorStatus = "pass" | "fail" | "skipped";
+
+export interface RegistryDoctorRecord {
+  readonly recordType: "registry" | "tool" | "interface" | "documentation" | "healthCheck";
+  readonly recordId: string;
+  readonly severity: RegistryDoctorSeverity;
+  readonly status: RegistryDoctorStatus;
+  readonly code: string;
+  readonly message: string;
+  readonly path?: string;
+}
+
+export interface RegistryDoctorReport {
+  readonly format: "capykit.registryDoctor.v0.1";
+  readonly ok: boolean;
+  readonly checkedAt: string;
+  readonly registry?: { readonly id: string; readonly name: string };
+  readonly records: readonly RegistryDoctorRecord[];
+}
+
+export interface RegistryDoctorOptions extends RegistryLoadOptions {
+  /** Operator-approved executable names. Registry content cannot extend this list. */
+  readonly approvedCommands?: readonly string[];
+  /** Operator-approved PATH used only for metadata lookup; commands are not executed. */
+  readonly path?: string;
+}
+
 /**
  * Load and resolve registry layers with fixed precedence:
  * builtin < organization < host < user. Input order and process cwd never
@@ -451,6 +479,111 @@ export async function loadRegistryCatalog(sources: readonly RegistrySource[], op
     tools: [...resolved.values()].sort((left, right) => left.id.localeCompare(right.id, "en-US")),
     sources: loadedSources.map(({ provenance }) => provenance),
   };
+}
+
+const executableName = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/u;
+
+function redactedMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown registry validation failure; details were redacted.";
+}
+
+function pathDirectories(pathValue: string | undefined): readonly string[] {
+  return (pathValue ?? process.env.PATH ?? "").split(delimiter).filter((entry) => entry.length > 0);
+}
+
+async function executableAvailable(command: string, pathValue: string | undefined): Promise<boolean> {
+  for (const directory of pathDirectories(pathValue)) {
+    const candidate = join(directory, command);
+    try {
+      await access(candidate, constants.X_OK);
+      const metadata = await stat(candidate);
+      if (metadata.isFile()) return true;
+    } catch {
+      // Try the next PATH entry without leaking filesystem details into the report.
+    }
+  }
+  return false;
+}
+
+function isApproved(command: string, approvedCommands: readonly string[] | undefined): boolean {
+  return Array.isArray(approvedCommands) && approvedCommands.includes(command);
+}
+
+function documentationRecord(toolId: string, index: number, url: unknown): RegistryDoctorRecord {
+  const recordId = `${toolId}.documentation[${String(index)}]`;
+  if (typeof url !== "string") {
+    return { recordType: "documentation", recordId, severity: "error", status: "fail", code: "documentation.url", message: "Documentation URL is not a string.", path: `/tools/${toolId}/documentation/${String(index)}/url` };
+  }
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("unsupported protocol");
+    return { recordType: "documentation", recordId, severity: "info", status: "pass", code: "documentation.url", message: "Documentation URL is syntactically valid and uses an HTTP(S) scheme.", path: `/tools/${toolId}/documentation/${String(index)}/url` };
+  } catch {
+    return { recordType: "documentation", recordId, severity: "error", status: "fail", code: "documentation.url", message: "Documentation URL is not a valid HTTP(S) URL; URL contents were redacted.", path: `/tools/${toolId}/documentation/${String(index)}/url` };
+  }
+}
+
+async function commandRecord(recordType: "interface" | "healthCheck", recordId: string, command: unknown, code: string, path: string, options: RegistryDoctorOptions): Promise<RegistryDoctorRecord> {
+  if (typeof command !== "string" || !executableName.test(command)) {
+    return { recordType, recordId, severity: "error", status: "fail", code, message: "Executable declaration must be one command token without shell syntax, arguments, paths, or whitespace; value was redacted.", path };
+  }
+  if (!isApproved(command, options.approvedCommands)) {
+    return { recordType, recordId, severity: "info", status: "skipped", code, message: "Executable lookup skipped because the command is not in the operator-approved allowlist.", path };
+  }
+  const available = await executableAvailable(command, options.path);
+  return { recordType, recordId, severity: available ? "info" : "error", status: available ? "pass" : "fail", code, message: available ? "Executable is present on the operator-approved PATH; it was not executed." : "Executable is approved but unavailable on the operator-approved PATH.", path };
+}
+
+export async function doctorRegistryFile(registryFile: string, options: RegistryDoctorOptions = {}): Promise<RegistryDoctorReport> {
+  const checkedAt = (options.now?.() ?? new Date()).toISOString();
+  const records: RegistryDoctorRecord[] = [];
+  const root = dirname(resolve(registryFile));
+  const path = basename(registryFile);
+  let catalog: RegistryCatalog;
+  try {
+    catalog = await loadRegistryCatalog([{ id: path, layer: "user", type: "file", root, path }], options.now === undefined ? {} : { now: options.now });
+    records.push({ recordType: "registry", recordId: path, severity: "info", status: "pass", code: "registry.load", message: "Registry document loaded, schema-validated, reference-validated, and checked for credential-like values." });
+  } catch (error) {
+    records.push({ recordType: "registry", recordId: path, severity: "error", status: "fail", code: "registry.load_failed", message: redactedMessage(error) });
+    return { format: "capykit.registryDoctor.v0.1", ok: false, checkedAt, records };
+  }
+
+  for (const tool of catalog.tools) {
+    const interfaces = Array.isArray(tool.record.interfaces) ? tool.record.interfaces : [];
+    for (const [index, iface] of interfaces.entries()) {
+      if (typeof iface !== "object" || iface === null || Array.isArray(iface)) continue;
+      const entry = iface as Record<string, unknown>;
+      const interfaceId = typeof entry.id === "string" ? entry.id : `${tool.id}.interfaces[${String(index)}]`;
+      if (entry.type === "cli") {
+        records.push(await commandRecord("interface", `${tool.id}.${interfaceId}`, entry.command, "executable.available", `/tools/${tool.id}/interfaces/${String(index)}/command`, options));
+      }
+    }
+
+    const documentation = Array.isArray(tool.record.documentation) ? tool.record.documentation : [];
+    for (const [index, doc] of documentation.entries()) {
+      const url = typeof doc === "object" && doc !== null && !Array.isArray(doc) ? (doc as Record<string, unknown>).url : undefined;
+      records.push(documentationRecord(tool.id, index, url));
+    }
+
+    const healthChecks = Array.isArray(tool.record.healthChecks) ? tool.record.healthChecks : [];
+    for (const [index, healthCheck] of healthChecks.entries()) {
+      if (typeof healthCheck !== "object" || healthCheck === null || Array.isArray(healthCheck)) continue;
+      const entry = healthCheck as Record<string, unknown>;
+      const healthId = typeof entry.id === "string" ? entry.id : `${tool.id}.healthChecks[${String(index)}]`;
+      if (entry.kind === "command-available") {
+        records.push(await commandRecord("healthCheck", `${tool.id}.${healthId}`, entry.command, "health.command_available", `/tools/${tool.id}/healthChecks/${String(index)}/command`, options));
+      }
+    }
+  }
+
+  const report: RegistryDoctorReport = {
+    format: "capykit.registryDoctor.v0.1",
+    ok: records.every(({ severity, status }) => !(severity === "error" && status === "fail")),
+    checkedAt,
+    records,
+  };
+  if (catalog.sources[0] === undefined) return report;
+  return { ...report, registry: { id: catalog.sources[0].registryId, name: catalog.sources[0].registryId } };
 }
 
 /** Resolve a path against an explicit base directory without consulting cwd. */
