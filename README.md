@@ -63,6 +63,19 @@ The corresponding machine-readable policy and positive/negative cases live in
 [`policies/v0.1/security-policy.json`](policies/v0.1/security-policy.json) and
 [`examples/security-policy-cases.json`](examples/security-policy-cases.json).
 
+## Read-only MCP server
+
+`capykit-mcp --registry /absolute/path/to/registry.json` exposes the same core
+registry loader through four read-only MCP tools: `search_tools`, `get_tool`,
+`list_capabilities`, and `check_availability`. The server defaults to `public`
+visibility and `agent` audience, and non-public records are disclosed only when
+the caller also supplies the matching registry context. Availability checks are
+catalog-only: they report declarations but do not execute commands, mutate
+state, or probe remote services.
+
+The v0.1 transport is stdio. Streamable HTTP is intentionally deferred until the
+package has a settled auth/session model for non-public context disclosure.
+
 Run the schema contract tests with Node.js 22 or newer:
 
 ```bash
