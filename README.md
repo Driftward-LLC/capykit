@@ -72,6 +72,11 @@ configuration export, and a Hermes reference export. Credential data remains at
 the catalog boundary: generated adapters include only declared reference names or
 paths and never credential values.
 
+Agents that need a reusable discovery workflow can follow the
+[`capykit-agent-discovery` skill](docs/agent-discovery-skill.md). It separates
+catalog discoverability from access and authorization, then guides selection
+among CLI, MCP, API, service, and skill interfaces before building replacements.
+
 ## Read-only MCP server
 
 `capykit-mcp --registry /absolute/path/to/registry.json` exposes the same core
