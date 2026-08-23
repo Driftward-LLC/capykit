@@ -1,13 +1,18 @@
-import { CAPYKIT_VERSION, doctorRegistryFile } from "../core/index.js";
+import { CAPYKIT_VERSION, doctorRegistryFile, generateDiscoveryAdapterBundle, loadRegistryCatalog } from "../core/index.js";
 import { realpathSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export function helpText(): string {
-  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command>\n\nCommands:\n  help                    Show this help\n  version                 Print the version\n  doctor <registry.json>  Validate a registry and print capykit.registryDoctor.v0.1 JSON\n`;
+  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command>\n\nCommands:\n  help                       Show this help\n  version                    Print the version\n  doctor <registry.json>     Validate a registry and print capykit.registryDoctor.v0.1 JSON\n  adapters <registry.json>   Print generated Codex, Hermes, and AGENTS discovery adapters as JSON\n`;
 }
 
 function doctorUsage(): string {
   return "Usage: capykit doctor <registry.json> [--allow-command <name>] [--path <path>]\n";
+}
+
+function adaptersUsage(): string {
+  return "Usage: capykit adapters <registry.json>\n";
 }
 
 interface ParsedDoctorArgs {
@@ -48,6 +53,14 @@ export function run(argv: readonly string[]): number {
   const command = argv[0] ?? "help";
   if (["help", "--help", "-h"].includes(command)) { process.stdout.write(helpText()); return 0; }
   if (["version", "--version", "-v"].includes(command)) { process.stdout.write(`${CAPYKIT_VERSION}\n`); return 0; }
+  if (command === "adapters") {
+    const registryPath = argv[1];
+    if (registryPath === undefined || argv.length !== 2) {
+      process.stderr.write(adaptersUsage());
+      return 2;
+    }
+    return 0;
+  }
   if (command === "doctor") {
     const parsed = parseDoctorArgs(argv.slice(1));
     if (parsed.registryPath === undefined || parsed.error !== undefined) {
@@ -61,6 +74,17 @@ export function run(argv: readonly string[]): number {
 
 export async function runAsync(argv: readonly string[]): Promise<number> {
   const command = argv[0] ?? "help";
+  if (command === "adapters") {
+    const registryPath = argv[1];
+    if (registryPath === undefined || argv.length !== 2) {
+      process.stderr.write(adaptersUsage());
+      return 2;
+    }
+    const absoluteRegistryPath = resolve(registryPath);
+    const catalog = await loadRegistryCatalog([{ id: basename(absoluteRegistryPath), layer: "user", type: "file", root: dirname(absoluteRegistryPath), path: basename(absoluteRegistryPath) }]);
+    process.stdout.write(`${JSON.stringify(generateDiscoveryAdapterBundle(catalog), null, 2)}\n`);
+    return 0;
+  }
   if (command !== "doctor") return run(argv);
   const parsed = parseDoctorArgs(argv.slice(1));
   if (parsed.registryPath === undefined || parsed.error !== undefined) {

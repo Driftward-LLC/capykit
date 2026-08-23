@@ -63,6 +63,15 @@ The corresponding machine-readable policy and positive/negative cases live in
 [`policies/v0.1/security-policy.json`](policies/v0.1/security-policy.json) and
 [`examples/security-policy-cases.json`](examples/security-policy-cases.json).
 
+## Discovery adapters
+
+`capykit adapters /absolute/path/to/registry.json` prints a deterministic
+`capykit.discoveryAdapters.v0.1` bundle generated directly from registry
+metadata. The bundle contains concise `AGENTS.md` guidance, a Codex discovery
+configuration export, and a Hermes reference export. Credential data remains at
+the catalog boundary: generated adapters include only declared reference names or
+paths and never credential values.
+
 ## Read-only MCP server
 
 `capykit-mcp --registry /absolute/path/to/registry.json` exposes the same core

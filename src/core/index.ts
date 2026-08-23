@@ -1,4 +1,5 @@
 export * from "./registry.js";
+export * from "./adapters.js";
 
 export const CAPYKIT_VERSION = "0.0.0";
 export interface CapabilitySummary { readonly id: string; readonly name: string; readonly description: string; }
