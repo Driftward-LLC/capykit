@@ -40,6 +40,18 @@ npm run check
 node dist/cli.js --help
 ```
 
+The read-only MCP server is available over stdio:
+
+```bash
+node dist/mcp.js --registry examples/all-interfaces.registry.json
+```
+
+It exposes only `search_tools`, `get_tool`, `list_capabilities`, and
+`check_availability`; it does not expose execution or mutation tools. Streamable
+HTTP transport is deferred until Capykit has a host authentication/session policy
+for HTTP clients so scoped catalog records cannot be disclosed to an
+unauthenticated network listener.
+
 CI runs lint, strict type checking, tests, builds, schema validation, and public
 repository safety checks. Tagged releases rerun the suite before publishing the
 npm package with provenance.
