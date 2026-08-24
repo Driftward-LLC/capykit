@@ -75,13 +75,16 @@ execute a health check that is not declared as safe and non-destructive.
 
 3. Select the narrowest safe interface:
 
-   | Need | Prefer | Reason |
-   | --- | --- | --- |
-   | Existing local command with stable output | CLI | Fast, scriptable, easy to validate locally |
-   | Agent-to-tool calls with structured read-only operations | MCP | Typed tools and clear read-only boundaries |
-   | Remote service data or operations already documented | API | Direct protocol contract and explicit auth model |
-   | Long-running host capability | Service | Reuses the managed service instead of spawning duplicates |
-   | Repeatable agent procedure | Skill | Captures workflow and pitfalls without adding runtime code |
+   - Existing local command with stable output: prefer CLI because it is fast,
+     scriptable, and easy to validate locally.
+   - Agent-to-tool calls with structured read-only operations: prefer MCP for
+     typed tools and clear read-only boundaries.
+   - Remote service data or operations already documented: prefer API for a
+     direct protocol contract and explicit auth model.
+   - Long-running host capability: prefer service reuse instead of spawning
+     duplicates.
+   - Repeatable agent procedure: prefer a skill to capture workflow and
+     pitfalls without adding runtime code.
 
    If more than one interface fits, prefer the least privileged interface that
    satisfies the task. For write-capable tools, confirm the catalog's approval
@@ -94,7 +97,8 @@ execute a health check that is not declared as safe and non-destructive.
 4. Build only when the catalog lacks a suitable capability. If no match exists,
    document the search terms and missing capability, then implement the smallest
    scoped addition. When the missing capability should be reusable, update the
-   Capykit registry or discovery adapter so future agents find it first.
+   Capykit registry or source metadata and regenerate discovery adapters so
+   future agents find it first.
 
    Completion criterion: new implementation work includes either a selected
    catalog record or a note explaining why no declared capability matched.
@@ -106,7 +110,16 @@ catalog export generated for the workspace:
 
 ```bash
 capykit adapters /absolute/path/to/registry.json > /tmp/capykit-adapters.json
-node -e 'const fs=require("node:fs"); const b=JSON.parse(fs.readFileSync("/tmp/capykit-adapters.json","utf8")); console.log(b.files.find(f=>f.path===".codex/capykit.discovery.json").content)'
+node <<'EOF'
+const fs = require("node:fs");
+const bundle = JSON.parse(
+  fs.readFileSync("/tmp/capykit-adapters.json", "utf8"),
+);
+const codexFile = bundle.files.find(
+  (file) => file.path === ".codex/capykit.discovery.json",
+);
+console.log(codexFile.content);
+EOF
 ```
 
 Then Codex should select an existing `cli`, `mcp`, or `api` interface when it
