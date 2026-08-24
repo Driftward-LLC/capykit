@@ -75,9 +75,12 @@ configuration defaults to `.capykit/sources.json` and can be overridden with
 `--config <path>` for host-local or repo-scoped automation.
 
 ```bash
-capykit registry source add local team --layer organization --root /opt/capykit --path team.registry.json
-capykit registry source add git private --layer host --repository /srv/registry --revision main --path registry.json
-capykit registry source add http public --layer builtin --url https://registry.example.com/capykit/registry.json
+capykit registry source add local team \
+  --layer organization --root /opt/capykit --path team.registry.json
+capykit registry source add git private \
+  --layer host --repository /srv/registry --revision main --path registry.json
+capykit registry source add http public \
+  --layer builtin --url https://registry.example.com/capykit/registry.json
 capykit registry source sync
 capykit registry source inspect
 capykit registry source remove team
