@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { helpText, run } from "../src/cli/index.js";
+import { completionText, helpText, run } from "../src/cli/index.js";
 import { CAPYKIT_VERSION } from "../src/core/index.js";
 
 afterEach(() => vi.restoreAllMocks());
@@ -29,6 +29,23 @@ describe("CLI scaffold", () => {
   it("prints documented JSON usage for doctor", () => {
     expect(helpText()).toContain("doctor <registry.json>");
     expect(helpText()).toContain("capykit.registryDoctor.v0.1");
+  });
+
+  it.each(["bash", "zsh", "fish"])("prints %s shell completions", (shell) => {
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    expect(run(["completion", shell])).toBe(0);
+    expect(stdout).toHaveBeenCalledWith(completionText(shell));
+    expect(completionText(shell)).toContain("capykit");
+    expect(stderr).not.toHaveBeenCalled();
+  });
+
+  it("rejects unsupported completion shells", () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    expect(run(["completion", "powershell"])).toBe(2);
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining("Usage: capykit completion <bash|zsh|fish>"));
   });
 
   it("rejects doctor without a registry path", () => {

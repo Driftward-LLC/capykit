@@ -42,7 +42,9 @@ node dist/cli.js --help
 
 CI runs lint, strict type checking, tests, builds, schema validation, and public
 repository safety checks. Tagged releases rerun the suite before publishing the
-npm package with provenance.
+npm package with provenance. npm installation, standalone executable artifacts,
+checksums, shell completions, upgrade, and uninstall workflows are documented in
+[`docs/publishing.md`](docs/publishing.md).
 
 ## Capability schema
 

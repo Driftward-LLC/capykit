@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,6 +42,11 @@ try {
     shell: process.platform === "win32",
   });
   assert.match(cliOutput, /Usage: capykit <command>/);
+  const completionOutput = execFileSync(join(binRoot, `capykit${binSuffix}`), ["completion", "bash"], {
+    encoding: "utf8",
+    shell: process.platform === "win32",
+  });
+  assert.match(completionOutput, /complete -F _capykit capykit/);
 
   const importSmoke = join(installRoot, "smoke.mjs");
   await writeFile(importSmoke, `
@@ -108,7 +113,21 @@ try {
   assert.equal(response.id, 1);
   assert.equal(response.result.serverInfo.name, "capykit");
 
-  console.log("Packed package smoke test passed: CLI, imports, schema asset, installed validator, and MCP server.");
+  execFileSync(npmCommand, ["run", "build:standalone"], { cwd: repositoryRoot, stdio: "pipe", shell: process.platform === "win32" });
+  const standaloneTarget = process.platform === "darwin" ? "darwin" : "linux";
+  const standaloneArch = process.arch === "arm64" ? "arm64" : "x64";
+  const standaloneName = `capykit-${standaloneTarget}-${standaloneArch}`;
+  const standaloneOutput = execFileSync(join(repositoryRoot, "dist", "standalone", standaloneName), ["--version"], {
+    encoding: "utf8",
+    shell: process.platform === "win32",
+  });
+  assert.equal(standaloneOutput.trim(), "0.0.0");
+  const checksums = JSON.parse(await readFile(join(repositoryRoot, "dist", "standalone", "checksums.json"), "utf8"));
+  assert.equal(checksums.format, "capykit.standaloneArtifacts.v0.1");
+  assert.equal(checksums.artifacts.length, 4);
+  assert.ok(checksums.artifacts.every((artifact) => /^[a-f0-9]{64}$/.test(artifact.sha256)), "standalone artifacts must publish sha256 checksums");
+
+  console.log("Packed package smoke test passed: CLI, completions, imports, schema asset, installed validator, MCP server, and standalone artifacts.");
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
 }

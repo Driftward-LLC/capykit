@@ -15,7 +15,39 @@ import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export function helpText(): string {
-  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command>\n\nCommands:\n  help                       Show this help\n  version                    Print the version\n  doctor <registry.json>     Validate a registry and print capykit.registryDoctor.v0.1 JSON\n  adapters <registry.json>   Print generated Codex, Hermes, and AGENTS discovery adapters as JSON\n  sources <action>           Add, remove, sync, or inspect approved registry sources\n`;
+  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command>\n\nCommands:\n  help                       Show this help\n  version                    Print the version\n  completion <shell>         Print shell completion for bash, zsh, or fish\n  doctor <registry.json>     Validate a registry and print capykit.registryDoctor.v0.1 JSON\n  adapters <registry.json>   Print generated Codex, Hermes, and AGENTS discovery adapters as JSON\n  sources <action>           Add, remove, sync, or inspect approved registry sources\n`;
+}
+
+const completionCommands = ["help", "version", "completion", "doctor", "adapters", "sources"] as const;
+
+function completionUsage(): string {
+  return "Usage: capykit completion <bash|zsh|fish>\n";
+}
+
+export function completionText(shell: string): string {
+  const commands = completionCommands.join(" ");
+  if (shell === "bash") {
+    return [
+      "_capykit() {",
+      "  local cur=\"${COMP_WORDS[COMP_CWORD]}\"",
+      `  COMPREPLY=( $(compgen -W "${commands}" -- "$cur") )`,
+      "}",
+      "complete -F _capykit capykit",
+      "",
+    ].join("\n");
+  }
+  if (shell === "zsh") {
+    return [
+      "#compdef capykit",
+      `local -a commands=(${completionCommands.map((command) => `'${command}'`).join(" ")})`,
+      "_describe 'capykit command' commands",
+      "",
+    ].join("\n");
+  }
+  if (shell === "fish") {
+    return completionCommands.map((command) => `complete -c capykit -f -a ${command}`).join("\n") + "\n";
+  }
+  throw new Error(`Unsupported completion shell: ${shell}`);
 }
 
 function doctorUsage(): string {
@@ -171,6 +203,11 @@ export function run(argv: readonly string[]): number {
   const command = argv[0] ?? "help";
   if (["help", "--help", "-h"].includes(command)) { process.stdout.write(helpText()); return 0; }
   if (["version", "--version", "-v"].includes(command)) { process.stdout.write(`${CAPYKIT_VERSION}\n`); return 0; }
+  if (["completion", "completions"].includes(command)) {
+    const shell = argv[1];
+    if (shell === undefined || argv.length !== 2) { process.stderr.write(completionUsage()); return 2; }
+    try { process.stdout.write(completionText(shell)); return 0; } catch (error) { process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n\n${completionUsage()}`); return 2; }
+  }
   if (command === "adapters") {
     const registryPath = argv[1];
     if (registryPath === undefined || argv.length !== 2) {
