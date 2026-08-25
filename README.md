@@ -55,7 +55,7 @@ Registry ingestion, credential references, health checks, and the read-only MCP
 surface are constrained by
 [`docs/adr/0002-registry-trust-boundaries.md`](docs/adr/0002-registry-trust-boundaries.md).
 Deterministic source precedence, explicit override rules, provenance, and
-local-file/Git source configuration are documented in
+local-file/Git/HTTPS source configuration are documented in
 [`docs/registry-loading.md`](docs/registry-loading.md).
 The registry doctor's redacted machine-readable report is documented in
 [`docs/registry-doctor.md`](docs/registry-doctor.md).
@@ -76,6 +76,23 @@ Agents that need a reusable discovery workflow can follow the
 [`capykit-agent-discovery` skill](docs/agent-discovery-skill.md). It separates
 catalog discoverability from access and authorization, then guides selection
 among CLI, MCP, API, service, and skill interfaces before building replacements.
+
+## Approved registry sources
+
+Operators can manage approved registry source configuration with
+`capykit sources`. Adds and syncs validate source bytes before atomically writing
+the config; Git sources are locked to resolved commits, and HTTPS sources cache
+last known-good bytes for deterministic offline sync.
+
+```bash
+capykit sources add --config /etc/capykit/registry-sources.json \
+  --id team.tools --layer organization \
+  --file-root /srv/capykit --file-path team.registry.json
+
+capykit sources inspect --config /etc/capykit/registry-sources.json
+capykit sources sync --config /etc/capykit/registry-sources.json --offline
+capykit sources remove --config /etc/capykit/registry-sources.json --id team.tools
+```
 
 ## Read-only MCP server
 

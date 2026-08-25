@@ -57,6 +57,8 @@ traversal, symlink escapes, and non-regular files. Git-backed sources require
 an absolute local `repository`, a revision, and a repository-relative POSIX
 `path`. Capykit resolves the revision to an immutable commit before reading it
 with `git show <commit>:<path>`; it does not silently use work-tree content.
+HTTPS sources require an operator-approved URL without credentials or fragments;
+sync caches the validated bytes and records the digest as the revision identity.
 The same configuration therefore resolves identically regardless of process
 cwd or uncommitted Git changes.
 
@@ -71,3 +73,22 @@ effective catalog.
 Load failures identify the source. Conflict errors expose the tool ID and both
 source IDs, then state whether to add an explicit override, remove a duplicate,
 or move a record to a different layer.
+
+## Source management CLI
+
+`capykit sources` manages an explicit JSON configuration file with format
+`capykit.registrySources.v0.1`:
+
+- `sources add` approves a local file, local Git repository path, or HTTPS
+  source only after the source validates against schema, semantic, override, and
+  secret-boundary checks.
+- `sources remove` writes a config without the source and revalidates the
+  remaining effective catalog before activation.
+- `sources sync` refreshes selected sources, records resolved revisions and
+  digests, and writes the new config atomically only after the full catalog is
+  usable. `--offline` keeps deterministic last known-good HTTP cache bytes.
+- `sources inspect` prints `capykit.registrySources.inspect.v0.1` JSON showing
+  configured sources, locks, winning tool provenance, and explicit overrides.
+
+Configuration writes are atomic. Failed adds, removes, or syncs leave the
+previous configuration and cached source bytes in place.

@@ -1,10 +1,21 @@
-import { CAPYKIT_VERSION, doctorRegistryFile, generateDiscoveryAdapterBundle, loadRegistryCatalog } from "../core/index.js";
+import {
+  addRegistrySource,
+  CAPYKIT_VERSION,
+  doctorRegistryFile,
+  generateDiscoveryAdapterBundle,
+  inspectRegistrySources,
+  loadRegistryCatalog,
+  removeRegistrySource,
+  syncRegistrySources,
+  type ApprovedRegistrySource,
+  type RegistryLayer,
+} from "../core/index.js";
 import { realpathSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export function helpText(): string {
-  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command>\n\nCommands:\n  help                       Show this help\n  version                    Print the version\n  doctor <registry.json>     Validate a registry and print capykit.registryDoctor.v0.1 JSON\n  adapters <registry.json>   Print generated Codex, Hermes, and AGENTS discovery adapters as JSON\n`;
+  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command>\n\nCommands:\n  help                       Show this help\n  version                    Print the version\n  doctor <registry.json>     Validate a registry and print capykit.registryDoctor.v0.1 JSON\n  adapters <registry.json>   Print generated Codex, Hermes, and AGENTS discovery adapters as JSON\n  sources <action>           Add, remove, sync, or inspect approved registry sources\n`;
 }
 
 function doctorUsage(): string {
@@ -15,11 +26,31 @@ function adaptersUsage(): string {
   return "Usage: capykit adapters <registry.json>\n";
 }
 
+function sourcesUsage(): string {
+  return [
+    "Usage:",
+    "  capykit sources add --config <path> --id <id> --layer <layer> --file-root <root> --file-path <path> [--override <tool>]...",
+    "  capykit sources add --config <path> --id <id> --layer <layer> --git-repository <repo> --git-revision <rev> --git-path <path> [--override <tool>]...",
+    "  capykit sources add --config <path> --id <id> --layer <layer> --http-url <url> [--override <tool>]...",
+    "  capykit sources remove --config <path> --id <id>",
+    "  capykit sources sync --config <path> [--id <id>]... [--offline]",
+    "  capykit sources inspect --config <path>",
+    "",
+  ].join("\n");
+}
+
 interface ParsedDoctorArgs {
   readonly registryPath: string | undefined;
   readonly approvedCommands: string[];
   readonly path: string | undefined;
   readonly error: string | undefined;
+}
+
+interface ParsedFlags {
+  readonly values: ReadonlyMap<string, string>;
+  readonly repeated: ReadonlyMap<string, readonly string[]>;
+  readonly switches: ReadonlySet<string>;
+  readonly error?: string | undefined;
 }
 
 function parseDoctorArgs(argv: readonly string[]): ParsedDoctorArgs {
@@ -49,6 +80,93 @@ function parseDoctorArgs(argv: readonly string[]): ParsedDoctorArgs {
   return { approvedCommands, path, registryPath, error: undefined };
 }
 
+function parseFlags(argv: readonly string[], switches: readonly string[] = []): ParsedFlags {
+  const values = new Map<string, string>();
+  const repeated = new Map<string, string[]>();
+  const switchSet = new Set(switches);
+  const enabledSwitches = new Set<string>();
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index];
+    if (argument === undefined || !argument.startsWith("--")) return { values, repeated, switches: enabledSwitches, error: `Unexpected argument: ${argument ?? ""}` };
+    if (switchSet.has(argument)) { enabledSwitches.add(argument); continue; }
+    const value = argv[index + 1];
+    if (value === undefined || value.startsWith("--")) return { values, repeated, switches: enabledSwitches, error: `Missing value for ${argument}.` };
+    if (repeated.has(argument)) repeated.get(argument)?.push(value);
+    else if (values.has(argument)) repeated.set(argument, [values.get(argument) as string, value]);
+    else values.set(argument, value);
+    index += 1;
+  }
+  return { values, repeated, switches: enabledSwitches };
+}
+
+function flag(parsed: ParsedFlags, name: string): string | undefined {
+  return parsed.values.get(name);
+}
+
+function repeatedFlag(parsed: ParsedFlags, name: string): readonly string[] {
+  return parsed.repeated.get(name) ?? (parsed.values.has(name) ? [parsed.values.get(name) as string] : []);
+}
+
+function requireFlag(parsed: ParsedFlags, name: string): string {
+  const value = flag(parsed, name);
+  if (value === undefined) throw new Error(`Missing required option ${name}.`);
+  return value;
+}
+
+function parseLayer(value: string): RegistryLayer {
+  if (["builtin", "organization", "host", "user"].includes(value)) return value as RegistryLayer;
+  throw new Error(`Unsupported source layer: ${value}`);
+}
+
+function parseAddSource(parsed: ParsedFlags): ApprovedRegistrySource {
+  const id = requireFlag(parsed, "--id");
+  const layer = parseLayer(requireFlag(parsed, "--layer"));
+  const overrides = repeatedFlag(parsed, "--override");
+  const base = overrides.length === 0 ? { id, layer } : { id, layer, overrides };
+  const fileRoot = flag(parsed, "--file-root");
+  const gitRepository = flag(parsed, "--git-repository");
+  const httpUrl = flag(parsed, "--http-url");
+  const selected = [fileRoot, gitRepository, httpUrl].filter((value) => value !== undefined);
+  if (selected.length !== 1) throw new Error("Choose exactly one source type: file, git, or http.");
+  if (fileRoot !== undefined) return { ...base, type: "file", root: fileRoot, path: requireFlag(parsed, "--file-path") };
+  if (gitRepository !== undefined) return { ...base, type: "git", repository: gitRepository, revision: requireFlag(parsed, "--git-revision"), path: requireFlag(parsed, "--git-path") };
+  return { ...base, type: "http", url: requireFlag(parsed, "--http-url") };
+}
+
+async function runSources(argv: readonly string[]): Promise<number> {
+  const action = argv[0];
+  if (action === undefined) { process.stderr.write(sourcesUsage()); return 2; }
+  const parsed = parseFlags(argv.slice(1), ["--offline"]);
+  if (parsed.error !== undefined) { process.stderr.write(`${parsed.error}\n\n${sourcesUsage()}`); return 2; }
+  try {
+    if (action === "add") {
+      const result = await addRegistrySource({ configPath: requireFlag(parsed, "--config"), source: parseAddSource(parsed) });
+      process.stdout.write(`${JSON.stringify({ source: result.source, lock: result.lock, toolCount: result.catalog.tools.length }, null, 2)}\n`);
+      return 0;
+    }
+    if (action === "remove") {
+      const result = await removeRegistrySource(requireFlag(parsed, "--config"), requireFlag(parsed, "--id"));
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      return 0;
+    }
+    if (action === "sync") {
+      const result = await syncRegistrySources({ configPath: requireFlag(parsed, "--config"), ids: repeatedFlag(parsed, "--id"), offline: parsed.switches.has("--offline") });
+      process.stdout.write(`${JSON.stringify({ updated: result.updated, toolCount: result.catalog.tools.length }, null, 2)}\n`);
+      return 0;
+    }
+    if (action === "inspect") {
+      const result = await inspectRegistrySources(requireFlag(parsed, "--config"));
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      return 0;
+    }
+    process.stderr.write(`Unknown sources action: ${action}\n\n${sourcesUsage()}`);
+    return 2;
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    return 1;
+  }
+}
+
 export function run(argv: readonly string[]): number {
   const command = argv[0] ?? "help";
   if (["help", "--help", "-h"].includes(command)) { process.stdout.write(helpText()); return 0; }
@@ -69,11 +187,13 @@ export function run(argv: readonly string[]): number {
     }
     return 0;
   }
+  if (command === "sources") return 0;
   process.stderr.write(`Unknown command: ${command}\n\n${helpText()}`); return 2;
 }
 
 export async function runAsync(argv: readonly string[]): Promise<number> {
   const command = argv[0] ?? "help";
+  if (command === "sources") return runSources(argv.slice(1));
   if (command === "adapters") {
     const registryPath = argv[1];
     if (registryPath === undefined || argv.length !== 2) {
