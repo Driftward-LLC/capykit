@@ -107,6 +107,10 @@ state, or probe remote services.
 The v0.1 transport is stdio. Streamable HTTP is intentionally deferred until the
 package has a settled auth/session model for non-public context disclosure.
 
+The hardened container packaging contract, read-only registry mount defaults,
+health check, and resource guidance are documented in
+[`docs/container-image.md`](docs/container-image.md).
+
 Run the schema contract tests with Node.js 22 or newer:
 
 ```bash

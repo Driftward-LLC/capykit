@@ -11,6 +11,8 @@
   "scripts": {
     "build": "tsup", "lint": "eslint .", "typecheck": "tsc --noEmit", "test": "vitest run", "test:package": "node scripts/test-package.mjs",
     "check:schema": "node scripts/test-schema.mjs && node scripts/test-security-policy.mjs",
+    "container:print-dockerfile": "node scripts/container-image.mjs print-containerfile",
+    "container:metadata": "node scripts/container-image.mjs print-metadata",
     "check:secrets": "node scripts/check-public-repository.mjs",
     "factory:verify": "node scripts/factory-verification.mjs",
     "check": "npm run lint && npm run typecheck && npm test && npm run build && npm run test:package && npm run check:schema && npm run check:secrets"
