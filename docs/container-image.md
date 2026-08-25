@@ -43,8 +43,9 @@ The generated image:
 Run with a read-only root filesystem and a read-only registry mount:
 
 ```bash
+REGISTRY_MOUNT="type=bind,source=$PWD/examples/all-interfaces.registry.json"
 docker run --rm --read-only --network none \
-  --mount type=bind,source="$PWD/examples/all-interfaces.registry.json",target=/registries/registry.json,readonly \
+  --mount "$REGISTRY_MOUNT,target=/registries/registry.json,readonly" \
   ghcr.io/driftward-llc/capykit:0.0.0
 ```
 
