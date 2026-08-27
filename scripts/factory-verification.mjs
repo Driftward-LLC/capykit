@@ -47,6 +47,7 @@ function checkChangedFileScope() {
 
   const allowedExact = new Set([
     ".github/workflows/factory-verification.yml",
+    ".github/workflows/release.yml",
     ".gitignore",
     ".npmrc",
     "LICENSE",
@@ -65,7 +66,7 @@ function checkChangedFileScope() {
     [/^registries\/private\//iu, "private-registry"],
     [/(^|\/)Dockerfile$/u, "dockerfile"],
     [/(^|\/)docker-compose\.ya?ml$/iu, "docker-compose"],
-    [/^\.github\/workflows\/(?!factory-verification\.yml$)/u, "workflow-mutation"],
+    [/^\.github\/workflows\/(?!(?:factory-verification|release)\.yml$)/u, "workflow-mutation"],
   ];
 
   const failures = [];
