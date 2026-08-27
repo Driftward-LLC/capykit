@@ -9,7 +9,7 @@
   "exports": { ".": "./dist/core.js", "./core": "./dist/core.js", "./schemas": "./dist/schemas.js", "./mcp": "./dist/mcp.js" },
   "files": ["dist", "schemas", "README.md", "LICENSE"],
   "scripts": {
-    "build": "tsup", "lint": "eslint .", "typecheck": "tsc --noEmit", "test": "vitest run", "test:package": "node scripts/test-package.mjs",
+    "build": "tsup", "build:standalone": "node scripts/build-standalone.mjs", "lint": "eslint .", "typecheck": "tsc --noEmit", "test": "vitest run", "test:package": "node scripts/test-package.mjs",
     "check:schema": "node scripts/test-schema.mjs && node scripts/test-security-policy.mjs",
     "container:print-dockerfile": "node scripts/container-image.mjs print-containerfile",
     "container:metadata": "node scripts/container-image.mjs print-metadata",
