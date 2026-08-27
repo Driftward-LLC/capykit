@@ -12,7 +12,7 @@ The runtime image uses a pinned Node.js 22 slim base:
 node:22.18.0-bookworm-slim@sha256:0d130e2ee18e88e1561375276daced6bff032539200173f2daf48c2e33f38ff5
 ```
 
-Builds must run after the package build has produced `dist/`:
+Local builds must run after the package build has produced `dist/`:
 
 ```bash
 npm ci
@@ -24,8 +24,24 @@ docker build --pull=false -f /tmp/capykit.Containerfile \
   .
 ```
 
-Use immutable, versioned tags for published images. Do not publish `latest` as a
-release contract until the release process explicitly defines mutable tag policy.
+Tagged releases publish Linux amd64 and arm64 images to GHCR after the full
+package check succeeds and the tag has been verified against `package.json`.
+The release workflow generates the Containerfile from this contract and pushes
+two immutable tags:
+
+- `ghcr.io/driftward-llc/capykit:<package version>`;
+- `ghcr.io/driftward-llc/capykit:sha-<12 character commit SHA>`.
+
+Do not publish `latest` as a release contract until the release process
+explicitly defines mutable tag policy.
+
+Verify a published image with:
+
+```bash
+docker buildx imagetools inspect ghcr.io/driftward-llc/capykit:0.0.0
+docker buildx imagetools inspect \
+  ghcr.io/driftward-llc/capykit:sha-$(git rev-parse --short=12 HEAD)
+```
 
 ## Runtime hardening
 
@@ -71,7 +87,7 @@ No credentials are baked into the image. Registry files must contain credential
 references only, not credential values. Runtime registry mounts should be
 read-only and supplied by the orchestrator, not copied into the image.
 
-Before publishing, run:
+Before publishing locally or tagging a release, run:
 
 ```bash
 npm run check:secrets

@@ -42,7 +42,7 @@ node dist/cli.js --help
 
 CI runs lint, strict type checking, tests, builds, schema validation, and public
 repository safety checks. Tagged releases rerun the suite before publishing the
-npm package with provenance.
+npm package with provenance and multi-architecture GHCR image tags.
 
 ## Capability schema
 
