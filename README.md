@@ -42,6 +42,7 @@ node dist/cli.js --help
 
 CI runs lint, strict type checking, tests, builds, schema validation, and public
 repository safety checks. Tagged releases rerun the suite before publishing the
+
 npm package with provenance. npm installation, standalone executable artifacts,
 checksums, shell completions, upgrade, and uninstall workflows are documented in
 [`docs/publishing.md`](docs/publishing.md).
@@ -108,6 +109,10 @@ state, or probe remote services.
 
 The v0.1 transport is stdio. Streamable HTTP is intentionally deferred until the
 package has a settled auth/session model for non-public context disclosure.
+
+The hardened container packaging contract, read-only registry mount defaults,
+health check, and resource guidance are documented in
+[`docs/container-image.md`](docs/container-image.md).
 
 Run the schema contract tests with Node.js 22 or newer:
 
