@@ -1,0 +1,844 @@
+{
+  "schemaVersion": "0.1.0",
+  "registry": {
+    "id": "driftward-private-capabilities",
+    "name": "Driftward private capability registry",
+    "description": "Private operator-approved source for Driftward and Derek-specific capability records. This file is intended to live outside the public Capykit application repository when activated.",
+    "homepage": "https://github.com/Driftward-LLC/capykit/blob/main/docs/driftward-private-capability-registry.md"
+  },
+  "tools": [
+    {
+      "id": "agent-browser",
+      "name": "agent-browser",
+      "summary": "Hermes/browser automation capability for sites without a reliable API.",
+      "owners": [
+        {
+          "id": "driftward-ops",
+          "name": "Driftward operations",
+          "url": "https://github.com/Driftward-LLC"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "agent-browser-cli",
+          "type": "cli",
+          "command": "hermes",
+          "capabilities": [
+            {
+              "name": "operate-browser",
+              "summary": "Navigate approved sites through browser automation with screenshots and accessibility snapshots."
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "host",
+        "audiences": [
+          "human",
+          "agent"
+        ],
+        "platforms": [
+          "linux",
+          "web"
+        ],
+        "contexts": [
+          "driftward-vps"
+        ]
+      },
+      "authentication": {
+        "mode": "required",
+        "requirements": [
+          {
+            "id": "browser-session-provider",
+            "type": "session",
+            "description": "Browser session storage and any login material are managed by the approved agent runtime.",
+            "references": [
+              {
+                "kind": "provider",
+                "name": "driftward-hermes-runtime"
+              }
+            ]
+          }
+        ]
+      },
+      "safety": {
+        "risk": "writes-data",
+        "approval": "always"
+      },
+      "lifecycle": {
+        "status": "active"
+      },
+      "healthChecks": [
+        {
+          "id": "agent-browser-runtime",
+          "kind": "command-available",
+          "command": "hermes"
+        }
+      ],
+      "documentation": [
+        {
+          "label": "Hermes browser tool documentation",
+          "url": "https://hermes-agent.nousresearch.com/docs"
+        }
+      ],
+      "relationships": [],
+      "examples": [
+        {
+          "title": "Use browser automation after selecting an approved task target",
+          "interfaceId": "agent-browser-cli",
+          "usage": "hermes --help"
+        }
+      ]
+    },
+    {
+      "id": "browserbase-browse",
+      "name": "Browserbase browse",
+      "summary": "Managed Browserbase browsing sessions for web tasks that need a remote browser.",
+      "owners": [
+        {
+          "id": "driftward-ops",
+          "name": "Driftward operations",
+          "url": "https://github.com/Driftward-LLC"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "browserbase-api",
+          "type": "api",
+          "protocol": "https",
+          "baseUrl": "https://api.browserbase.com",
+          "operations": [
+            {
+              "id": "create-session",
+              "method": "POST",
+              "path": "/v1/sessions",
+              "summary": "Create an approved hosted browser session."
+            },
+            {
+              "id": "get-session",
+              "method": "GET",
+              "path": "/v1/sessions/{id}",
+              "summary": "Read hosted browser session state."
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "organization",
+        "audiences": [
+          "agent"
+        ],
+        "platforms": [
+          "web"
+        ],
+        "contexts": [
+          "driftward"
+        ]
+      },
+      "authentication": {
+        "mode": "required",
+        "requirements": [
+          {
+            "id": "browserbase-project",
+            "type": "api-key",
+            "description": "Browserbase project selection is supplied by environment reference.",
+            "references": [
+              {
+                "kind": "environment",
+                "name": "BROWSERBASE_PROJECT_ID"
+              }
+            ]
+          },
+          {
+            "id": "browserbase-api",
+            "type": "api-key",
+            "description": "Browserbase API access is supplied by environment reference.",
+            "references": [
+              {
+                "kind": "environment",
+                "name": "BROWSERBASE_API_KEY"
+              }
+            ]
+          }
+        ]
+      },
+      "safety": {
+        "risk": "executes-code",
+        "approval": "always",
+        "notes": "Hosted browsing can interact with third-party sites and must follow task-specific authorization."
+      },
+      "lifecycle": {
+        "status": "active"
+      },
+      "healthChecks": [
+        {
+          "id": "browserbase-api-status",
+          "kind": "http-get",
+          "url": "https://api.browserbase.com/",
+          "expectedStatus": 200
+        }
+      ],
+      "documentation": [
+        {
+          "label": "Browserbase documentation",
+          "url": "https://docs.browserbase.com/"
+        }
+      ],
+      "relationships": [],
+      "examples": [
+        {
+          "title": "Create hosted browser session",
+          "interfaceId": "browserbase-api",
+          "usage": "POST /v1/sessions with credentials resolved from the approved environment."
+        }
+      ]
+    },
+    {
+      "id": "driftward-hermes",
+      "name": "driftward-hermes",
+      "summary": "Driftward operations Hermes profile for host-level and org-scoped automation.",
+      "owners": [
+        {
+          "id": "driftward-ops",
+          "name": "Driftward operations",
+          "url": "https://github.com/Driftward-LLC"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "driftward-hermes-cli",
+          "type": "cli",
+          "command": "hermes",
+          "capabilities": [
+            {
+              "name": "run-driftward-automation",
+              "summary": "Use Driftward Hermes with Driftward-specific skills, MCP tools, and gateway workflows."
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "organization",
+        "audiences": [
+          "human",
+          "agent"
+        ],
+        "platforms": [
+          "linux"
+        ],
+        "contexts": [
+          "driftward"
+        ]
+      },
+      "authentication": {
+        "mode": "required",
+        "requirements": [
+          {
+            "id": "driftward-hermes-state",
+            "type": "session",
+            "description": "Live Driftward automation state is kept on the Driftward VPS, outside the public app repository.",
+            "references": [
+              {
+                "kind": "file",
+                "path": "/docker/driftward/hermes/data"
+              }
+            ]
+          },
+          {
+            "id": "driftward-mcp-providers",
+            "type": "session",
+            "description": "External tool credentials are supplied through Driftward Hermes profile providers.",
+            "references": [
+              {
+                "kind": "provider",
+                "name": "driftward-hermes-runtime"
+              }
+            ]
+          }
+        ]
+      },
+      "safety": {
+        "risk": "executes-code",
+        "approval": "always"
+      },
+      "lifecycle": {
+        "status": "active"
+      },
+      "healthChecks": [
+        {
+          "id": "driftward-hermes-cli",
+          "kind": "command-available",
+          "command": "hermes"
+        }
+      ],
+      "documentation": [
+        {
+          "label": "Hermes Agent documentation",
+          "url": "https://hermes-agent.nousresearch.com/docs"
+        }
+      ],
+      "relationships": [],
+      "examples": [
+        {
+          "title": "Inspect Driftward Hermes",
+          "interfaceId": "driftward-hermes-cli",
+          "usage": "hermes --help"
+        }
+      ],
+      "description": "Host-level Driftward automation runtime. Private profile state remains separate from Capykit source code."
+    },
+    {
+      "id": "driftward-hermes-smoke",
+      "name": "driftward-hermes-smoke",
+      "summary": "Smoke-test capability for verifying the Driftward Hermes runtime wiring without mutating services.",
+      "owners": [
+        {
+          "id": "driftward-ops",
+          "name": "Driftward operations",
+          "url": "https://github.com/Driftward-LLC"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "driftward-hermes-smoke-cli",
+          "type": "cli",
+          "command": "hermes",
+          "capabilities": [
+            {
+              "name": "smoke-test-runtime",
+              "summary": "Run approved read-only checks against the Driftward Hermes runtime configuration."
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "host",
+        "audiences": [
+          "human",
+          "agent"
+        ],
+        "platforms": [
+          "linux"
+        ],
+        "contexts": [
+          "driftward-vps"
+        ]
+      },
+      "authentication": {
+        "mode": "required",
+        "requirements": [
+          {
+            "id": "smoke-profile-state",
+            "type": "session",
+            "description": "Smoke checks use the Driftward Hermes profile state and do not embed credentials.",
+            "references": [
+              {
+                "kind": "file",
+                "path": "/docker/driftward/hermes/data"
+              }
+            ]
+          }
+        ]
+      },
+      "safety": {
+        "risk": "read-only",
+        "approval": "never"
+      },
+      "lifecycle": {
+        "status": "active"
+      },
+      "healthChecks": [
+        {
+          "id": "smoke-hermes-cli",
+          "kind": "command-available",
+          "command": "hermes"
+        }
+      ],
+      "documentation": [
+        {
+          "label": "Hermes Agent documentation",
+          "url": "https://hermes-agent.nousresearch.com/docs"
+        }
+      ],
+      "relationships": [],
+      "examples": [
+        {
+          "title": "Run a read-only smoke check",
+          "interfaceId": "driftward-hermes-smoke-cli",
+          "usage": "hermes --help"
+        }
+      ]
+    },
+    {
+      "id": "github-cli",
+      "name": "GitHub CLI",
+      "summary": "GitHub command-line interface for Driftward repository operations.",
+      "owners": [
+        {
+          "id": "driftward-ops",
+          "name": "Driftward operations",
+          "url": "https://github.com/Driftward-LLC"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "github-cli-cli",
+          "type": "cli",
+          "command": "gh",
+          "capabilities": [
+            {
+              "name": "manage-github",
+              "summary": "Read and update GitHub repositories, issues, pull requests, and workflow state."
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "organization",
+        "audiences": [
+          "human",
+          "agent"
+        ],
+        "platforms": [
+          "linux",
+          "macos",
+          "windows"
+        ],
+        "contexts": [
+          "driftward"
+        ]
+      },
+      "authentication": {
+        "mode": "required",
+        "requirements": [
+          {
+            "id": "github-cli-auth",
+            "type": "oauth",
+            "description": "gh stores host authentication in its configured config directory.",
+            "references": [
+              {
+                "kind": "file",
+                "path": "~/.config/gh/hosts.yml"
+              }
+            ]
+          },
+          {
+            "id": "github-token-env",
+            "type": "oauth",
+            "description": "Automation may supply GitHub access through an environment reference.",
+            "references": [
+              {
+                "kind": "environment",
+                "name": "GITHUB_TOKEN"
+              }
+            ]
+          }
+        ]
+      },
+      "safety": {
+        "risk": "writes-data",
+        "approval": "on-write"
+      },
+      "lifecycle": {
+        "status": "active"
+      },
+      "healthChecks": [
+        {
+          "id": "github-cli-installed",
+          "kind": "command-available",
+          "command": "gh"
+        }
+      ],
+      "documentation": [
+        {
+          "label": "GitHub CLI manual",
+          "url": "https://cli.github.com/manual/"
+        }
+      ],
+      "relationships": [],
+      "examples": [
+        {
+          "title": "Check authenticated GitHub account",
+          "interfaceId": "github-cli-cli",
+          "usage": "gh --help"
+        }
+      ]
+    },
+    {
+      "id": "himalaya",
+      "name": "Himalaya",
+      "summary": "Terminal IMAP and SMTP email client used by approved Hermes email workflows.",
+      "owners": [
+        {
+          "id": "driftward-ops",
+          "name": "Driftward operations",
+          "url": "https://github.com/Driftward-LLC"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "himalaya-cli",
+          "type": "cli",
+          "command": "himalaya",
+          "capabilities": [
+            {
+              "name": "manage-email",
+              "summary": "Search, read, and send email through configured accounts."
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "personal",
+        "audiences": [
+          "human",
+          "agent"
+        ],
+        "platforms": [
+          "linux",
+          "macos"
+        ],
+        "contexts": [
+          "derek"
+        ]
+      },
+      "authentication": {
+        "mode": "required",
+        "requirements": [
+          {
+            "id": "himalaya-config",
+            "type": "session",
+            "description": "Account configuration and credential references live in the user's Himalaya config.",
+            "references": [
+              {
+                "kind": "file",
+                "path": "~/.config/himalaya/config.toml"
+              }
+            ]
+          },
+          {
+            "id": "email-credential-provider",
+            "type": "session",
+            "description": "Mailbox passwords or OAuth sessions are resolved by the configured account provider.",
+            "references": [
+              {
+                "kind": "provider",
+                "name": "himalaya-account-provider"
+              }
+            ]
+          }
+        ]
+      },
+      "safety": {
+        "risk": "writes-data",
+        "approval": "on-write"
+      },
+      "lifecycle": {
+        "status": "active"
+      },
+      "healthChecks": [
+        {
+          "id": "himalaya-cli",
+          "kind": "command-available",
+          "command": "himalaya"
+        }
+      ],
+      "documentation": [
+        {
+          "label": "Himalaya project",
+          "url": "https://github.com/soywod/himalaya"
+        }
+      ],
+      "relationships": [],
+      "examples": [
+        {
+          "title": "List configured mailboxes",
+          "interfaceId": "himalaya-cli",
+          "usage": "himalaya --help"
+        }
+      ]
+    },
+    {
+      "id": "linear",
+      "name": "Linear",
+      "summary": "Linear workspace API and MCP integration for Driftward issue and project state.",
+      "owners": [
+        {
+          "id": "driftward-ops",
+          "name": "Driftward operations",
+          "url": "https://github.com/Driftward-LLC"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "linear-api",
+          "type": "api",
+          "protocol": "https",
+          "baseUrl": "https://api.linear.app",
+          "operations": [
+            {
+              "id": "graphql",
+              "method": "POST",
+              "path": "/graphql",
+              "summary": "Read or update Linear workspace objects through approved GraphQL operations."
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "organization",
+        "audiences": [
+          "human",
+          "agent"
+        ],
+        "platforms": [
+          "web"
+        ],
+        "contexts": [
+          "driftward"
+        ]
+      },
+      "authentication": {
+        "mode": "required",
+        "requirements": [
+          {
+            "id": "linear-api-access",
+            "type": "api-key",
+            "description": "Linear access is supplied through an environment reference or equivalent approved provider.",
+            "references": [
+              {
+                "kind": "environment",
+                "name": "LINEAR_API_KEY"
+              }
+            ]
+          }
+        ]
+      },
+      "safety": {
+        "risk": "writes-data",
+        "approval": "on-write"
+      },
+      "lifecycle": {
+        "status": "active"
+      },
+      "healthChecks": [
+        {
+          "id": "linear-graphql",
+          "kind": "http-get",
+          "url": "https://api.linear.app/graphql",
+          "expectedStatus": 405
+        }
+      ],
+      "documentation": [
+        {
+          "label": "Linear API documentation",
+          "url": "https://developers.linear.app/docs/graphql/working-with-the-graphql-api"
+        }
+      ],
+      "relationships": [],
+      "examples": [
+        {
+          "title": "Read a Linear issue",
+          "interfaceId": "linear-api",
+          "usage": "POST /graphql using the approved Linear credential reference."
+        }
+      ]
+    },
+    {
+      "id": "notion-api",
+      "name": "Notion API",
+      "summary": "Notion API access for Driftward workspaces and acquisition operating data.",
+      "owners": [
+        {
+          "id": "driftward-ops",
+          "name": "Driftward operations",
+          "url": "https://github.com/Driftward-LLC"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "notion-api",
+          "type": "api",
+          "protocol": "https",
+          "baseUrl": "https://api.notion.com",
+          "operations": [
+            {
+              "id": "query-database",
+              "method": "POST",
+              "path": "/v1/databases/{database_id}/query",
+              "summary": "Query an approved Notion database."
+            },
+            {
+              "id": "create-page",
+              "method": "POST",
+              "path": "/v1/pages",
+              "summary": "Create a page in an approved Notion parent."
+            },
+            {
+              "id": "update-page",
+              "method": "PATCH",
+              "path": "/v1/pages/{page_id}",
+              "summary": "Update properties on an approved Notion page."
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "organization",
+        "audiences": [
+          "human",
+          "agent"
+        ],
+        "platforms": [
+          "web"
+        ],
+        "contexts": [
+          "driftward"
+        ]
+      },
+      "authentication": {
+        "mode": "required",
+        "requirements": [
+          {
+            "id": "notion-api-access",
+            "type": "api-key",
+            "description": "Notion API access is supplied by environment reference or an approved secrets provider.",
+            "references": [
+              {
+                "kind": "environment",
+                "name": "NOTION_TOKEN"
+              }
+            ]
+          }
+        ]
+      },
+      "safety": {
+        "risk": "writes-data",
+        "approval": "on-write"
+      },
+      "lifecycle": {
+        "status": "active"
+      },
+      "healthChecks": [
+        {
+          "id": "notion-users-me",
+          "kind": "http-get",
+          "url": "https://api.notion.com/v1/users/me",
+          "expectedStatus": 401
+        }
+      ],
+      "documentation": [
+        {
+          "label": "Notion API reference",
+          "url": "https://developers.notion.com/reference/intro"
+        }
+      ],
+      "relationships": [],
+      "examples": [
+        {
+          "title": "Query an approved database",
+          "interfaceId": "notion-api",
+          "usage": "POST /v1/databases/{database_id}/query with access resolved from NOTION_TOKEN."
+        }
+      ]
+    },
+    {
+      "id": "personal-hermes",
+      "name": "personal-hermes",
+      "summary": "Derek's personal Hermes profile for personal automation and chat-driven workflows.",
+      "owners": [
+        {
+          "id": "driftward-ops",
+          "name": "Driftward operations",
+          "url": "https://github.com/Driftward-LLC"
+        }
+      ],
+      "interfaces": [
+        {
+          "id": "personal-hermes-cli",
+          "type": "cli",
+          "command": "hermes",
+          "capabilities": [
+            {
+              "name": "run-personal-automation",
+              "summary": "Use the personal Hermes runtime and its configured native integrations."
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "visibility": "personal",
+        "audiences": [
+          "human",
+          "agent"
+        ],
+        "platforms": [
+          "linux"
+        ],
+        "contexts": [
+          "derek"
+        ]
+      },
+      "authentication": {
+        "mode": "required",
+        "requirements": [
+          {
+            "id": "personal-hermes-profile",
+            "type": "session",
+            "description": "Profile state and credentials stay in the personal Hermes home, outside this registry.",
+            "references": [
+              {
+                "kind": "file",
+                "path": "~/.hermes"
+              }
+            ]
+          },
+          {
+            "id": "personal-hermes-gateway",
+            "type": "session",
+            "description": "Gateway and MCP credentials are resolved by the personal Hermes runtime.",
+            "references": [
+              {
+                "kind": "provider",
+                "name": "personal-hermes-runtime"
+              }
+            ]
+          }
+        ]
+      },
+      "safety": {
+        "risk": "executes-code",
+        "approval": "always"
+      },
+      "lifecycle": {
+        "status": "active"
+      },
+      "healthChecks": [
+        {
+          "id": "personal-hermes-cli",
+          "kind": "command-available",
+          "command": "hermes"
+        }
+      ],
+      "documentation": [
+        {
+          "label": "Hermes Agent documentation",
+          "url": "https://hermes-agent.nousresearch.com/docs"
+        }
+      ],
+      "relationships": [],
+      "examples": [
+        {
+          "title": "Open personal Hermes",
+          "interfaceId": "personal-hermes-cli",
+          "usage": "hermes --help"
+        }
+      ],
+      "description": "Scope is personal to Derek. The registry records profile and provider locations only; it does not store tokens, cookies, or gateway session material."
+    }
+  ],
+  "extensions": {
+    "x-catalog-version": 1,
+    "x-source-class": "private-template"
+  }
+}
