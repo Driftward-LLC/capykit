@@ -53,12 +53,14 @@ The private Driftward registry repository will own:
   protected file locations, but never credential values.
 - Driftward policy overlays that are data, not changes to Capykit code.
 
-`Driftward-LLC/driftward-infra` owns installation and host bootstrap on the
-Driftward VPS. It consumes released Capykit artifacts and the private registry;
+`Driftward-LLC/driftward-host` owns host-level bootstrap on the Driftward VPS,
+including host package installs and secret-file placement. It consumes released
+Capykit artifacts and the private registry;
 it does not become Capykit's application repository.
 
-Private records must never be published in the npm package, container image,
-standalone executables, public fixtures, or Capykit release logs.
+Private records must never be committed to the public Capykit repository or
+published in the npm package, container image, standalone executables, public
+fixtures, or Capykit release logs.
 
 ## Implementation and platforms
 
