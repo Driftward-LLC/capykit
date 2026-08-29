@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const schema = join(root, "schemas/v0.1/registry.schema.json");
 const example = join(root, "examples/all-interfaces.registry.json");
-const driftwardPrivateRegistry = join(root, "docs/driftward-private-capability-registry.registry.json");
 const npx = process.platform === "win32" ? "npx.cmd" : "npx";
 const temporaryDirectory = mkdtempSync(join(tmpdir(), "capykit-schema-"));
 
@@ -265,7 +264,6 @@ const semanticInvalidCases = [
 try {
   assertAjvResult(runAjv("compile"), true, "schema compile");
   assertAjvResult(runAjv("validate", example), true, "valid example");
-  assertAjvResult(runAjv("validate", driftwardPrivateRegistry), true, "driftward private registry seed");
 
   const validSemanticErrors = semanticErrors(validDocument);
   if (validSemanticErrors.length > 0) {

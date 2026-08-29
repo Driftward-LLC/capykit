@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-const files = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" }).split("\0").filter(Boolean);
-const forbiddenFiles = files.filter((path) => /(^|\/)(\.env(?:\..*)?|credentials?\.json|cookies?\.json)$/i.test(path) || path.startsWith("registries/private/"));
+import { existsSync, readFileSync } from "node:fs";
+const files = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" }).split("\0").filter(Boolean).filter(existsSync);
+const forbiddenFiles = files.filter((path) => /(^|\/)(\.env(?:\..*)?|credentials?\.json|cookies?\.json)$/i.test(path) || path.startsWith("registries/private/") || /^docs\/driftward-private-capability-registry(?:\.registry\.json|\.md)$/i.test(path));
 const detectors = [["private key", /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/], ["GitHub token", /gh[pousr]_[A-Za-z0-9]{30,}/], ["generic secret assignment", /(?:api[_-]?key|access[_-]?token|client[_-]?secret)\s*[:=]\s*["']?[A-Za-z0-9_-]{20,}/i]];
 const findings = [];
 for (const path of files) {

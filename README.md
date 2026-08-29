@@ -18,9 +18,11 @@ registry repository and will be consumed by Capykit at runtime.
 
 ## Project status
 
-Capykit is in initial development. The accepted product contract, v0.1 scope,
+Capykit is in v0.1 stabilization. The accepted product contract, v0.1 scope,
 and ownership boundaries are recorded in
 [`docs/adr/0001-product-contract.md`](docs/adr/0001-product-contract.md).
+Current v0.1 completion requirements are tracked in
+[`docs/v0.1-requirements.md`](docs/v0.1-requirements.md).
 
 Canonical planning lives in the
 [Capykit Linear project](https://linear.app/driftward/project/capykit-72e4a9e54d52).
