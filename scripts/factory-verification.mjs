@@ -88,7 +88,7 @@ function checkChangedFileScope() {
 
 async function smokeMcp() {
   const transport = new StdioClientTransport({ command: nodeCommand, args: ["dist/mcp.js", "--registry", exampleRegistry] });
-  const client = new Client({ name: "capykit-factory-verification", version: "0.0.0" });
+  const client = new Client({ name: "capykit-factory-verification", version: "0.1.0" });
   await client.connect(transport);
   try {
     const tools = await client.listTools();

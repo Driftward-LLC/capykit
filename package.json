@@ -1,6 +1,6 @@
 {
   "name": "@driftward/capykit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Portable capability registry for people and agents",
   "type": "module",
   "license": "MIT",

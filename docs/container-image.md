@@ -19,7 +19,7 @@ npm ci
 npm run build
 node scripts/container-image.mjs print-containerfile > /tmp/capykit.Containerfile
 docker build --pull=false -f /tmp/capykit.Containerfile \
-  -t ghcr.io/driftward-llc/capykit:0.0.0 \
+  -t ghcr.io/driftward-llc/capykit:0.1.0 \
   -t ghcr.io/driftward-llc/capykit:sha-$(git rev-parse --short=12 HEAD) \
   .
 ```
@@ -38,7 +38,7 @@ explicitly defines mutable tag policy.
 Verify a published image with:
 
 ```bash
-docker buildx imagetools inspect ghcr.io/driftward-llc/capykit:0.0.0
+docker buildx imagetools inspect ghcr.io/driftward-llc/capykit:0.1.0
 docker buildx imagetools inspect \
   ghcr.io/driftward-llc/capykit:sha-$(git rev-parse --short=12 HEAD)
 ```
@@ -62,7 +62,7 @@ Run with a read-only root filesystem and a read-only registry mount:
 REGISTRY_MOUNT="type=bind,source=$PWD/examples/all-interfaces.registry.json"
 docker run --rm --read-only --network none \
   --mount "$REGISTRY_MOUNT,target=/registries/registry.json,readonly" \
-  ghcr.io/driftward-llc/capykit:0.0.0
+  ghcr.io/driftward-llc/capykit:0.1.0
 ```
 
 The v0.1 MCP transport is stdio, so `--network none` is appropriate unless a
@@ -97,5 +97,5 @@ Also inspect the generated Containerfile and image metadata:
 
 ```bash
 node scripts/container-image.mjs print-containerfile
-node scripts/container-image.mjs print-metadata 0.0.0
+node scripts/container-image.mjs print-metadata 0.1.0
 ```
