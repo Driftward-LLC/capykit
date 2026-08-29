@@ -53,7 +53,7 @@ try {
     import { access } from "node:fs/promises";
     import { CAPYKIT_VERSION } from "@driftward/capykit";
     import { registrySchemaUrl } from "@driftward/capykit/schemas";
-    if (CAPYKIT_VERSION !== "0.0.0") throw new Error("unexpected package version");
+    if (CAPYKIT_VERSION !== "0.1.0") throw new Error("unexpected package version");
     await access(registrySchemaUrl());
   `, "utf8");
   execFileSync(process.execPath, [importSmoke], { cwd: installRoot, stdio: "pipe" });
@@ -96,7 +96,7 @@ try {
     params: {
       protocolVersion: "2025-06-18",
       capabilities: {},
-      clientInfo: { name: "capykit-package-smoke", version: "0.0.0" },
+      clientInfo: { name: "capykit-package-smoke", version: "0.1.0" },
     },
   });
   const mcpResult = spawnSync(join(binRoot, `capykit-mcp${binSuffix}`), [], {
@@ -121,7 +121,7 @@ try {
     encoding: "utf8",
     shell: process.platform === "win32",
   });
-  assert.equal(standaloneOutput.trim(), "0.0.0");
+  assert.equal(standaloneOutput.trim(), "0.1.0");
   const checksums = JSON.parse(await readFile(join(repositoryRoot, "dist", "standalone", "checksums.json"), "utf8"));
   assert.equal(checksums.format, "capykit.standaloneArtifacts.v0.1");
   assert.equal(checksums.artifacts.length, 4);

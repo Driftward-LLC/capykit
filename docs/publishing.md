@@ -32,6 +32,12 @@ The package is configured for public npm provenance with `publishConfig.provenan
 Release automation must publish with `npm publish --provenance` from GitHub Actions
 or another npm-supported trusted publisher.
 
+## v0.1.0 release notes
+
+The v0.1.0 changelog and release notes are recorded in
+[`docs/release-notes-v0.1.0.md`](release-notes-v0.1.0.md). Treat that file as
+the public release summary when preparing the `v0.1.0` GitHub release.
+
 ## Standalone artifacts
 
 Build the package and generate release artifacts locally:
