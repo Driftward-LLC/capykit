@@ -26,14 +26,22 @@ docker build --pull=false -f /tmp/capykit.Containerfile \
 
 Tagged releases publish Linux amd64 and arm64 images to GHCR after the full
 package check succeeds and the tag has been verified against `package.json`.
-The release workflow generates the Containerfile from this contract and pushes
-two immutable tags:
+The release workflow registers arm64 emulation with
+`docker/setup-qemu-action@v3`, generates the Containerfile from this contract,
+and pushes two immutable tags:
 
 - `ghcr.io/driftward-llc/capykit:<package version>`;
 - `ghcr.io/driftward-llc/capykit:sha-<12 character commit SHA>`.
 
 Do not publish `latest` as a release contract until the release process
 explicitly defines mutable tag policy.
+
+If npm publishing succeeds but the container publish fails, recover with a
+manual Release workflow dispatch instead of rerunning the tag push job end to
+end. Use the published tag, set `publish_npm` to `false`, and set
+`create_release` to `false` when the GitHub release already exists. This
+re-runs validation and GHCR publishing without trying to publish the same npm
+version again.
 
 Verify a published image with:
 
