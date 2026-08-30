@@ -43,7 +43,12 @@ describe("container image packaging contract", () => {
 
     expect(workflow).toContain("packages: write");
     expect(workflow).toContain("CAPYKIT_IMAGE: ghcr.io/driftward-llc/capykit");
+    expect(workflow).toContain("workflow_dispatch:");
+    expect(workflow).toContain("publish_npm:");
+    expect(workflow).toContain("create_release:");
     expect(workflow).toContain("node scripts/container-image.mjs print-containerfile");
+    expect(workflow).toContain("docker/setup-qemu-action@v3");
+    expect(workflow).toContain("platforms: arm64");
     expect(workflow).toContain("docker/setup-buildx-action@v3");
     expect(workflow).toContain("docker/login-action@v3");
     expect(workflow).toContain("docker/build-push-action@v6");
