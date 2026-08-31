@@ -7,10 +7,9 @@ every supported agent the same machine-readable answer to three questions:
 - What can each tool do?
 - How should the tool be invoked safely?
 
-Capykit will ship as the `capykit` CLI, the `@driftward/capykit` npm package,
+Capykit ships as the `capykit` CLI, the `@driftward/capykit` npm package,
 standalone executables, and the `ghcr.io/driftward-llc/capykit` container image.
-The CLI and a read-only MCP server will expose the same layered capability
-catalog.
+The CLI and a read-only MCP server expose the same layered capability catalog.
 
 The public application contains no Driftward credentials or private capability
 records. Driftward-specific catalog data will live in a separate private
@@ -26,6 +25,54 @@ Current v0.1 completion requirements are tracked in
 
 Canonical planning lives in the
 [Capykit Linear project](https://linear.app/driftward/project/capykit-72e4a9e54d52).
+
+## Install
+
+Install the published npm package on a machine with Node.js 22 or newer:
+
+```bash
+npm install --global @driftward/capykit@latest
+```
+
+Confirm the CLI is available:
+
+```bash
+capykit --version
+capykit --help
+```
+
+Already have a local project and want a one-off run instead of a global
+install?
+
+```bash
+npm exec --package @driftward/capykit@latest -- capykit --help
+```
+
+## Quick start
+
+Download the public example registry, validate it, and generate discovery
+adapters:
+
+```bash
+curl -fsSL \
+  "https://raw.githubusercontent.com/Driftward-LLC/capykit/main/"\
+"examples/all-interfaces.registry.json" \
+  -o capykit.registry.json
+
+capykit doctor capykit.registry.json
+capykit adapters capykit.registry.json > capykit.discovery.json
+```
+
+The doctor command prints a machine-readable
+`capykit.registryDoctor.v0.1` report. The adapters command prints generated
+Codex, Hermes, and `AGENTS.md` discovery content from the same registry, keeping
+credential values outside the catalog.
+
+Run the read-only MCP server against the same registry:
+
+```bash
+capykit-mcp --registry "$PWD/capykit.registry.json"
+```
 
 ## Development
 
@@ -44,7 +91,6 @@ node dist/cli.js --help
 
 CI runs lint, strict type checking, tests, builds, schema validation, and public
 repository safety checks. Tagged releases rerun the suite before publishing the
-
 npm package with provenance. npm installation, standalone executable artifacts,
 checksums, shell completions, upgrade, and uninstall workflows are documented in
 [`docs/publishing.md`](docs/publishing.md).
