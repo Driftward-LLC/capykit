@@ -54,9 +54,9 @@ Download the public example registry, validate it, and generate discovery
 adapters:
 
 ```bash
-curl -fsSL \
-  "https://raw.githubusercontent.com/Driftward-LLC/capykit/main/"\
-"examples/all-interfaces.registry.json" \
+REGISTRY_URL="https://raw.githubusercontent.com/Driftward-LLC/capykit/main"
+
+curl -fsSL "$REGISTRY_URL/examples/all-interfaces.registry.json" \
   -o capykit.registry.json
 
 capykit doctor capykit.registry.json
