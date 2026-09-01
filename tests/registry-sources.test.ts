@@ -149,6 +149,7 @@ describe.sequential("default registry source discovery CLI", () => {
   it("falls back to the home-directory config path when XDG_CONFIG_HOME is unset", async () => {
     const home = join(temporaryDirectory, "home");
     process.env.HOME = home;
+    delete process.env.XDG_CONFIG_HOME;
     const homeConfigPath = join(home, ".config", "capykit", "registry-sources.json");
     await writeSourcesConfig(homeConfigPath);
     const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
