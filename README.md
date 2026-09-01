@@ -145,6 +145,18 @@ capykit sources sync --config /etc/capykit/registry-sources.json --offline
 capykit sources remove --config /etc/capykit/registry-sources.json --id team.tools
 ```
 
+For day-to-day discovery, `capykit tools` and `capykit tools list` read the
+effective catalog from `$XDG_CONFIG_HOME/capykit/registry-sources.json`, falling
+back to `~/.config/capykit/registry-sources.json`. Pass `--config <path>` to
+override the default for admin and test workflows. Both list and show support
+`--json` for deterministic agent-readable output.
+
+```bash
+capykit tools
+capykit tools list --json
+capykit tools show shared-tool --config /etc/capykit/registry-sources.json
+```
+
 ## Read-only MCP server
 
 `capykit-mcp --registry /absolute/path/to/registry.json` exposes the same core
