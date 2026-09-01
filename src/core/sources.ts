@@ -350,7 +350,8 @@ export async function registrySourcesConfigExists(configPath: string): Promise<b
 
 export function defaultRegistrySourcesConfigPath(): string {
   const xdgConfigHome = process.env.XDG_CONFIG_HOME;
-  const baseDirectory = xdgConfigHome !== undefined && xdgConfigHome.length > 0 ? xdgConfigHome : resolve(homedir(), ".config");
+  const homeDirectory = process.env.HOME !== undefined && process.env.HOME.length > 0 ? process.env.HOME : homedir();
+  const baseDirectory = xdgConfigHome !== undefined && xdgConfigHome.length > 0 ? xdgConfigHome : resolve(homeDirectory, ".config");
   return registrySourcesConfigPath(resolve(baseDirectory, "capykit"));
 }
 
