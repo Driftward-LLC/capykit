@@ -84,3 +84,116 @@ describe.sequential("registry source management", () => {
     expect(result.catalog.tools.map(({ id }) => id)).toEqual(["shared-tool"]);
   });
 });
+
+describe.sequential("default registry source discovery CLI", () => {
+  let temporaryDirectory: string;
+  let originalCwd: string;
+  let originalHome: string | undefined;
+  let originalXdgConfigHome: string | undefined;
+
+  beforeEach(async () => {
+    originalCwd = process.cwd();
+    originalHome = process.env.HOME;
+    originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+    temporaryDirectory = await mkdtemp(join(tmpdir(), "capykit-default-sources-"));
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    process.chdir(originalCwd);
+    if (originalXdgConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  });
+
+  async function writeSourcesConfig(configPath: string, registryFile = "builtin.registry.json"): Promise<void> {
+    await mkdir(dirname(configPath), { recursive: true });
+    await writeFile(configPath, `${JSON.stringify({
+      format: "capykit.registrySources.v0.1",
+      sources: [{ id: "default.fixture", layer: "user", type: "file", root: fixtures, path: registryFile }],
+      locks: [],
+    }, null, 2)}\n`, "utf8");
+  }
+
+  it("resolves the default XDG registry sources config for tools list from any cwd", async () => {
+    const xdgHome = join(temporaryDirectory, "xdg");
+    const configPath = join(xdgHome, "capykit", "registry-sources.json");
+    await writeSourcesConfig(configPath);
+    process.env.XDG_CONFIG_HOME = xdgHome;
+    process.chdir(tmpdir());
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["tools", "list"])).resolves.toBe(0);
+
+    const output = String(stdout.mock.calls.at(-1)?.[0] ?? "");
+    expect(stderr).not.toHaveBeenCalled();
+    expect(output).toContain("shared-tool");
+    expect(output).toContain("shared");
+    expect(output).toContain("builtin definition");
+  });
+
+  it("treats capykit tools as a short alias for listing tools", async () => {
+    const xdgHome = join(temporaryDirectory, "xdg");
+    await writeSourcesConfig(join(xdgHome, "capykit", "registry-sources.json"));
+    process.env.XDG_CONFIG_HOME = xdgHome;
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["tools"])).resolves.toBe(0);
+
+    expect(String(stdout.mock.calls.at(-1)?.[0] ?? "")).toContain("shared-tool");
+  });
+
+  it("falls back to the home-directory config path when XDG_CONFIG_HOME is unset", async () => {
+    const home = join(temporaryDirectory, "home");
+    process.env.HOME = home;
+    const homeConfigPath = join(home, ".config", "capykit", "registry-sources.json");
+    await writeSourcesConfig(homeConfigPath);
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["tools", "list", "--json"])).resolves.toBe(0);
+
+    const output = JSON.parse(String(stdout.mock.calls.at(-1)?.[0] ?? "")) as { configPath: string; tools: Array<{ id: string; command: string; summary: string }> };
+    expect(output.configPath).toBe(homeConfigPath);
+    expect(output.tools).toEqual([expect.objectContaining({ id: "shared-tool", command: "shared", summary: "builtin definition" })]);
+  });
+
+  it("lets explicit --config override the default config path", async () => {
+    const xdgHome = join(temporaryDirectory, "xdg");
+    await writeSourcesConfig(join(xdgHome, "capykit", "registry-sources.json"), "builtin.registry.json");
+    const overridePath = join(temporaryDirectory, "override", "registry-sources.json");
+    await writeSourcesConfig(overridePath, "user.registry.json");
+    process.env.XDG_CONFIG_HOME = xdgHome;
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["tools", "list", "--config", overridePath, "--json"])).resolves.toBe(0);
+
+    const output = JSON.parse(String(stdout.mock.calls.at(-1)?.[0] ?? "")) as { configPath: string; tools: Array<{ summary: string }> };
+    expect(output.configPath).toBe(overridePath);
+    expect(output.tools).toEqual([expect.objectContaining({ summary: "user definition" })]);
+  });
+
+  it("reports a missing default config instead of returning an empty catalog", async () => {
+    process.env.XDG_CONFIG_HOME = join(temporaryDirectory, "missing-xdg");
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["tools", "list"])).resolves.toBe(1);
+
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining("No registry sources config found"));
+  });
+
+  it("uses the default config for sources inspect when --config is omitted", async () => {
+    const xdgHome = join(temporaryDirectory, "xdg");
+    const configPath = join(xdgHome, "capykit", "registry-sources.json");
+    await writeSourcesConfig(configPath);
+    process.env.XDG_CONFIG_HOME = xdgHome;
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["sources", "inspect"])).resolves.toBe(0);
+
+    const output = JSON.parse(String(stdout.mock.calls.at(-1)?.[0] ?? "")) as { precedence: Array<{ toolId: string }> };
+    expect(output.precedence).toEqual([expect.objectContaining({ toolId: "shared-tool" })]);
+  });
+});

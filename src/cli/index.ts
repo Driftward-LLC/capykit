@@ -1,24 +1,29 @@
 import {
   addRegistrySource,
   CAPYKIT_VERSION,
+  defaultRegistrySourcesConfigPath,
   doctorRegistryFile,
   generateDiscoveryAdapterBundle,
   inspectRegistrySources,
   loadRegistryCatalog,
+  loadRegistryCatalogForSourcesConfig,
   removeRegistrySource,
+  registrySourcesConfigExists,
   syncRegistrySources,
   type ApprovedRegistrySource,
+  type RegistryCatalog,
   type RegistryLayer,
+  type ResolvedRegistryTool,
 } from "../core/index.js";
 import { realpathSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export function helpText(): string {
-  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command>\n\nCommands:\n  help                       Show this help\n  version                    Print the version\n  completion <shell>         Print shell completion for bash, zsh, or fish\n  doctor <registry.json>     Validate a registry and print capykit.registryDoctor.v0.1 JSON\n  adapters <registry.json>   Print generated Codex, Hermes, and AGENTS discovery adapters as JSON\n  sources <action>           Add, remove, sync, or inspect approved registry sources\n`;
+  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command>\n\nCommands:\n  help                       Show this help\n  version                    Print the version\n  completion <shell>         Print shell completion for bash, zsh, or fish\n  doctor <registry.json>     Validate a registry and print capykit.registryDoctor.v0.1 JSON\n  adapters <registry.json>   Print generated Codex, Hermes, and AGENTS discovery adapters as JSON\n  sources <action>           Add, remove, sync, or inspect approved registry sources\n  tools [list|show]          List or inspect tools from the effective catalog\n`;
 }
 
-const completionCommands = ["help", "version", "completion", "doctor", "adapters", "sources"] as const;
+const completionCommands = ["help", "version", "completion", "doctor", "adapters", "sources", "tools"] as const;
 
 function completionUsage(): string {
   return "Usage: capykit completion <bash|zsh|fish>\n";
@@ -66,7 +71,16 @@ function sourcesUsage(): string {
     "  capykit sources add --config <path> --id <id> --layer <layer> --http-url <url> [--override <tool>]...",
     "  capykit sources remove --config <path> --id <id>",
     "  capykit sources sync --config <path> [--id <id>]... [--offline]",
-    "  capykit sources inspect --config <path>",
+    "  capykit sources inspect [--config <path>] [--json]",
+    "",
+  ].join("\n");
+}
+
+function toolsUsage(): string {
+  return [
+    "Usage:",
+    "  capykit tools [list] [--config <path>] [--json]",
+    "  capykit tools show <tool-id> [--config <path>] [--json]",
     "",
   ].join("\n");
 }
@@ -165,10 +179,72 @@ function parseAddSource(parsed: ParsedFlags): ApprovedRegistrySource {
   return { ...base, type: "http", url: requireFlag(parsed, "--http-url") };
 }
 
+async function resolveConfigPath(parsed: ParsedFlags, requireExisting: boolean): Promise<string> {
+  const explicit = flag(parsed, "--config");
+  const configPath = explicit ?? defaultRegistrySourcesConfigPath();
+  if (explicit === undefined && requireExisting && !(await registrySourcesConfigExists(configPath))) {
+    throw new Error(`No registry sources config found at ${configPath}. Run capykit sources add --config <path> or pass --config <path>.`);
+  }
+  return configPath;
+}
+
+interface ToolSummary {
+  readonly id: string;
+  readonly name: string;
+  readonly command: string;
+  readonly summary: string;
+  readonly sourceId: string;
+  readonly layer: RegistryLayer;
+}
+
+function toolCommand(tool: ResolvedRegistryTool): string {
+  const interfaces = Array.isArray(tool.record.interfaces) ? tool.record.interfaces : [];
+  for (const entry of interfaces) {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) continue;
+    const candidate = entry as Record<string, unknown>;
+    if (candidate.type === "cli" && typeof candidate.command === "string") return candidate.command;
+  }
+  return "-";
+}
+
+function toolSummary(tool: ResolvedRegistryTool): ToolSummary {
+  return {
+    id: tool.id,
+    name: typeof tool.record.name === "string" ? tool.record.name : tool.id,
+    command: toolCommand(tool),
+    summary: typeof tool.record.summary === "string" ? tool.record.summary : "",
+    sourceId: tool.provenance.sourceId,
+    layer: tool.provenance.layer,
+  };
+}
+
+function formatToolsHuman(tools: readonly ToolSummary[]): string {
+  if (tools.length === 0) return "No tools found.\n";
+  return `${tools.map((tool) => `${tool.id}\t${tool.command}\t${tool.summary}`).join("\n")}\n`;
+}
+
+function writeToolsList(catalog: RegistryCatalog, configPath: string, json: boolean): void {
+  const tools = catalog.tools.map(toolSummary);
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ format: "capykit.tools.list.v0.1", configPath, tools }, null, 2)}\n`);
+    return;
+  }
+  process.stdout.write(formatToolsHuman(tools));
+}
+
+function writeToolShow(tool: ResolvedRegistryTool, configPath: string, json: boolean): void {
+  const summary = toolSummary(tool);
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ format: "capykit.tools.show.v0.1", configPath, tool: { ...summary, record: tool.record, provenance: tool.provenance } }, null, 2)}\n`);
+    return;
+  }
+  process.stdout.write([summary.id, `command: ${summary.command}`, `summary: ${summary.summary}`, `source: ${summary.sourceId} (${summary.layer})`, ""].join("\n"));
+}
+
 async function runSources(argv: readonly string[]): Promise<number> {
   const action = argv[0];
   if (action === undefined) { process.stderr.write(sourcesUsage()); return 2; }
-  const parsed = parseFlags(argv.slice(1), ["--offline"]);
+  const parsed = parseFlags(argv.slice(1), ["--offline", "--json"]);
   if (parsed.error !== undefined) { process.stderr.write(`${parsed.error}\n\n${sourcesUsage()}`); return 2; }
   try {
     if (action === "add") {
@@ -187,11 +263,40 @@ async function runSources(argv: readonly string[]): Promise<number> {
       return 0;
     }
     if (action === "inspect") {
-      const result = await inspectRegistrySources(requireFlag(parsed, "--config"));
+      const result = await inspectRegistrySources(await resolveConfigPath(parsed, false));
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
       return 0;
     }
     process.stderr.write(`Unknown sources action: ${action}\n\n${sourcesUsage()}`);
+    return 2;
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    return 1;
+  }
+}
+
+async function runTools(argv: readonly string[]): Promise<number> {
+  const first = argv[0];
+  const action = first === undefined || first.startsWith("--") ? "list" : first;
+  const flagOffset = first === undefined || first.startsWith("--") ? 0 : action === "show" ? 2 : 1;
+  const parsed = parseFlags(argv.slice(flagOffset), ["--json"]);
+  if (parsed.error !== undefined) { process.stderr.write(`${parsed.error}\n\n${toolsUsage()}`); return 2; }
+  try {
+    const configPath = await resolveConfigPath(parsed, true);
+    const catalog = await loadRegistryCatalogForSourcesConfig(configPath);
+    if (action === "list") {
+      writeToolsList(catalog, configPath, parsed.switches.has("--json"));
+      return 0;
+    }
+    if (action === "show") {
+      const toolId = argv[1];
+      if (toolId === undefined || toolId.startsWith("--")) { process.stderr.write(toolsUsage()); return 2; }
+      const tool = catalog.tools.find(({ id }) => id === toolId);
+      if (tool === undefined) { process.stderr.write(`Tool not found: ${toolId}\n`); return 1; }
+      writeToolShow(tool, configPath, parsed.switches.has("--json"));
+      return 0;
+    }
+    process.stderr.write(`Unknown tools action: ${action}\n\n${toolsUsage()}`);
     return 2;
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
@@ -225,12 +330,14 @@ export function run(argv: readonly string[]): number {
     return 0;
   }
   if (command === "sources") return 0;
+  if (command === "tools") return 0;
   process.stderr.write(`Unknown command: ${command}\n\n${helpText()}`); return 2;
 }
 
 export async function runAsync(argv: readonly string[]): Promise<number> {
   const command = argv[0] ?? "help";
   if (command === "sources") return runSources(argv.slice(1));
+  if (command === "tools") return runTools(argv.slice(1));
   if (command === "adapters") {
     const registryPath = argv[1];
     if (registryPath === undefined || argv.length !== 2) {

@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { promises as dns } from "node:dns";
 import { BlockList, isIP } from "node:net";
 import { constants } from "node:fs";
-import { mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { loadRegistryCatalog, REGISTRY_LAYERS, RegistryLoadError, type RegistryCatalog, type RegistryLayer, type RegistrySource } from "./registry.js";
@@ -330,6 +331,27 @@ export async function inspectRegistrySources(configPath: string): Promise<Regist
     sources: config.sources.map((source) => ({ ...source, lock: config.locks.find(({ sourceId }) => sourceId === source.id) })),
     precedence: catalog.tools.map((tool) => ({ toolId: tool.id, sourceId: tool.provenance.sourceId, layer: tool.provenance.layer, revision: tool.provenance.revision, sha256: tool.provenance.sha256, overridden: tool.overridden.map(({ sourceId }) => sourceId) })),
   };
+}
+
+export async function loadRegistryCatalogForSourcesConfig(configPath: string): Promise<RegistryCatalog> {
+  const config = await readConfig(configPath);
+  return loadCatalogForConfig(configPath, config);
+}
+
+export async function registrySourcesConfigExists(configPath: string): Promise<boolean> {
+  try {
+    await access(configPath, constants.R_OK);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw new RegistryLoadError("Unable to access registry sources config.", { cause: error });
+  }
+}
+
+export function defaultRegistrySourcesConfigPath(): string {
+  const xdgConfigHome = process.env.XDG_CONFIG_HOME;
+  const baseDirectory = xdgConfigHome !== undefined && xdgConfigHome.length > 0 ? xdgConfigHome : resolve(homedir(), ".config");
+  return registrySourcesConfigPath(resolve(baseDirectory, "capykit"));
 }
 
 export function registrySourcesConfigPath(baseDirectory: string, relativePath = "registry-sources.json"): string {
