@@ -2,7 +2,7 @@ export * from "./registry.js";
 export * from "./adapters.js";
 export * from "./sources.js";
 
-export const CAPYKIT_VERSION = "0.1.0";
+export const CAPYKIT_VERSION = "0.1.1";
 export interface CapabilitySummary { readonly id: string; readonly name: string; readonly description: string; }
 export function normalizeQuery(query: string): string { return query.trim().toLocaleLowerCase("en-US"); }
 export function searchCapabilities(capabilities: readonly CapabilitySummary[], query: string): CapabilitySummary[] {
