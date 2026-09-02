@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -90,11 +90,13 @@ describe.sequential("default registry source discovery CLI", () => {
   let originalCwd: string;
   let originalHome: string | undefined;
   let originalXdgConfigHome: string | undefined;
+  let originalPath: string | undefined;
 
   beforeEach(async () => {
     originalCwd = process.cwd();
     originalHome = process.env.HOME;
     originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+    originalPath = process.env.PATH;
     temporaryDirectory = await mkdtemp(join(tmpdir(), "capykit-default-sources-"));
   });
 
@@ -105,6 +107,8 @@ describe.sequential("default registry source discovery CLI", () => {
     else process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
     if (originalHome === undefined) delete process.env.HOME;
     else process.env.HOME = originalHome;
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
     await rm(temporaryDirectory, { recursive: true, force: true });
   });
 
@@ -174,6 +178,60 @@ describe.sequential("default registry source discovery CLI", () => {
     const output = JSON.parse(String(stdout.mock.calls.at(-1)?.[0] ?? "")) as { configPath: string; tools: Array<{ summary: string }> };
     expect(output.configPath).toBe(overridePath);
     expect(output.tools).toEqual([expect.objectContaining({ summary: "user definition" })]);
+  });
+
+  it("reports checked command availability without executing declared commands", async () => {
+    const binDirectory = join(temporaryDirectory, "approved-bin");
+    await mkdir(binDirectory, { recursive: true });
+    await writeFile(join(binDirectory, "present-tool"), "#!/bin/sh\nexit 99\n", { mode: 0o755 });
+
+    const registryPath = join(temporaryDirectory, "availability.registry.json");
+    const document = JSON.parse(await readFile(join(fixtures, "builtin.registry.json"), "utf8")) as Record<string, unknown>;
+    document.tools = [
+      { ...(document.tools as Record<string, unknown>[])[0], id: "present-tool", interfaces: [{ id: "present-cli", type: "cli", command: "present-tool", capabilities: [{ name: "inspect", summary: "Inspect safely." }] }] },
+      { ...(document.tools as Record<string, unknown>[])[0], id: "missing-tool", interfaces: [{ id: "missing-cli", type: "cli", command: "missing-tool", capabilities: [{ name: "inspect", summary: "Inspect safely." }] }] },
+      { ...(document.tools as Record<string, unknown>[])[0], id: "unchecked-tool", interfaces: [{ id: "unchecked-cli", type: "cli", command: "unchecked-tool", capabilities: [{ name: "inspect", summary: "Inspect safely." }] }] },
+    ];
+    await writeFile(registryPath, JSON.stringify(document), "utf8");
+    const configPath = join(temporaryDirectory, "availability-sources.json");
+    await writeFile(configPath, `${JSON.stringify({
+      format: "capykit.registrySources.v0.1",
+      sources: [{ id: "availability.fixture", layer: "user", type: "file", root: temporaryDirectory, path: "availability.registry.json" }],
+      locks: [],
+    }, null, 2)}\n`, "utf8");
+
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["tools", "list", "--config", configPath, "--check", "--path", binDirectory, "--allow-command", "present-tool", "--allow-command", "missing-tool", "--json"])).resolves.toBe(0);
+
+    const output = JSON.parse(String(stdout.mock.calls.at(-1)?.[0] ?? "")) as { tools: Array<{ id: string; availability: { status: string; checked: boolean; command: string; pathMode: string } }> };
+    expect(output.tools.find(({ id }) => id === "present-tool")?.availability).toMatchObject({ status: "available", checked: true, command: "present-tool", pathMode: "explicit" });
+    expect(output.tools.find(({ id }) => id === "missing-tool")?.availability).toMatchObject({ status: "unavailable", checked: true, command: "missing-tool", pathMode: "explicit" });
+    expect(output.tools.find(({ id }) => id === "unchecked-tool")?.availability).toMatchObject({ status: "skipped", checked: false, command: "unchecked-tool", pathMode: "explicit" });
+  });
+
+  it("isolates tools checks from the process PATH unless an approved path is passed", async () => {
+    const processPathBin = join(temporaryDirectory, "process-path-bin");
+    await mkdir(processPathBin, { recursive: true });
+    await writeFile(join(processPathBin, "isolated-tool"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+
+    const registryPath = join(temporaryDirectory, "isolated.registry.json");
+    const document = JSON.parse(await readFile(join(fixtures, "builtin.registry.json"), "utf8")) as Record<string, unknown>;
+    document.tools = [{ ...(document.tools as Record<string, unknown>[])[0], id: "isolated-tool", interfaces: [{ id: "isolated-cli", type: "cli", command: "isolated-tool", capabilities: [{ name: "inspect", summary: "Inspect safely." }] }] }];
+    await writeFile(registryPath, JSON.stringify(document), "utf8");
+    const configPath = join(temporaryDirectory, "isolated-sources.json");
+    await writeFile(configPath, `${JSON.stringify({
+      format: "capykit.registrySources.v0.1",
+      sources: [{ id: "isolated.fixture", layer: "user", type: "file", root: temporaryDirectory, path: "isolated.registry.json" }],
+      locks: [],
+    }, null, 2)}\n`, "utf8");
+    process.env.PATH = [processPathBin, process.env.PATH ?? ""].join(delimiter);
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["tools", "list", "--config", configPath, "--check", "--allow-command", "isolated-tool", "--json"])).resolves.toBe(0);
+
+    const output = JSON.parse(String(stdout.mock.calls.at(-1)?.[0] ?? "")) as { tools: Array<{ availability: { status: string; checked: boolean; pathMode: string } }> };
+    expect(output.tools[0]?.availability).toMatchObject({ status: "unavailable", checked: true, pathMode: "explicit-empty" });
   });
 
   it("reports a missing default config instead of returning an empty catalog", async () => {
