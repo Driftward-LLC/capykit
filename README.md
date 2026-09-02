@@ -148,12 +148,25 @@ capykit sources remove --config /etc/capykit/registry-sources.json --id team.too
 For day-to-day discovery, `capykit tools` and `capykit tools list` read the
 effective catalog from `$XDG_CONFIG_HOME/capykit/registry-sources.json`, falling
 back to `~/.config/capykit/registry-sources.json`. Pass `--config <path>` to
-override the default for admin and test workflows. Both list and show support
-`--json` for deterministic agent-readable output.
+override the default for admin and test workflows. By default, tools output is a
+catalog declaration and marks command availability as `unchecked`; it does not
+prove a command is installed.
+
+Use `capykit tools list --check` or `capykit tools check` to request lightweight
+local command lookup. Checks only test whether an allowlisted executable name is
+present on the operator-approved PATH; declared commands are never executed.
+Pass every command that may be checked with `--allow-command <name>` and pass the
+PATH to inspect with `--path <path>`. If `--path` is omitted, Capykit checks an
+empty PATH instead of inheriting the process PATH, so bundled agent helper
+directories do not masquerade as host-wide availability. Both list and show
+support `--json` for deterministic agent-readable output, including stable
+`availability.status`, `availability.checked`, and `availability.pathMode`
+fields.
 
 ```bash
 capykit tools
 capykit tools list --json
+capykit tools check --allow-command rg --path "$PATH" --json
 capykit tools show shared-tool --config /etc/capykit/registry-sources.json
 ```
 

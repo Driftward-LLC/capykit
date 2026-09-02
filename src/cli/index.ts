@@ -1,6 +1,7 @@
 import {
   addRegistrySource,
   CAPYKIT_VERSION,
+  checkCommandAvailability,
   defaultRegistrySourcesConfigPath,
   doctorRegistryFile,
   generateDiscoveryAdapterBundle,
@@ -79,8 +80,9 @@ function sourcesUsage(): string {
 function toolsUsage(): string {
   return [
     "Usage:",
-    "  capykit tools [list] [--config <path>] [--json]",
-    "  capykit tools show <tool-id> [--config <path>] [--json]",
+    "  capykit tools [list] [--config <path>] [--json] [--check] [--allow-command <name>]... [--path <path>]",
+    "  capykit tools check [--config <path>] [--json] [--allow-command <name>]... [--path <path>]",
+    "  capykit tools show <tool-id> [--config <path>] [--json] [--check] [--allow-command <name>]... [--path <path>]",
     "",
   ].join("\n");
 }
@@ -195,6 +197,15 @@ interface ToolSummary {
   readonly summary: string;
   readonly sourceId: string;
   readonly layer: RegistryLayer;
+  readonly availability?: ToolAvailability | undefined;
+}
+
+interface ToolAvailability {
+  readonly command: string;
+  readonly status: "available" | "unavailable" | "skipped" | "unchecked";
+  readonly checked: boolean;
+  readonly pathMode: "explicit" | "explicit-empty";
+  readonly message: string;
 }
 
 function toolCommand(tool: ResolvedRegistryTool): string {
@@ -207,24 +218,51 @@ function toolCommand(tool: ResolvedRegistryTool): string {
   return "-";
 }
 
-function toolSummary(tool: ResolvedRegistryTool): ToolSummary {
+function uncheckedAvailability(command: string): ToolAvailability {
+  return {
+    command,
+    status: "unchecked",
+    checked: false,
+    pathMode: "explicit-empty",
+    message: "Command availability was not checked; catalog entries are declarations, not installation proof.",
+  };
+}
+
+async function checkedAvailability(command: string, parsed: ParsedFlags): Promise<ToolAvailability> {
+  const explicitPath = flag(parsed, "--path");
+  const result = await checkCommandAvailability(command === "-" ? undefined : command, { approvedCommands: repeatedFlag(parsed, "--allow-command"), path: explicitPath ?? "" });
+  return {
+    command: result.command === "-" ? command : result.command,
+    status: result.status,
+    checked: result.checked,
+    pathMode: explicitPath === undefined || explicitPath.length === 0 ? "explicit-empty" : "explicit",
+    message: result.message,
+  };
+}
+
+async function toolSummary(tool: ResolvedRegistryTool, parsed?: ParsedFlags): Promise<ToolSummary> {
+  const command = toolCommand(tool);
+  const availability = parsed === undefined
+    ? uncheckedAvailability(command)
+    : await checkedAvailability(command, parsed);
   return {
     id: tool.id,
     name: typeof tool.record.name === "string" ? tool.record.name : tool.id,
-    command: toolCommand(tool),
+    command,
     summary: typeof tool.record.summary === "string" ? tool.record.summary : "",
     sourceId: tool.provenance.sourceId,
     layer: tool.provenance.layer,
+    availability,
   };
 }
 
 function formatToolsHuman(tools: readonly ToolSummary[]): string {
   if (tools.length === 0) return "No tools found.\n";
-  return `${tools.map((tool) => `${tool.id}\t${tool.command}\t${tool.summary}`).join("\n")}\n`;
+  return `${tools.map((tool) => `${tool.id}\t${tool.command}\t${tool.availability?.status ?? "unchecked"}\t${tool.summary}`).join("\n")}\n`;
 }
 
-function writeToolsList(catalog: RegistryCatalog, configPath: string, json: boolean): void {
-  const tools = catalog.tools.map(toolSummary);
+async function writeToolsList(catalog: RegistryCatalog, configPath: string, json: boolean, parsed?: ParsedFlags): Promise<void> {
+  const tools = await Promise.all(catalog.tools.map((tool) => toolSummary(tool, parsed)));
   if (json) {
     process.stdout.write(`${JSON.stringify({ format: "capykit.tools.list.v0.1", configPath, tools }, null, 2)}\n`);
     return;
@@ -232,13 +270,13 @@ function writeToolsList(catalog: RegistryCatalog, configPath: string, json: bool
   process.stdout.write(formatToolsHuman(tools));
 }
 
-function writeToolShow(tool: ResolvedRegistryTool, configPath: string, json: boolean): void {
-  const summary = toolSummary(tool);
+async function writeToolShow(tool: ResolvedRegistryTool, configPath: string, json: boolean, parsed?: ParsedFlags): Promise<void> {
+  const summary = await toolSummary(tool, parsed);
   if (json) {
     process.stdout.write(`${JSON.stringify({ format: "capykit.tools.show.v0.1", configPath, tool: { ...summary, record: tool.record, provenance: tool.provenance } }, null, 2)}\n`);
     return;
   }
-  process.stdout.write([summary.id, `command: ${summary.command}`, `summary: ${summary.summary}`, `source: ${summary.sourceId} (${summary.layer})`, ""].join("\n"));
+  process.stdout.write([summary.id, `command: ${summary.command}`, `availability: ${summary.availability?.status ?? "unchecked"}`, `summary: ${summary.summary}`, `source: ${summary.sourceId} (${summary.layer})`, ""].join("\n"));
 }
 
 async function runSources(argv: readonly string[]): Promise<number> {
@@ -279,13 +317,13 @@ async function runTools(argv: readonly string[]): Promise<number> {
   const first = argv[0];
   const action = first === undefined || first.startsWith("--") ? "list" : first;
   const flagOffset = first === undefined || first.startsWith("--") ? 0 : action === "show" ? 2 : 1;
-  const parsed = parseFlags(argv.slice(flagOffset), ["--json"]);
+  const parsed = parseFlags(argv.slice(flagOffset), ["--json", "--check"]);
   if (parsed.error !== undefined) { process.stderr.write(`${parsed.error}\n\n${toolsUsage()}`); return 2; }
   try {
     const configPath = await resolveConfigPath(parsed, true);
     const catalog = await loadRegistryCatalogForSourcesConfig(configPath);
-    if (action === "list") {
-      writeToolsList(catalog, configPath, parsed.switches.has("--json"));
+    if (action === "list" || action === "check") {
+      await writeToolsList(catalog, configPath, parsed.switches.has("--json"), action === "check" || parsed.switches.has("--check") ? parsed : undefined);
       return 0;
     }
     if (action === "show") {
@@ -293,7 +331,7 @@ async function runTools(argv: readonly string[]): Promise<number> {
       if (toolId === undefined || toolId.startsWith("--")) { process.stderr.write(toolsUsage()); return 2; }
       const tool = catalog.tools.find(({ id }) => id === toolId);
       if (tool === undefined) { process.stderr.write(`Tool not found: ${toolId}\n`); return 1; }
-      writeToolShow(tool, configPath, parsed.switches.has("--json"));
+      await writeToolShow(tool, configPath, parsed.switches.has("--json"), parsed.switches.has("--check") ? parsed : undefined);
       return 0;
     }
     process.stderr.write(`Unknown tools action: ${action}\n\n${toolsUsage()}`);

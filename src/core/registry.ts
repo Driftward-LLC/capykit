@@ -418,6 +418,15 @@ export interface RegistryDoctorOptions extends RegistryLoadOptions {
   readonly path?: string;
 }
 
+export type CommandAvailabilityStatus = "available" | "unavailable" | "skipped";
+
+export interface CommandAvailabilityResult {
+  readonly command: string;
+  readonly status: CommandAvailabilityStatus;
+  readonly checked: boolean;
+  readonly message: string;
+}
+
 /**
  * Load and resolve registry layers with fixed precedence:
  * builtin < organization < host < user. Input order and process cwd never
@@ -509,6 +518,22 @@ function isApproved(command: string, approvedCommands: readonly string[] | undef
   return Array.isArray(approvedCommands) && approvedCommands.includes(command);
 }
 
+export async function checkCommandAvailability(command: unknown, options: Pick<RegistryDoctorOptions, "approvedCommands" | "path"> = {}): Promise<CommandAvailabilityResult> {
+  if (typeof command !== "string" || !executableName.test(command)) {
+    return { command: "-", status: "skipped", checked: false, message: "Executable declaration is not a safe single command token; value was redacted." };
+  }
+  if (!isApproved(command, options.approvedCommands)) {
+    return { command, status: "skipped", checked: false, message: "Executable lookup skipped because the command is not in the operator-approved allowlist." };
+  }
+  const available = await executableAvailable(command, options.path);
+  return {
+    command,
+    status: available ? "available" : "unavailable",
+    checked: true,
+    message: available ? "Executable is present on the operator-approved PATH; it was not executed." : "Executable is approved but unavailable on the operator-approved PATH.",
+  };
+}
+
 function documentationRecord(toolId: string, index: number, url: unknown): RegistryDoctorRecord {
   const recordId = `${toolId}.documentation[${String(index)}]`;
   if (typeof url !== "string") {
@@ -527,10 +552,11 @@ async function commandRecord(recordType: "interface" | "healthCheck", recordId: 
   if (typeof command !== "string" || !executableName.test(command)) {
     return { recordType, recordId, severity: "error", status: "fail", code, message: "Executable declaration must be one command token without shell syntax, arguments, paths, or whitespace; value was redacted.", path };
   }
-  if (!isApproved(command, options.approvedCommands)) {
+  const availability = await checkCommandAvailability(command, options);
+  if (availability.status === "skipped") {
     return { recordType, recordId, severity: "info", status: "skipped", code, message: "Executable lookup skipped because the command is not in the operator-approved allowlist.", path };
   }
-  const available = await executableAvailable(command, options.path);
+  const available = availability.status === "available";
   return { recordType, recordId, severity: available ? "info" : "error", status: available ? "pass" : "fail", code, message: available ? "Executable is present on the operator-approved PATH; it was not executed." : "Executable is approved but unavailable on the operator-approved PATH.", path };
 }
 
