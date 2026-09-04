@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -89,11 +89,13 @@ describe.sequential("default registry source discovery CLI", () => {
   let temporaryDirectory: string;
   let originalCwd: string;
   let originalHome: string | undefined;
+  let originalPath: string | undefined;
   let originalXdgConfigHome: string | undefined;
 
   beforeEach(async () => {
     originalCwd = process.cwd();
     originalHome = process.env.HOME;
+    originalPath = process.env.PATH;
     originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
     temporaryDirectory = await mkdtemp(join(tmpdir(), "capykit-default-sources-"));
   });
@@ -105,6 +107,8 @@ describe.sequential("default registry source discovery CLI", () => {
     else process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
     if (originalHome === undefined) delete process.env.HOME;
     else process.env.HOME = originalHome;
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
     await rm(temporaryDirectory, { recursive: true, force: true });
   });
 
@@ -196,5 +200,54 @@ describe.sequential("default registry source discovery CLI", () => {
 
     const output = JSON.parse(String(stdout.mock.calls.at(-1)?.[0] ?? "")) as { precedence: Array<{ toolId: string }> };
     expect(output.precedence).toEqual([expect.objectContaining({ toolId: "shared-tool" })]);
+  });
+
+  it("reports checked CLI tool availability in JSON output", async () => {
+    const xdgHome = join(temporaryDirectory, "xdg");
+    const configPath = join(xdgHome, "capykit", "registry-sources.json");
+    const binDirectory = join(temporaryDirectory, "bin");
+    await mkdir(binDirectory, { recursive: true });
+    await writeFile(join(binDirectory, "shared"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    await writeSourcesConfig(configPath);
+    process.env.XDG_CONFIG_HOME = xdgHome;
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["tools", "list", "--check", "--path", binDirectory, "--json"])).resolves.toBe(0);
+
+    const output = JSON.parse(String(stdout.mock.calls.at(-1)?.[0] ?? "")) as { tools: Array<{ availability: { status: string; checked: boolean; command: string } }> };
+    expect(output.tools[0]?.availability).toMatchObject({ status: "available", checked: true, command: "shared" });
+  });
+
+  it("reports missing checked CLI commands as unavailable without executing them", async () => {
+    const xdgHome = join(temporaryDirectory, "xdg");
+    const configPath = join(xdgHome, "capykit", "registry-sources.json");
+    await writeSourcesConfig(configPath);
+    process.env.XDG_CONFIG_HOME = xdgHome;
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["tools", "check", "--path", temporaryDirectory, "--json"])).resolves.toBe(0);
+
+    const output = JSON.parse(String(stdout.mock.calls.at(-1)?.[0] ?? "")) as { tools: Array<{ availability: { status: string; checked: boolean; command: string } }> };
+    expect(output.tools[0]?.availability).toMatchObject({ status: "unavailable", checked: true, command: "shared" });
+  });
+
+  it("isolates availability checks to the operator-approved PATH", async () => {
+    const xdgHome = join(temporaryDirectory, "xdg");
+    const configPath = join(xdgHome, "capykit", "registry-sources.json");
+    const hiddenBinDirectory = join(temporaryDirectory, "hidden-bin");
+    const approvedBinDirectory = join(temporaryDirectory, "approved-bin");
+    await mkdir(hiddenBinDirectory, { recursive: true });
+    await mkdir(approvedBinDirectory, { recursive: true });
+    await writeFile(join(hiddenBinDirectory, "shared"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    await writeSourcesConfig(configPath);
+    process.env.XDG_CONFIG_HOME = xdgHome;
+    process.env.PATH = [hiddenBinDirectory, process.env.PATH ?? ""].join(delimiter);
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["tools", "list", "--check", "--path", approvedBinDirectory, "--json"])).resolves.toBe(0);
+
+    const output = JSON.parse(String(stdout.mock.calls.at(-1)?.[0] ?? "")) as { pathPolicy: { pathSource: string }; tools: Array<{ availability: { status: string; checked: boolean; command: string } }> };
+    expect(output.pathPolicy.pathSource).toBe("--path");
+    expect(output.tools[0]?.availability).toMatchObject({ status: "unavailable", checked: true, command: "shared" });
   });
 });

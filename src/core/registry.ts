@@ -418,6 +418,14 @@ export interface RegistryDoctorOptions extends RegistryLoadOptions {
   readonly path?: string;
 }
 
+export type CommandAvailabilityStatus = "available" | "unavailable" | "invalid" | "unchecked";
+
+export interface CommandAvailabilityResult {
+  readonly command: string;
+  readonly checked: boolean;
+  readonly status: CommandAvailabilityStatus;
+}
+
 /**
  * Load and resolve registry layers with fixed precedence:
  * builtin < organization < host < user. Input order and process cwd never
@@ -503,6 +511,11 @@ async function executableAvailable(command: string, pathValue: string | undefine
     }
   }
   return false;
+}
+
+export async function checkCommandAvailability(command: string, pathValue: string | undefined): Promise<CommandAvailabilityResult> {
+  if (!executableName.test(command)) return { command, checked: false, status: "invalid" };
+  return { command, checked: true, status: await executableAvailable(command, pathValue) ? "available" : "unavailable" };
 }
 
 function isApproved(command: string, approvedCommands: readonly string[] | undefined): boolean {
