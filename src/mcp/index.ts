@@ -7,8 +7,11 @@ import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   CAPYKIT_VERSION,
+  defaultRegistrySourcesConfigPath,
   loadRegistryCatalog,
+  loadRegistryCatalogForSourcesConfig,
   normalizeQuery,
+  registrySourcesConfigExists,
   type RegistryCatalog,
   type RegistrySource,
   type RegistryTool,
@@ -23,7 +26,7 @@ interface ToolInterface extends Record<string, unknown> { readonly id?: unknown;
 interface ToolHealthCheck extends Record<string, unknown> { readonly id?: unknown; readonly kind?: unknown; readonly interfaceId?: unknown; }
 
 export interface McpCatalogFilters { readonly visibility?: ScopeVisibility | undefined; readonly audience?: ScopeAudience | undefined; readonly context?: string | undefined; }
-export interface CapykitMcpServerOptions { readonly sources?: readonly RegistrySource[] | undefined; readonly registryPath?: string | undefined; readonly now?: (() => Date) | undefined; }
+export interface CapykitMcpServerOptions { readonly sources?: readonly RegistrySource[] | undefined; readonly registryPath?: string | undefined; readonly sourcesConfigPath?: string | undefined; readonly now?: (() => Date) | undefined; }
 
 export interface LoadedCatalogProvider { readonly catalog: () => Promise<RegistryCatalog>; }
 interface SearchToolsArgs extends McpCatalogFilters { readonly query?: string | undefined; }
@@ -49,7 +52,7 @@ function createCatalogProvider(options: CapykitMcpServerOptions): LoadedCatalogP
   const sources = options.sources ?? (options.registryPath === undefined ? [] : [registryFileSource(options.registryPath)]);
   return {
     catalog: async () => {
-      catalogPromise ??= loadRegistryCatalog(sources, options.now === undefined ? {} : { now: options.now });
+      catalogPromise ??= options.sourcesConfigPath === undefined ? loadRegistryCatalog(sources, options.now === undefined ? {} : { now: options.now }) : loadRegistryCatalogForSourcesConfig(options.sourcesConfigPath);
       return catalogPromise;
     },
   };
@@ -199,19 +202,30 @@ export function createServer(options: CapykitMcpServerOptions = {}): McpServer {
   return server;
 }
 
-function parseArgs(argv: readonly string[]): CapykitMcpServerOptions {
+async function parseArgs(argv: readonly string[]): Promise<CapykitMcpServerOptions> {
   const registryFlagIndex = argv.indexOf("--registry");
-  if (registryFlagIndex === -1) return {};
-  const registryPath = argv[registryFlagIndex + 1];
-  if (registryPath === undefined) throw new Error("Missing value for --registry.");
-  return { registryPath };
+  const configFlagIndex = argv.indexOf("--config");
+  if (registryFlagIndex !== -1 && configFlagIndex !== -1) throw new Error("Choose either --registry or --config, not both.");
+  if (registryFlagIndex !== -1) {
+    const registryPath = argv[registryFlagIndex + 1];
+    if (registryPath === undefined) throw new Error("Missing value for --registry.");
+    return { registryPath };
+  }
+  if (configFlagIndex !== -1) {
+    const sourcesConfigPath = argv[configFlagIndex + 1];
+    if (sourcesConfigPath === undefined) throw new Error("Missing value for --config.");
+    return { sourcesConfigPath };
+  }
+  const sourcesConfigPath = defaultRegistrySourcesConfigPath();
+  if (await registrySourcesConfigExists(sourcesConfigPath)) return { sourcesConfigPath };
+  return {};
 }
 
 export async function main(argv: readonly string[] = process.argv.slice(2)): Promise<void> {
   if (argv.includes("--http")) {
     throw new Error("Streamable HTTP transport is deferred for v0.1; run capykit-mcp over stdio.");
   }
-  await createServer(parseArgs(argv)).connect(new StdioServerTransport());
+  await createServer(await parseArgs(argv)).connect(new StdioServerTransport());
 }
 
 function isDirectExecution(): boolean {

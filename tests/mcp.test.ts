@@ -1,4 +1,7 @@
 import { fileURLToPath } from "node:url";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   checkAvailability,
@@ -8,7 +11,7 @@ import {
   searchTools,
   type LoadedCatalogProvider,
 } from "../src/mcp/index.js";
-import { loadRegistryCatalog, type RegistrySource } from "../src/core/index.js";
+import { loadRegistryCatalog, loadRegistryCatalogForSourcesConfig, type RegistrySource } from "../src/core/index.js";
 
 const fixtures = fileURLToPath(new URL("./fixtures/registries/", import.meta.url));
 const examples = fileURLToPath(new URL("../examples/", import.meta.url));
@@ -28,6 +31,18 @@ function exampleSource(): RegistrySource {
 function content(result: { readonly structuredContent?: Record<string, unknown> | undefined }): Record<string, unknown> {
   if (result.structuredContent === undefined) throw new Error("expected structured content");
   return result.structuredContent;
+}
+
+async function writeSourcesConfig(registryFile = "builtin.registry.json"): Promise<string> {
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), "capykit-mcp-sources-"));
+  const configPath = join(temporaryDirectory, "registry-sources.json");
+  await mkdir(dirname(configPath), { recursive: true });
+  await writeFile(configPath, `${JSON.stringify({
+    format: "capykit.registrySources.v0.1",
+    sources: [{ id: "mcp.fixture", layer: "user", type: "file", root: fixtures, path: registryFile }],
+    locks: [],
+  }, null, 2)}\n`, "utf8");
+  return configPath;
 }
 
 describe("read-only MCP server", () => {
@@ -83,5 +98,14 @@ describe("read-only MCP server", () => {
 
   it("accepts a CLI-compatible registry file path for stdio startup configuration", () => {
     expect(createServer({ registryPath: fileURLToPath(new URL("./fixtures/registries/builtin.registry.json", import.meta.url)) })).toBeDefined();
+  });
+
+  it("loads the same approved registry sources config as CLI discovery", async () => {
+    const configPath = await writeSourcesConfig();
+    const result = content(await searchTools({ catalog: async () => loadRegistryCatalogForSourcesConfig(configPath) }, { query: "built" }));
+
+    expect(result.tools).toEqual([
+      expect.objectContaining({ id: "shared-tool", summary: "builtin definition" }),
+    ]);
   });
 });

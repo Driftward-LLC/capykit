@@ -74,6 +74,13 @@ Run the read-only MCP server against the same registry:
 capykit-mcp --registry "$PWD/capykit.registry.json"
 ```
 
+For operator-approved layered sources, point the server at the same config file
+used by `capykit tools`:
+
+```bash
+capykit-mcp --config /etc/capykit/registry-sources.json
+```
+
 ## Development
 
 The TypeScript application has explicit boundaries under `src/`: `core` owns
@@ -159,13 +166,18 @@ capykit tools show shared-tool --config /etc/capykit/registry-sources.json
 
 ## Read-only MCP server
 
-`capykit-mcp --registry /absolute/path/to/registry.json` exposes the same core
-registry loader through four read-only MCP tools: `search_tools`, `get_tool`,
-`list_capabilities`, and `check_availability`. The server defaults to `public`
-visibility and `agent` audience, and non-public records are disclosed only when
-the caller also supplies the matching registry context. Availability checks are
-catalog-only: they report declarations but do not execute commands, mutate
-state, or probe remote services.
+`capykit-mcp --registry /absolute/path/to/registry.json` exposes a single
+registry file, while `capykit-mcp --config /absolute/path/to/registry-sources.json`
+uses the same approved layered source config as `capykit tools`. With no explicit
+source flag, the server uses the default `$XDG_CONFIG_HOME/capykit/registry-sources.json`
+or `~/.config/capykit/registry-sources.json` when it exists, and otherwise starts
+with an empty catalog for protocol handshakes. In all modes it exposes four
+read-only MCP tools: `search_tools`, `get_tool`, `list_capabilities`, and
+`check_availability`. The server defaults to `public` visibility and `agent`
+audience, and non-public records are disclosed only when the caller also
+supplies the matching registry context. Availability checks are catalog-only:
+they report declarations but do not execute commands, mutate state, or probe
+remote services.
 
 The v0.1 transport is stdio. Streamable HTTP is intentionally deferred until the
 package has a settled auth/session model for non-public context disclosure.
