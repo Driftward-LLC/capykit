@@ -418,6 +418,15 @@ export interface RegistryDoctorOptions extends RegistryLoadOptions {
   readonly path?: string;
 }
 
+export type CommandAvailabilityStatus = "available" | "unavailable" | "skipped";
+
+export interface CommandAvailabilityReport {
+  readonly status: CommandAvailabilityStatus;
+  readonly command: string | undefined;
+  readonly checked: boolean;
+  readonly reason: "present_on_path" | "missing_on_path" | "invalid_command" | "not_approved";
+}
+
 /**
  * Load and resolve registry layers with fixed precedence:
  * builtin < organization < host < user. Input order and process cwd never
@@ -509,6 +518,19 @@ function isApproved(command: string, approvedCommands: readonly string[] | undef
   return Array.isArray(approvedCommands) && approvedCommands.includes(command);
 }
 
+export async function checkCommandAvailability(command: string, options: { readonly approvedCommands?: readonly string[]; readonly path?: string } = {}): Promise<CommandAvailabilityReport> {
+  if (!executableName.test(command)) {
+    return { status: "skipped", command: undefined, checked: false, reason: "invalid_command" };
+  }
+  if (options.approvedCommands !== undefined && !isApproved(command, options.approvedCommands)) {
+    return { status: "skipped", command, checked: false, reason: "not_approved" };
+  }
+  const available = await executableAvailable(command, options.path);
+  return available
+    ? { status: "available", command, checked: true, reason: "present_on_path" }
+    : { status: "unavailable", command, checked: true, reason: "missing_on_path" };
+}
+
 function documentationRecord(toolId: string, index: number, url: unknown): RegistryDoctorRecord {
   const recordId = `${toolId}.documentation[${String(index)}]`;
   if (typeof url !== "string") {
@@ -530,7 +552,11 @@ async function commandRecord(recordType: "interface" | "healthCheck", recordId: 
   if (!isApproved(command, options.approvedCommands)) {
     return { recordType, recordId, severity: "info", status: "skipped", code, message: "Executable lookup skipped because the command is not in the operator-approved allowlist.", path };
   }
-  const available = await executableAvailable(command, options.path);
+  const approvedCommands = options.approvedCommands ?? [];
+  const availabilityOptions = options.path === undefined
+    ? { approvedCommands }
+    : { approvedCommands, path: options.path };
+  const available = (await checkCommandAvailability(command, availabilityOptions)).status === "available";
   return { recordType, recordId, severity: available ? "info" : "error", status: available ? "pass" : "fail", code, message: available ? "Executable is present on the operator-approved PATH; it was not executed." : "Executable is approved but unavailable on the operator-approved PATH.", path };
 }
 

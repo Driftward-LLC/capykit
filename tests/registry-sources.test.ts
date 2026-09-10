@@ -90,11 +90,13 @@ describe.sequential("default registry source discovery CLI", () => {
   let originalCwd: string;
   let originalHome: string | undefined;
   let originalXdgConfigHome: string | undefined;
+  let originalPath: string | undefined;
 
   beforeEach(async () => {
     originalCwd = process.cwd();
     originalHome = process.env.HOME;
     originalXdgConfigHome = process.env.XDG_CONFIG_HOME;
+    originalPath = process.env.PATH;
     temporaryDirectory = await mkdtemp(join(tmpdir(), "capykit-default-sources-"));
   });
 
@@ -105,15 +107,36 @@ describe.sequential("default registry source discovery CLI", () => {
     else process.env.XDG_CONFIG_HOME = originalXdgConfigHome;
     if (originalHome === undefined) delete process.env.HOME;
     else process.env.HOME = originalHome;
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
     await rm(temporaryDirectory, { recursive: true, force: true });
   });
 
-  async function writeSourcesConfig(configPath: string, registryFile = "builtin.registry.json"): Promise<void> {
+  async function writeSourcesConfig(configPath: string, registryFile = "builtin.registry.json", root = fixtures): Promise<void> {
     await mkdir(dirname(configPath), { recursive: true });
     await writeFile(configPath, `${JSON.stringify({
       format: "capykit.registrySources.v0.1",
-      sources: [{ id: "default.fixture", layer: "user", type: "file", root: fixtures, path: registryFile }],
+      sources: [{ id: "default.fixture", layer: "user", type: "file", root, path: registryFile }],
       locks: [],
+    }, null, 2)}\n`, "utf8");
+  }
+
+  async function writeToolRegistry(registryPath: string, command: string): Promise<void> {
+    await writeFile(registryPath, `${JSON.stringify({
+      schemaVersion: "0.1.0",
+      registry: { id: "availability-fixture", name: "Availability fixture" },
+      tools: [{
+        id: "availability-tool", name: "Availability tool", summary: "availability definition",
+        owners: [{ id: "capykit", name: "Capykit" }],
+        interfaces: [{ id: "availability-cli", type: "cli", command, capabilities: [{ name: "inspect", summary: "Inspect availability." }] }],
+        scope: { visibility: "public", audiences: ["human", "agent"], platforms: ["linux"] },
+        authentication: { mode: "none", requirements: [] },
+        safety: { risk: "read-only", approval: "never" },
+        lifecycle: { status: "active" },
+        healthChecks: [],
+        documentation: [{ label: "Docs", url: "https://example.com/capykit" }],
+        relationships: [], examples: [],
+      }],
     }, null, 2)}\n`, "utf8");
   }
 
@@ -183,6 +206,58 @@ describe.sequential("default registry source discovery CLI", () => {
     await expect(runAsync(["tools", "list"])).resolves.toBe(1);
 
     expect(stderr).toHaveBeenCalledWith(expect.stringContaining("No registry sources config found"));
+  });
+
+  it("reports requested tools availability in JSON without executing commands", async () => {
+    const binDirectory = join(temporaryDirectory, "bin");
+    await mkdir(binDirectory, { recursive: true });
+    await writeFile(join(binDirectory, "available-tool"), "#!/bin/sh\nexit 99\n", { mode: 0o755 });
+    const registryPath = join(temporaryDirectory, "availability.registry.json");
+    const configPath = join(temporaryDirectory, "availability-sources.json");
+    await writeToolRegistry(registryPath, "available-tool");
+    await writeSourcesConfig(configPath, "availability.registry.json", temporaryDirectory);
+
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["tools", "list", "--config", configPath, "--json", "--check", "--path", binDirectory])).resolves.toBe(0);
+
+    const output = JSON.parse(String(stdout.mock.calls.at(-1)?.[0] ?? "")) as { availability: { checked: boolean; pathSource: string }; tools: Array<{ availability: { status: string; checked: boolean; command: string; reason: string } }> };
+    expect(output.availability).toEqual({ checked: true, pathSource: "option" });
+    expect(output.tools[0]?.availability).toEqual({ status: "available", checked: true, command: "available-tool", reason: "present_on_path" });
+  });
+
+  it("reports missing commands as unavailable when availability checks are requested", async () => {
+    const registryPath = join(temporaryDirectory, "missing.registry.json");
+    const configPath = join(temporaryDirectory, "missing-sources.json");
+    await writeToolRegistry(registryPath, "missing-tool");
+    await writeSourcesConfig(configPath, "missing.registry.json", temporaryDirectory);
+
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["tools", "check", "--config", configPath, "--json", "--path", temporaryDirectory])).resolves.toBe(0);
+
+    const output = JSON.parse(String(stdout.mock.calls.at(-1)?.[0] ?? "")) as { tools: Array<{ availability: { status: string; checked: boolean; command: string; reason: string } }> };
+    expect(output.tools[0]?.availability).toEqual({ status: "unavailable", checked: true, command: "missing-tool", reason: "missing_on_path" });
+  });
+
+  it("uses the explicit tools check path instead of the process PATH", async () => {
+    const hiddenBinDirectory = join(temporaryDirectory, "hidden-bin");
+    const approvedBinDirectory = join(temporaryDirectory, "approved-bin");
+    await mkdir(hiddenBinDirectory, { recursive: true });
+    await mkdir(approvedBinDirectory, { recursive: true });
+    await writeFile(join(hiddenBinDirectory, "path-isolated-tool"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    const registryPath = join(temporaryDirectory, "path-isolated.registry.json");
+    const configPath = join(temporaryDirectory, "path-isolated-sources.json");
+    await writeToolRegistry(registryPath, "path-isolated-tool");
+    await writeSourcesConfig(configPath, "path-isolated.registry.json", temporaryDirectory);
+    process.env.PATH = [hiddenBinDirectory, process.env.PATH ?? ""].join(process.platform === "win32" ? ";" : ":");
+
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await expect(runAsync(["tools", "show", "availability-tool", "--config", configPath, "--json", "--check", "--path", approvedBinDirectory])).resolves.toBe(0);
+
+    const output = JSON.parse(String(stdout.mock.calls.at(-1)?.[0] ?? "")) as { tool: { availability: { status: string; checked: boolean; command: string; reason: string } } };
+    expect(output.tool.availability).toEqual({ status: "unavailable", checked: true, command: "path-isolated-tool", reason: "missing_on_path" });
   });
 
   it("uses the default config for sources inspect when --config is omitted", async () => {

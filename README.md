@@ -151,10 +151,19 @@ back to `~/.config/capykit/registry-sources.json`. Pass `--config <path>` to
 override the default for admin and test workflows. Both list and show support
 `--json` for deterministic agent-readable output.
 
+Plain tools output is a declaration view: it shows what the effective catalog
+claims, not whether those commands are installed. Use `capykit tools check` or
+`capykit tools list --check` to add command availability metadata. Availability
+checks only look up command tokens on the selected PATH and never execute tool
+commands. Pass `--path <path>` when you need an explicit operator-approved PATH,
+for example to avoid counting bundled agent helper directories as host-wide
+availability.
+
 ```bash
 capykit tools
 capykit tools list --json
-capykit tools show shared-tool --config /etc/capykit/registry-sources.json
+capykit tools check --path /usr/local/bin:/usr/bin --json
+capykit tools show shared-tool --config /etc/capykit/registry-sources.json --check
 ```
 
 ## Read-only MCP server
