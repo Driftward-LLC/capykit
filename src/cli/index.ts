@@ -1,6 +1,7 @@
 import {
   addRegistrySource,
   CAPYKIT_VERSION,
+  checkCommandAvailability,
   defaultRegistrySourcesConfigPath,
   doctorRegistryFile,
   generateDiscoveryAdapterBundle,
@@ -11,6 +12,7 @@ import {
   registrySourcesConfigExists,
   syncRegistrySources,
   type ApprovedRegistrySource,
+  type CommandAvailabilityReport,
   type RegistryCatalog,
   type RegistryLayer,
   type ResolvedRegistryTool,
@@ -79,8 +81,9 @@ function sourcesUsage(): string {
 function toolsUsage(): string {
   return [
     "Usage:",
-    "  capykit tools [list] [--config <path>] [--json]",
-    "  capykit tools show <tool-id> [--config <path>] [--json]",
+    "  capykit tools [list] [--config <path>] [--json] [--check] [--path <path>]",
+    "  capykit tools check [--config <path>] [--json] [--path <path>]",
+    "  capykit tools show <tool-id> [--config <path>] [--json] [--check] [--path <path>]",
     "",
   ].join("\n");
 }
@@ -195,6 +198,14 @@ interface ToolSummary {
   readonly summary: string;
   readonly sourceId: string;
   readonly layer: RegistryLayer;
+  readonly availability?: ToolAvailabilitySummary;
+}
+
+interface ToolAvailabilitySummary {
+  readonly status: "unchecked" | CommandAvailabilityReport["status"];
+  readonly checked: boolean;
+  readonly command: string | undefined;
+  readonly reason: "not_requested" | "no_cli_command" | CommandAvailabilityReport["reason"];
 }
 
 function toolCommand(tool: ResolvedRegistryTool): string {
@@ -218,27 +229,42 @@ function toolSummary(tool: ResolvedRegistryTool): ToolSummary {
   };
 }
 
-function formatToolsHuman(tools: readonly ToolSummary[]): string {
-  if (tools.length === 0) return "No tools found.\n";
-  return `${tools.map((tool) => `${tool.id}\t${tool.command}\t${tool.summary}`).join("\n")}\n`;
+async function toolAvailability(command: string, check: boolean, path: string | undefined): Promise<ToolAvailabilitySummary> {
+  if (!check) return { status: "unchecked", checked: false, command: command === "-" ? undefined : command, reason: "not_requested" };
+  if (command === "-") return { status: "skipped", checked: false, command: undefined, reason: "no_cli_command" };
+  return path === undefined ? checkCommandAvailability(command) : checkCommandAvailability(command, { path });
 }
 
-function writeToolsList(catalog: RegistryCatalog, configPath: string, json: boolean): void {
-  const tools = catalog.tools.map(toolSummary);
-  if (json) {
-    process.stdout.write(`${JSON.stringify({ format: "capykit.tools.list.v0.1", configPath, tools }, null, 2)}\n`);
+async function toolSummaryWithAvailability(tool: ResolvedRegistryTool, check: boolean, path: string | undefined): Promise<ToolSummary> {
+  const summary = toolSummary(tool);
+  return { ...summary, availability: await toolAvailability(summary.command, check, path) };
+}
+
+function formatToolsHuman(tools: readonly ToolSummary[]): string {
+  if (tools.length === 0) return "No tools found.\n";
+  return `${tools.map((tool) => {
+    const availability = tool.availability === undefined ? "" : `\t${tool.availability.status}`;
+    return `${tool.id}\t${tool.command}${availability}\t${tool.summary}`;
+  }).join("\n")}\n`;
+}
+
+async function writeToolsList(catalog: RegistryCatalog, configPath: string, options: { readonly json: boolean; readonly check: boolean; readonly path: string | undefined }): Promise<void> {
+  const tools = await Promise.all(catalog.tools.map((tool) => toolSummaryWithAvailability(tool, options.check, options.path)));
+  if (options.json) {
+    process.stdout.write(`${JSON.stringify({ format: "capykit.tools.list.v0.1", configPath, availability: { checked: options.check, pathSource: options.path === undefined ? "process" : "option" }, tools }, null, 2)}\n`);
     return;
   }
   process.stdout.write(formatToolsHuman(tools));
 }
 
-function writeToolShow(tool: ResolvedRegistryTool, configPath: string, json: boolean): void {
-  const summary = toolSummary(tool);
-  if (json) {
-    process.stdout.write(`${JSON.stringify({ format: "capykit.tools.show.v0.1", configPath, tool: { ...summary, record: tool.record, provenance: tool.provenance } }, null, 2)}\n`);
+async function writeToolShow(tool: ResolvedRegistryTool, configPath: string, options: { readonly json: boolean; readonly check: boolean; readonly path: string | undefined }): Promise<void> {
+  const summary = await toolSummaryWithAvailability(tool, options.check, options.path);
+  if (options.json) {
+    process.stdout.write(`${JSON.stringify({ format: "capykit.tools.show.v0.1", configPath, availability: { checked: options.check, pathSource: options.path === undefined ? "process" : "option" }, tool: { ...summary, record: tool.record, provenance: tool.provenance } }, null, 2)}\n`);
     return;
   }
-  process.stdout.write([summary.id, `command: ${summary.command}`, `summary: ${summary.summary}`, `source: ${summary.sourceId} (${summary.layer})`, ""].join("\n"));
+  const availability = summary.availability === undefined ? [] : [`availability: ${summary.availability.status}`];
+  process.stdout.write([summary.id, `command: ${summary.command}`, ...availability, `summary: ${summary.summary}`, `source: ${summary.sourceId} (${summary.layer})`, ""].join("\n"));
 }
 
 async function runSources(argv: readonly string[]): Promise<number> {
@@ -279,13 +305,14 @@ async function runTools(argv: readonly string[]): Promise<number> {
   const first = argv[0];
   const action = first === undefined || first.startsWith("--") ? "list" : first;
   const flagOffset = first === undefined || first.startsWith("--") ? 0 : action === "show" ? 2 : 1;
-  const parsed = parseFlags(argv.slice(flagOffset), ["--json"]);
+  const parsed = parseFlags(argv.slice(flagOffset), ["--json", "--check"]);
   if (parsed.error !== undefined) { process.stderr.write(`${parsed.error}\n\n${toolsUsage()}`); return 2; }
   try {
     const configPath = await resolveConfigPath(parsed, true);
     const catalog = await loadRegistryCatalogForSourcesConfig(configPath);
-    if (action === "list") {
-      writeToolsList(catalog, configPath, parsed.switches.has("--json"));
+    const options = { json: parsed.switches.has("--json"), check: parsed.switches.has("--check") || action === "check", path: flag(parsed, "--path") };
+    if (action === "list" || action === "check") {
+      await writeToolsList(catalog, configPath, options);
       return 0;
     }
     if (action === "show") {
@@ -293,7 +320,7 @@ async function runTools(argv: readonly string[]): Promise<number> {
       if (toolId === undefined || toolId.startsWith("--")) { process.stderr.write(toolsUsage()); return 2; }
       const tool = catalog.tools.find(({ id }) => id === toolId);
       if (tool === undefined) { process.stderr.write(`Tool not found: ${toolId}\n`); return 1; }
-      writeToolShow(tool, configPath, parsed.switches.has("--json"));
+      await writeToolShow(tool, configPath, options);
       return 0;
     }
     process.stderr.write(`Unknown tools action: ${action}\n\n${toolsUsage()}`);
