@@ -1,7 +1,7 @@
 import { execFile as nodeExecFile } from "node:child_process";
 import { constants } from "node:fs";
-import { readdir, stat } from "node:fs/promises";
-import { delimiter } from "node:path";
+import { access, readdir, stat } from "node:fs/promises";
+import { delimiter, join } from "node:path";
 import { hostname as osHostname } from "node:os";
 import { promisify } from "node:util";
 import type { RegistryDocument, RegistryTool } from "./registry.js";
@@ -58,9 +58,9 @@ function normalizeIdentifier(value: string, fallback: string): string {
 async function executableAvailable(command: string, pathValue: string | undefined): Promise<boolean> {
   for (const directory of configuredPath(pathValue)) {
     try {
-      const candidate = `${directory}/${command}`;
+      const candidate = join(directory, command);
       await stat(candidate);
-      await import("node:fs/promises").then(({ access }) => access(candidate, constants.X_OK));
+      await access(candidate, constants.X_OK);
       return true;
     } catch {
       // Keep looking on the next PATH entry.
@@ -72,24 +72,22 @@ async function executableAvailable(command: string, pathValue: string | undefine
 async function discoverPathCommands(pathValue: string | undefined): Promise<readonly DiscoveredCommand[]> {
   const commands = new Map<string, DiscoveredCommand>();
   for (const directory of configuredPath(pathValue)) {
-    let entries: string[];
     try {
-      entries = await readdir(directory);
+      const entries = await readdir(directory, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isFile()) continue;
+        if (!executableName.test(entry.name)) continue;
+        if (commands.has(entry.name)) continue;
+        try {
+          const candidate = join(directory, entry.name);
+          await access(candidate, constants.X_OK);
+          commands.set(entry.name, { command: entry.name, source: bootstrapHelperCommands.has(entry.name) ? "bootstrap-helper" : "path" });
+        } catch {
+          // Ignore non-executable or disappearing PATH entries.
+        }
+      }
     } catch {
       continue;
-    }
-    for (const entry of entries) {
-      if (!executableName.test(entry)) continue;
-      if (commands.has(entry)) continue;
-      try {
-        const candidate = `${directory}/${entry}`;
-        const metadata = await stat(candidate);
-        if (!metadata.isFile()) continue;
-        await import("node:fs/promises").then(({ access }) => access(candidate, constants.X_OK));
-        commands.set(entry, { command: entry, source: bootstrapHelperCommands.has(entry) ? "bootstrap-helper" : "path" });
-      } catch {
-        // Ignore non-executable or disappearing PATH entries.
-      }
     }
   }
   return [...commands.values()].sort((left, right) => left.command.localeCompare(right.command, "en-US"));
