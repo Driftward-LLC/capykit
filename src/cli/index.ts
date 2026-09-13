@@ -3,6 +3,7 @@ import {
   CAPYKIT_VERSION,
   checkCommandAvailability,
   defaultRegistrySourcesConfigPath,
+  discoverHostRegistry,
   doctorRegistryFile,
   generateDiscoveryAdapterBundle,
   inspectRegistrySources,
@@ -22,10 +23,10 @@ import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export function helpText(): string {
-  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command>\n\nCommands:\n  help                       Show this help\n  version                    Print the version\n  completion <shell>         Print shell completion for bash, zsh, or fish\n  doctor <registry.json>     Validate a registry and print capykit.registryDoctor.v0.1 JSON\n  adapters <registry.json>   Print generated Codex, Hermes, and AGENTS discovery adapters as JSON\n  sources <action>           Add, remove, sync, or inspect approved registry sources\n  tools [list|show]          List or inspect tools from the effective catalog\n`;
+  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command>\n\nCommands:\n  help                       Show this help\n  version                    Print the version\n  completion <shell>         Print shell completion for bash, zsh, or fish\n  doctor <registry.json>     Validate a registry and print capykit.registryDoctor.v0.1 JSON\n  adapters <registry.json>   Print generated Codex, Hermes, and AGENTS discovery adapters as JSON\n  discover host --json       Generate a host registry from live discovery\n  sources <action>           Add, remove, sync, or inspect approved registry sources\n  tools [list|show]          List or inspect tools from the effective catalog\n`;
 }
 
-const completionCommands = ["help", "version", "completion", "doctor", "adapters", "sources", "tools"] as const;
+const completionCommands = ["help", "version", "completion", "doctor", "adapters", "discover", "sources", "tools"] as const;
 
 function completionUsage(): string {
   return "Usage: capykit completion <bash|zsh|fish>\n";
@@ -63,6 +64,10 @@ function doctorUsage(): string {
 
 function adaptersUsage(): string {
   return "Usage: capykit adapters <registry.json>\n";
+}
+
+function discoverUsage(): string {
+  return "Usage: capykit discover host --json [--path <path>]\n";
 }
 
 function sourcesUsage(): string {
@@ -331,6 +336,18 @@ async function runTools(argv: readonly string[]): Promise<number> {
   }
 }
 
+async function runDiscover(argv: readonly string[]): Promise<number> {
+  const target = argv[0];
+  if (target !== "host") { process.stderr.write(discoverUsage()); return 2; }
+  const parsed = parseFlags(argv.slice(1), ["--json"]);
+  if (parsed.error !== undefined) { process.stderr.write(`${parsed.error}\n\n${discoverUsage()}`); return 2; }
+  if (!parsed.switches.has("--json")) { process.stderr.write(discoverUsage()); return 2; }
+  const path = flag(parsed, "--path");
+  const registry = await discoverHostRegistry(path === undefined ? {} : { path });
+  process.stdout.write(`${JSON.stringify(registry, null, 2)}\n`);
+  return 0;
+}
+
 export function run(argv: readonly string[]): number {
   const command = argv[0] ?? "help";
   if (["help", "--help", "-h"].includes(command)) { process.stdout.write(helpText()); return 0; }
@@ -357,6 +374,7 @@ export function run(argv: readonly string[]): number {
     return 0;
   }
   if (command === "sources") return 0;
+  if (command === "discover") return 0;
   if (command === "tools") return 0;
   process.stderr.write(`Unknown command: ${command}\n\n${helpText()}`); return 2;
 }
@@ -364,6 +382,7 @@ export function run(argv: readonly string[]): number {
 export async function runAsync(argv: readonly string[]): Promise<number> {
   const command = argv[0] ?? "help";
   if (command === "sources") return runSources(argv.slice(1));
+  if (command === "discover") return runDiscover(argv.slice(1));
   if (command === "tools") return runTools(argv.slice(1));
   if (command === "adapters") {
     const registryPath = argv[1];
