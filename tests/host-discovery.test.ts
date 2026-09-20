@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { join } from "node:path";
 import { mkdtemp } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import { runAsync } from "../src/cli/index.js";
@@ -90,13 +90,15 @@ describe("host registry discovery", () => {
   it("does not execute discovered PATH commands while inspecting availability", async () => {
     const directory = await mkdtemp(join(tmpdir(), "capykit-discovery-safe-"));
     await writeExecutable(directory, "dangerous-tool");
+    const execFile = vi.fn(() => { throw new Error("PATH discovery must not execute commands"); });
 
     const registry = await discoverHostRegistry({
-      path: [directory, process.env.PATH ?? ""].join(delimiter),
+      path: directory,
       hostname: "safe-host",
-      execFile: () => { throw new Error("only codex discovery may execute an approved command"); },
+      execFile,
     });
 
     expect(registry.tools.some(({ id }) => id === "dangerous-tool-cli")).toBe(true);
+    expect(execFile).not.toHaveBeenCalled();
   });
 });
