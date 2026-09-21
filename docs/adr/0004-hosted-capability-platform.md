@@ -57,6 +57,8 @@ on its service has been selected.
 
 ## Hosted objects
 
+<!-- markdownlint-disable MD013 -->
+
 | Object | Responsibility |
 | --- | --- |
 | Workspace and principal | Own resources and identify a human or an agent. Agents act through explicit grants or delegated authority. |
@@ -65,6 +67,8 @@ on its service has been selected.
 | Function version or skill artifact | Persist code or complete skill files centrally. Functions execute in a provisioned runtime; skills are retrieved by authorized clients or loaded into a hosted agent run. |
 | Grant | Bind a principal to permitted capabilities and connections, with any approval requirements and usage limits. |
 | Run | Record who invoked which version using which connection, plus status, permitted outputs, redacted logs, and measured usage. |
+
+<!-- markdownlint-enable MD013 -->
 
 Descriptions, visibility labels, and registry context strings are metadata.
 Authorization comes from authenticated identity and stored grants. In

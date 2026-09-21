@@ -35,8 +35,9 @@ Discovery-package v0.1 completion requirements are tracked in
 Canonical planning lives in the
 [Capykit Linear project](https://linear.app/driftward/project/capykit-72e4a9e54d52).
 
-Portable environment profiles, task search, shared MCP source configuration, and expanded discovery details are
-unreleased changes in this checkout. Build from source to try them using
+Portable environment profiles, task search, shared MCP source configuration,
+and expanded discovery details are unreleased changes in this checkout.
+Build from source to try them using
 `node dist/cli.js` and `node dist/mcp.js` until a new package release is published.
 
 ## Install

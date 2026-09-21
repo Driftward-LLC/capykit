@@ -9,6 +9,8 @@ were isolated environments on one machine, not separate operating systems.
 
 Both environments passed the same checks:
 
+<!-- markdownlint-disable MD013 -->
+
 | Check | Result |
 | --- | --- |
 | Apply with `--install-tools` | Installed the catalog, complete skill, and pinned Prettier 3.9.8 |
@@ -18,6 +20,8 @@ Both environments passed the same checks:
 | CLI search for `validate JSON` | Found the JSON review skill |
 | Run copied `scripts/check-json.mjs` | Validated the test JSON successfully |
 | Connect using the reported MCP command | `get_tool` returned the environment's installed `SKILL.md` path |
+
+<!-- markdownlint-enable MD013 -->
 
 The shared profile digest was
 `58e30cb5d685ba0d79d6dddf7db1c3b2777b72eca140ab1e4c7b82c9aa4c8464`.

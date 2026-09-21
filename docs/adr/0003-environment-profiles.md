@@ -4,7 +4,8 @@
 - Date: 2026-09-21
 - Decision owner: Driftward LLC
 - Extends: [ADR 0001](0001-product-contract.md)
-- Preserves: [ADR 0002](0002-registry-trust-boundaries.md) discovery and credential boundaries
+- Preserves: [ADR 0002](0002-registry-trust-boundaries.md) discovery and
+  credential boundaries
 
 [ADR 0004](0004-hosted-capability-platform.md) establishes the hosted product
 direction. These profiles remain an optional local setup and sharing facility;

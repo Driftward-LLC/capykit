@@ -5,6 +5,8 @@ using the public `examples/all-interfaces.registry.json` fixture. The comparison
 used actual CLI subprocesses and MCP stdio clients against a saved baseline
 build and the updated build.
 
+<!-- markdownlint-disable MD013 -->
+
 | Task keywords / interface | CLI search before → after | MCP search before → after |
 | --- | --- | --- |
 | `transform JSON` / CLI | unsupported → pass | pass → pass |
@@ -13,9 +15,13 @@ build and the updated build.
 | `read approved file` / MCP | unsupported → pass | no match → pass |
 | `local document index` / service | unsupported → pass | pass → pass |
 
+<!-- markdownlint-enable MD013 -->
+
 A search passes when the expected tool is the first result. The CLI used the
 local operator's catalog. MCP requests for organization and host records
 included their required visibility and matching example context.
+
+<!-- markdownlint-disable MD013 -->
 
 | Detail and configuration check | Before | After |
 | --- | --- | --- |
@@ -25,6 +31,8 @@ included their required visibility and matching example context.
 | Adapter export through default configured sources | unsupported | succeeds |
 | MCP hides scoped records with default, missing, or incorrect context | passes | passes |
 | MCP availability for a declared API | `available: true` | `declared: true`, `available: null`, `access: "unverified"` |
+
+<!-- markdownlint-enable MD013 -->
 
 Required invocation fields were the CLI command, MCP server/transport/command,
 API base URL and operations, service manager/name, and skill location/format.

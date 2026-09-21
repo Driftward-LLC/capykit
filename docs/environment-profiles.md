@@ -49,6 +49,8 @@ Omit `--install-tools` to apply the registry and skills without installing npm
 packages. Missing tools and unfinished connections remain visible in the report;
 they do not imply the profile is fully usable.
 
+<!-- markdownlint-disable MD013 -->
+
 | Option | Meaning |
 | --- | --- |
 | `--config <path>` | Select the registry sources configuration. Managed profile files and dependency prefixes live beside it. The default is `$XDG_CONFIG_HOME/capykit/registry-sources.json`, or `~/.config/capykit/registry-sources.json`. |
@@ -56,6 +58,8 @@ they do not imply the profile is fully usable.
 | `--path <path>` | Set the executable search path used by the availability report. The profile's dependency bin directory is searched first. This option does not change the shell or agent's `PATH`, or npm's execution environment. |
 | `--install-tools` | On `apply` only, install the declared exact npm package versions into the profile's isolated prefix. |
 | `--json` | Return the structured plan or apply report, including destinations and `npm.binPath`. |
+
+<!-- markdownlint-enable MD013 -->
 
 ## Make the profile usable by an agent
 
