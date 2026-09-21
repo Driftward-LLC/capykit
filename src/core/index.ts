@@ -2,6 +2,7 @@ export * from "./registry.js";
 export * from "./adapters.js";
 export * from "./sources.js";
 export * from "./host-discovery.js";
+export * from "./hosted-state.js";
 
 export const CAPYKIT_VERSION = "0.1.1";
 export interface CapabilitySummary { readonly id: string; readonly name: string; readonly description: string; }

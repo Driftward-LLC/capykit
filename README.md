@@ -14,6 +14,8 @@ The CLI and a read-only MCP server expose the same layered capability catalog.
 The public application contains no Driftward credentials or private capability
 records. Driftward-specific catalog data will live in a separate private
 registry repository and will be consumed by Capykit at runtime.
+Hosted workspace state, bootstrap order, and same-origin session requirements
+are recorded in [`docs/hosted-workspace-state.md`](docs/hosted-workspace-state.md).
 
 ## Project status
 
