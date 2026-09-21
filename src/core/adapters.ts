@@ -13,6 +13,7 @@ export interface DiscoveryAdapterAuthReference {
 export interface DiscoveryAdapterAuthRequirement {
   readonly id: string;
   readonly type: string;
+  readonly description?: string;
   readonly references: readonly DiscoveryAdapterAuthReference[];
 }
 
@@ -28,6 +29,20 @@ export interface DiscoveryAdapterInterface {
   readonly command?: string;
   readonly serverName?: string;
   readonly transport?: string;
+  readonly url?: string;
+  readonly protocol?: string;
+  readonly baseUrl?: string;
+  readonly operations?: readonly {
+    readonly id: string;
+    readonly method: string;
+    readonly path: string;
+    readonly summary: string;
+  }[];
+  readonly manager?: string;
+  readonly serviceName?: string;
+  readonly endpoint?: string;
+  readonly format?: string;
+  readonly location?: string;
   readonly capabilities: readonly DiscoveryAdapterInterfaceCapability[];
 }
 
@@ -43,6 +58,13 @@ export interface DiscoveryAdapterTool {
     readonly requirements: readonly DiscoveryAdapterAuthRequirement[];
   };
   readonly interfaces: readonly DiscoveryAdapterInterface[];
+  readonly safety: {
+    readonly risk: string;
+    readonly approval: string;
+    readonly notes?: string;
+  };
+  readonly documentation: readonly { readonly label: string; readonly url: string }[];
+  readonly examples: readonly { readonly title: string; readonly interfaceId: string; readonly usage: string }[];
   readonly source: {
     readonly layer: string;
     readonly registryId: string;
@@ -98,6 +120,7 @@ function authenticationRequirements(tool: RegistryTool): readonly DiscoveryAdapt
   return objectArray(authentication.requirements).map((requirement) => ({
     id: stringField(requirement.id) ?? "unknown",
     type: stringField(requirement.type) ?? "unknown",
+    ...(typeof requirement.description === "string" ? { description: requirement.description } : {}),
     references: objectArray(requirement.references).map((reference) => {
       const name = stringField(reference.name);
       const path = stringField(reference.path);
@@ -114,15 +137,21 @@ function authenticationRequirements(tool: RegistryTool): readonly DiscoveryAdapt
 
 function adapterInterfaces(tool: RegistryTool): readonly DiscoveryAdapterInterface[] {
   return objectArray(tool.interfaces).map((iface) => {
-    const command = stringField(iface.command);
-    const serverName = stringField(iface.serverName);
-    const transport = stringField(iface.transport);
+    const invocation = Object.fromEntries(
+      ["command", "serverName", "transport", "url", "protocol", "baseUrl", "manager", "serviceName", "endpoint", "format", "location"]
+        .filter((key) => stringField(iface[key]) !== undefined)
+        .map((key) => [key, iface[key]]),
+    );
     return {
       id: stringField(iface.id) ?? "unknown",
       type: stringField(iface.type) ?? "unknown",
-      ...(command === undefined ? {} : { command }),
-      ...(serverName === undefined ? {} : { serverName }),
-      ...(transport === undefined ? {} : { transport }),
+      ...invocation,
+      ...(Array.isArray(iface.operations) ? { operations: objectArray(iface.operations).map((operation) => ({
+        id: stringField(operation.id) ?? "unknown",
+        method: stringField(operation.method) ?? "unknown",
+        path: stringField(operation.path) ?? "unknown",
+        summary: stringField(operation.summary) ?? "No summary declared.",
+      })).sort((left, right) => left.id.localeCompare(right.id, "en-US")) } : {}),
       capabilities: objectArray(iface.capabilities).map((capability) => {
         const usage = stringField(capability.usage);
         return {
@@ -138,6 +167,7 @@ function adapterInterfaces(tool: RegistryTool): readonly DiscoveryAdapterInterfa
 function adapterTool(tool: ResolvedRegistryTool): DiscoveryAdapterTool {
   const scope = typeof tool.record.scope === "object" && tool.record.scope !== null && !Array.isArray(tool.record.scope) ? tool.record.scope as Record<string, unknown> : {};
   const authentication = typeof tool.record.authentication === "object" && tool.record.authentication !== null && !Array.isArray(tool.record.authentication) ? tool.record.authentication as Record<string, unknown> : {};
+  const safety = typeof tool.record.safety === "object" && tool.record.safety !== null && !Array.isArray(tool.record.safety) ? tool.record.safety as Record<string, unknown> : {};
   return {
     id: tool.id,
     name: stringField(tool.record.name) ?? tool.id,
@@ -150,6 +180,20 @@ function adapterTool(tool: ResolvedRegistryTool): DiscoveryAdapterTool {
       requirements: authenticationRequirements(tool.record),
     },
     interfaces: adapterInterfaces(tool.record),
+    safety: {
+      risk: stringField(safety.risk) ?? "unknown",
+      approval: stringField(safety.approval) ?? "unknown",
+      ...(typeof safety.notes === "string" ? { notes: safety.notes } : {}),
+    },
+    documentation: objectArray(tool.record.documentation).map((documentation) => ({
+      label: stringField(documentation.label) ?? "Documentation",
+      url: stringField(documentation.url) ?? "unknown",
+    })),
+    examples: objectArray(tool.record.examples).map((example) => ({
+      title: stringField(example.title) ?? "Example",
+      interfaceId: stringField(example.interfaceId) ?? "unknown",
+      usage: stringField(example.usage) ?? "No usage declared.",
+    })),
     source: {
       layer: tool.provenance.layer,
       registryId: tool.provenance.registryId,
@@ -169,13 +213,14 @@ function renderAgentsGuidance(tools: readonly DiscoveryAdapterTool[], catalogDig
     "This file is generated from the Capykit catalog. Do not edit it by hand; regenerate it from catalog metadata.",
     `Catalog digest: ${catalogDigest}`,
     "",
-    "Before implementation:",
-    "- Discover approved capabilities in the Capykit catalog before adding new tools or integrations.",
-    "- Prefer declared interfaces and documentation over ad hoc commands.",
+    "Find a capability for your task:",
+    '- Run `capykit tools search "<task keywords>"` to find relevant tools.',
+    "- Run `capykit tools show <id> --json --check` for invocation details, examples, documentation, safety metadata, and local availability checks.",
+    "- Follow the selected interface or skill instructions and the authorization already given for the task. Catalog metadata does not grant permission or verify access.",
     "- Treat credential references as boundaries: use only the referenced provider, environment variable, or file path; never copy or print credential values.",
-    "- If a needed capability is missing, update the catalog first so adapters stay reproducible.",
+    "- The .codex/capykit.discovery.json file is a reference export; load it explicitly when needed.",
     "",
-    "Available agent-facing tools:",
+    "Declared agent-facing tools:",
   ];
   for (const tool of tools.filter((entry) => entry.audiences.includes("agent"))) {
     lines.push(`- ${tool.id}: ${tool.summary} (${tool.visibility}; ${tool.interfaces.map((entry) => entry.type).join(", ")})`);
@@ -188,7 +233,9 @@ function codexConfig(tools: readonly DiscoveryAdapterTool[], catalogDigest: stri
     format: "capykit.codexDiscovery.v0.1",
     catalogDigest,
     instructions: [
-      "Inspect Capykit discovery data before implementing new integration logic.",
+      'Run capykit tools search "<task keywords>" to find a capability, then capykit tools show <id> --json --check for invocation details and local availability checks.',
+      "Follow the selected interface or skill instructions and the authorization already given for the task. Catalog metadata does not grant permission or verify access.",
+      "This file is a reference export and must be loaded explicitly.",
       "Use authentication references only as boundaries; never expose credential values.",
     ],
     tools: tools.filter((tool) => tool.audiences.includes("agent")),
@@ -202,7 +249,8 @@ function hermesReference(tools: readonly DiscoveryAdapterTool[], catalogDigest: 
     "Generated from Capykit catalog metadata.",
     `Catalog digest: ${catalogDigest}`,
     "",
-    "Use this reference to choose declared capabilities before creating custom scripts, plugins, or MCP integrations.",
+    'Run `capykit tools search "<task keywords>"` to find a capability, then `capykit tools show <id> --json --check` for invocation details and local availability checks.',
+    "Follow the selected interface or skill instructions and the authorization already given for the task. Catalog metadata does not grant permission or verify access.",
     "Credential entries below are references only; they are not credential values.",
     "",
   ];
@@ -211,8 +259,14 @@ function hermesReference(tools: readonly DiscoveryAdapterTool[], catalogDigest: 
     lines.push(`- id: ${tool.id}`);
     lines.push(`- summary: ${tool.summary}`);
     lines.push(`- visibility: ${tool.visibility}`);
-    lines.push(`- interfaces: ${tool.interfaces.map((entry) => `${entry.id} (${entry.type})`).join(", ")}`);
-    lines.push(`- auth: ${tool.authentication.mode}${tool.authentication.requirements.length === 0 ? "" : ` via ${tool.authentication.requirements.map((entry) => entry.references.map((reference) => reference.name ?? reference.path ?? reference.issuer ?? reference.kind).join("/")).join(", ")}`}`);
+    lines.push(`- next step: \`capykit tools show ${tool.id} --json --check\``);
+    lines.push("", "Declared invocation details:", "", "```json", stableJson({
+      interfaces: tool.interfaces,
+      authentication: tool.authentication,
+      safety: tool.safety,
+      documentation: tool.documentation,
+      examples: tool.examples,
+    }).trimEnd(), "```");
     lines.push("");
   }
   return lines.join("\n");

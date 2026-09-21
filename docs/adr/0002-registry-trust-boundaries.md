@@ -6,6 +6,11 @@
 - Linear issue: [ENG-4](https://linear.app/driftward/issue/ENG-4/define-registry-trust-credential-and-execution-boundaries)
 - Depends on: [ADR 0001](0001-product-contract.md)
 
+[ADR 0004](0004-hosted-capability-platform.md) adds a future hosted connection
+and invocation service as a separate authenticated boundary. This ADR and the
+v0.1 policy still govern the existing discovery package. Catalog visibility
+and caller-supplied context are not hosted authentication or tenant grants.
+
 ## Context
 
 Capykit combines capability metadata from bundled, local, and remote registry

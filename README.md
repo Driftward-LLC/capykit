@@ -1,7 +1,14 @@
 # Capykit
 
-Capykit is an installable capability registry for people and agents. It gives
-every supported agent the same machine-readable answer to three questions:
+Capykit is being built as a hosted capability platform for people and agents.
+The app will store connections, functions, tools, and skills centrally and
+provision authorized access and execution when requested from the web app,
+API, CLI, or MCP. See the
+[hosted product direction](docs/adr/0004-hosted-capability-platform.md).
+
+The current implementation is the installable discovery and local setup
+foundation. Hosted connections, function execution, and the web app are not yet
+implemented. The existing catalog answers three questions:
 
 - What tools are available?
 - What can each tool do?
@@ -17,14 +24,20 @@ registry repository and will be consumed by Capykit at runtime.
 
 ## Project status
 
-Capykit is in v0.1 stabilization. The accepted product contract, v0.1 scope,
-and ownership boundaries are recorded in
-[`docs/adr/0001-product-contract.md`](docs/adr/0001-product-contract.md).
-Current v0.1 completion requirements are tracked in
+The hosted product direction is recorded in
+[`ADR 0004`](docs/adr/0004-hosted-capability-platform.md), including the first
+complete user-and-agent invocation milestone. The existing v0.1 discovery
+package and its original ownership boundaries are recorded in
+[`ADR 0001`](docs/adr/0001-product-contract.md).
+Discovery-package v0.1 completion requirements are tracked in
 [`docs/v0.1-requirements.md`](docs/v0.1-requirements.md).
 
 Canonical planning lives in the
 [Capykit Linear project](https://linear.app/driftward/project/capykit-72e4a9e54d52).
+
+Portable environment profiles, task search, shared MCP source configuration, and expanded discovery details are
+unreleased changes in this checkout. Build from source to try them using
+`node dist/cli.js` and `node dist/mcp.js` until a new package release is published.
 
 ## Install
 
@@ -50,8 +63,8 @@ npm exec --package @driftward/capykit@latest -- capykit --help
 
 ## Quick start
 
-Download the public example registry, validate it, and generate discovery
-adapters:
+Download the public example registry, validate it, and add it to your configured
+sources. These examples demonstrate discovery; most describe fictional tools.
 
 ```bash
 REGISTRY_URL="https://raw.githubusercontent.com/Driftward-LLC/capykit/main"
@@ -60,19 +73,52 @@ curl -fsSL "$REGISTRY_URL/examples/all-interfaces.registry.json" \
   -o capykit.registry.json
 
 capykit doctor capykit.registry.json
-capykit adapters capykit.registry.json > capykit.discovery.json
+
+capykit sources add \
+  --config "${XDG_CONFIG_HOME:-$HOME/.config}/capykit/registry-sources.json" \
+  --id public.examples --layer user \
+  --file-root "$PWD" --file-path capykit.registry.json
+
+capykit tools search "filter JSON"
+capykit tools show jq --check
 ```
 
-The doctor command prints a machine-readable
-`capykit.registryDoctor.v0.1` report. The adapters command prints generated
-Codex, Hermes, and `AGENTS.md` discovery content from the same registry, keeping
-credential values outside the catalog.
+Search finds tools by task keywords. Inspect a match to get its invocation
+details, examples, safety metadata, authentication references, and documentation.
+`--check` looks up the declared CLI command on PATH; it does not verify access
+or execute the tool. Add `--json` for machine-readable search or detail output.
 
-Run the read-only MCP server against the same registry:
+The CLI, adapters, and read-only MCP server share your configured sources:
 
 ```bash
-capykit-mcp --registry "$PWD/capykit.registry.json"
+capykit adapters > capykit.discovery.json
+capykit-mcp
 ```
+
+Pass `--config <path>` to any of those entry points to choose another sources
+configuration. For a single file without registration, use
+`capykit adapters <registry.json>` or `capykit-mcp --registry <registry.json>`.
+
+## Use the same skills and tools in another environment
+
+A versioned environment profile bundles a registry, complete skill folders,
+optional pinned npm dependencies, and connection instructions. Share the folder
+through Git or an archive, then apply it in each environment. The included
+JSON toolkit works with the local build:
+
+```bash
+npm ci
+npm run build
+node dist/cli.js profile inspect examples/portable-toolkit/profile.json --json
+node dist/cli.js profile apply examples/portable-toolkit/profile.json --install-tools
+```
+
+Use `--config <path>` for an isolated configuration and `--skills-dir <path>`
+to copy skills into an agent's native skill directory. The report gives you the
+MCP connection and dependency `PATH` to configure for that environment.
+Connections still need their own authentication. See
+[environment profiles](docs/environment-profiles.md) for sharing, upgrades,
+and the complete setup flow. Profile commands are currently unreleased.
 
 ## Development
 
@@ -116,12 +162,19 @@ The corresponding machine-readable policy and positive/negative cases live in
 
 ## Discovery adapters
 
-`capykit adapters /absolute/path/to/registry.json` prints a deterministic
+`capykit adapters` prints a deterministic
 `capykit.discoveryAdapters.v0.1` bundle generated directly from registry
 metadata. The bundle contains concise `AGENTS.md` guidance, a Codex discovery
-configuration export, and a Hermes reference export. Credential data remains at
+reference export, and a Hermes reference export. Detail exports retain CLI/MCP
+invocation fields, API operations, service identifiers, skill locations,
+examples, safety, and documentation. Credential data remains at
 the catalog boundary: generated adapters include only declared reference names or
 paths and never credential values.
+
+Exports are returned as `{path, content}` entries; the command does not install
+them or overwrite agent configuration. `.codex/capykit.discovery.json` is a
+reference that must be read explicitly. Use `--config <path>` for alternate
+configured sources, or a positional registry file for an isolated export.
 
 Agents that need a reusable discovery workflow can follow the
 [`capykit-agent-discovery` skill](docs/agent-discovery-skill.md). It separates
@@ -148,8 +201,14 @@ capykit sources remove --config /etc/capykit/registry-sources.json --id team.too
 For day-to-day discovery, `capykit tools` and `capykit tools list` read the
 effective catalog from `$XDG_CONFIG_HOME/capykit/registry-sources.json`, falling
 back to `~/.config/capykit/registry-sources.json`. Pass `--config <path>` to
-override the default for admin and test workflows. Both list and show support
+override the default for admin and test workflows. List, search, and show support
 `--json` for deterministic agent-readable output.
+
+`capykit tools search "deployment logs"` matches all whitespace-separated
+keywords, in any order, across names, summaries, invocation identifiers,
+capabilities, API operations, and examples. Matching is case-insensitive;
+results retain catalog order. Use a few task keywords rather than a full
+question. No match returns an empty result, without suggesting an invented tool.
 
 Plain tools output is a declaration view: it shows what the effective catalog
 claims, not whether those commands are installed. Use `capykit tools check` or
@@ -162,19 +221,39 @@ availability.
 ```bash
 capykit tools
 capykit tools list --json
+capykit tools search "deployment logs" --json
 capykit tools check --path /usr/local/bin:/usr/bin --json
 capykit tools show shared-tool --config /etc/capykit/registry-sources.json --check
 ```
 
 ## Read-only MCP server
 
-`capykit-mcp --registry /absolute/path/to/registry.json` exposes the same core
-registry loader through four read-only MCP tools: `search_tools`, `get_tool`,
+`capykit-mcp` loads the same approved source configuration as the CLI, with
+`--config <path>` available for overrides. A missing configuration produces an
+actionable error on the first catalog request. `--registry <registry.json>`
+continues to support standalone registry files; it cannot be combined with
+`--config`. The server exposes four read-only MCP tools: `search_tools`, `get_tool`,
 `list_capabilities`, and `check_availability`. The server defaults to `public`
 visibility and `agent` audience, and non-public records are disclosed only when
-the caller also supplies the matching registry context. Availability checks are
-catalog-only: they report declarations but do not execute commands, mutate
-state, or probe remote services.
+the caller also supplies the matching registry context. For example, a host
+record scoped to `example-host` requires `visibility: "host"` and
+`context: "example-host"` on each request. Sharing configuration does not make
+non-public records visible by default.
+
+Search uses the same keyword matching as the CLI and returns summaries.
+`get_tool` returns full validated invocation details, examples, authentication
+references, and safety metadata. `list_capabilities` includes API operations.
+The server loads its catalog on the first request and caches it; restart it
+after changing or synchronizing sources.
+
+Availability checks remain catalog-only. A matching interface returns
+`declared: true`, `status: "declared"`, `available: null`, and
+`access: "unverified"`; an absent requested interface returns `declared: false`,
+`status: "not-declared"`, and `available: false`. They do not execute commands,
+read credentials, or probe services. This corrects earlier releases that
+returned `available: true` for a declaration. Consumers should use `declared`
+for catalog presence and treat `available: null` as unknown. CLI `--check`
+continues to report command presence separately, with access unverified.
 
 The v0.1 transport is stdio. Streamable HTTP is intentionally deferred until the
 package has a settled auth/session model for non-public context disclosure.
