@@ -7,8 +7,10 @@ import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   CAPYKIT_VERSION,
+  loadConfiguredRegistryCatalog,
   loadRegistryCatalog,
-  normalizeQuery,
+  searchRegistryTools,
+  toolCapabilities,
   type RegistryCatalog,
   type RegistrySource,
   type RegistryTool,
@@ -23,7 +25,7 @@ interface ToolInterface extends Record<string, unknown> { readonly id?: unknown;
 interface ToolHealthCheck extends Record<string, unknown> { readonly id?: unknown; readonly kind?: unknown; readonly interfaceId?: unknown; }
 
 export interface McpCatalogFilters { readonly visibility?: ScopeVisibility | undefined; readonly audience?: ScopeAudience | undefined; readonly context?: string | undefined; }
-export interface CapykitMcpServerOptions { readonly sources?: readonly RegistrySource[] | undefined; readonly registryPath?: string | undefined; readonly now?: (() => Date) | undefined; }
+export interface CapykitMcpServerOptions { readonly sources?: readonly RegistrySource[] | undefined; readonly registryPath?: string | undefined; readonly configPath?: string | undefined; readonly now?: (() => Date) | undefined; }
 
 export interface LoadedCatalogProvider { readonly catalog: () => Promise<RegistryCatalog>; }
 interface SearchToolsArgs extends McpCatalogFilters { readonly query?: string | undefined; }
@@ -46,10 +48,12 @@ function registryFileSource(registryPath: string): RegistrySource {
 
 function createCatalogProvider(options: CapykitMcpServerOptions): LoadedCatalogProvider {
   let catalogPromise: Promise<RegistryCatalog> | undefined;
-  const sources = options.sources ?? (options.registryPath === undefined ? [] : [registryFileSource(options.registryPath)]);
+  const sources = options.sources ?? (options.registryPath === undefined ? undefined : [registryFileSource(options.registryPath)]);
   return {
     catalog: async () => {
-      catalogPromise ??= loadRegistryCatalog(sources, options.now === undefined ? {} : { now: options.now });
+      catalogPromise ??= sources === undefined
+        ? loadConfiguredRegistryCatalog(options.configPath)
+        : loadRegistryCatalog(sources, options.now === undefined ? {} : { now: options.now });
       return catalogPromise;
     },
   };
@@ -87,18 +91,6 @@ function toolHealthChecks(tool: RegistryTool): readonly ToolHealthCheck[] {
   return Array.isArray(tool.healthChecks) ? tool.healthChecks.filter((entry): entry is ToolHealthCheck => typeof entry === "object" && entry !== null && !Array.isArray(entry)) : [];
 }
 
-function capabilitySummaries(tool: RegistryTool): readonly Record<string, unknown>[] {
-  return toolInterfaces(tool).flatMap((toolInterface) => {
-    const capabilities = Array.isArray(toolInterface.capabilities) ? toolInterface.capabilities : [];
-    return capabilities.filter((capability): capability is Record<string, unknown> => typeof capability === "object" && capability !== null && !Array.isArray(capability)).map((capability) => {
-      const summary: Record<string, unknown> = { ...capability, toolId: tool.id };
-      if (typeof toolInterface.id === "string") summary.interfaceId = toolInterface.id;
-      if (typeof toolInterface.type === "string") summary.interfaceType = toolInterface.type;
-      return summary;
-    });
-  });
-}
-
 function publicToolSummary(tool: ResolvedRegistryTool): Record<string, unknown> {
   return {
     id: tool.id,
@@ -128,27 +120,19 @@ function notFound(message: string): CallToolResult {
 }
 
 export async function searchTools(provider: LoadedCatalogProvider, args: SearchToolsArgs): Promise<CallToolResult> {
-  const query = normalizeQuery(args.query ?? "");
-  const tools = visibleTools(await provider.catalog(), args).filter((tool) => {
-    if (query.length === 0) return true;
-    const haystack = [tool.id, tool.record.name, tool.record.summary, ...capabilitySummaries(tool.record).flatMap((capability) => [capability.name, capability.summary])]
-      .filter((value): value is string => typeof value === "string")
-      .map(normalizeQuery)
-      .join("\n");
-    return haystack.includes(query);
-  }).map(publicToolSummary);
+  const tools = searchRegistryTools(visibleTools(await provider.catalog(), args), args.query ?? "").map(publicToolSummary);
   return ok({ tools, count: tools.length });
 }
 
 export async function getTool(provider: LoadedCatalogProvider, args: GetToolArgs): Promise<CallToolResult> {
   const tool = visibleTools(await provider.catalog(), args).find((candidate) => candidate.id === args.id);
   if (tool === undefined) return notFound(`No visible Capykit tool found for id ${JSON.stringify(args.id)}.`);
-  return ok({ tool: publicToolSummary(tool) });
+  return ok({ tool: { ...publicToolSummary(tool), ...tool.record } });
 }
 
 export async function listCapabilities(provider: LoadedCatalogProvider, args: ListCapabilitiesArgs): Promise<CallToolResult> {
   const tools = visibleTools(await provider.catalog(), args).filter((tool) => args.toolId === undefined || tool.id === args.toolId);
-  const capabilities = tools.flatMap((tool) => capabilitySummaries(tool.record));
+  const capabilities = tools.flatMap((tool) => toolCapabilities(tool.record));
   return ok({ capabilities, count: capabilities.length });
 }
 
@@ -156,7 +140,6 @@ export async function checkAvailability(provider: LoadedCatalogProvider, args: C
   const tools = visibleTools(await provider.catalog(), args).filter((tool) => args.toolId === undefined || tool.id === args.toolId);
   const checks = tools.flatMap((tool) => {
     const interfaces = toolInterfaces(tool.record);
-    const interfaceIds = new Set(interfaces.map(({ id }) => id).filter((id): id is string => typeof id === "string"));
     const matchingInterfaces = args.interfaceId === undefined ? interfaces : interfaces.filter(({ id }) => id === args.interfaceId);
     const healthChecks = toolHealthChecks(tool.record).filter((healthCheck) => args.interfaceId === undefined || healthCheck.interfaceId === args.interfaceId);
     return [{
@@ -166,7 +149,10 @@ export async function checkAvailability(provider: LoadedCatalogProvider, args: C
       safety: tool.record.safety,
       interfaces: matchingInterfaces.map((toolInterface) => ({ id: toolInterface.id, type: toolInterface.type })),
       healthChecks: healthChecks.map((healthCheck) => ({ ...healthCheck, status: "declared-not-executed" })),
-      available: matchingInterfaces.length > 0 && (args.interfaceId === undefined || interfaceIds.has(args.interfaceId)),
+      declared: matchingInterfaces.length > 0,
+      available: matchingInterfaces.length > 0 ? null : false,
+      status: matchingInterfaces.length > 0 ? "declared" : "not-declared",
+      access: "unverified",
       note: "Read-only availability only reports catalog declarations; it does not execute commands, mutate state, or probe remote services.",
     }];
   });
@@ -183,7 +169,7 @@ export function createServer(options: CapykitMcpServerOptions = {}): McpServer {
   }, async (args) => searchTools(provider, args));
   server.registerTool("get_tool", {
     title: "Get a Capykit tool",
-    description: "Return one visible catalog tool by stable id.",
+    description: "Return a visible tool's invocation details, examples, authentication requirements, and safety guidance by stable id.",
     inputSchema: { ...filterShape, id: z.string() },
   }, async (args) => getTool(provider, args));
   server.registerTool("list_capabilities", {
@@ -193,18 +179,25 @@ export function createServer(options: CapykitMcpServerOptions = {}): McpServer {
   }, async (args) => listCapabilities(provider, args));
   server.registerTool("check_availability", {
     title: "Check catalog availability declarations",
-    description: "Report deterministic availability metadata without executing checks.",
+    description: "Report declared interfaces and health checks. Installation and access remain unverified; no commands or probes are executed.",
     inputSchema: { ...filterShape, toolId: z.string().optional(), interfaceId: z.string().optional() },
   }, async (args) => checkAvailability(provider, args));
   return server;
 }
 
 function parseArgs(argv: readonly string[]): CapykitMcpServerOptions {
-  const registryFlagIndex = argv.indexOf("--registry");
-  if (registryFlagIndex === -1) return {};
-  const registryPath = argv[registryFlagIndex + 1];
-  if (registryPath === undefined) throw new Error("Missing value for --registry.");
-  return { registryPath };
+  const options: { registryPath?: string; configPath?: string } = {};
+  for (let index = 0; index < argv.length; index += 2) {
+    const flag = argv[index];
+    if (flag !== "--registry" && flag !== "--config") throw new Error(`Unknown argument ${JSON.stringify(flag)}. Use --config <path> or --registry <path>.`);
+    const value = argv[index + 1];
+    if (value === undefined || value.length === 0 || value.startsWith("-")) throw new Error(`Missing value for ${flag}.`);
+    const key = flag === "--registry" ? "registryPath" : "configPath";
+    if (options[key] !== undefined) throw new Error(`Duplicate option ${flag}.`);
+    options[key] = value;
+  }
+  if (options.registryPath !== undefined && options.configPath !== undefined) throw new Error("Use either --config or --registry, not both.");
+  return options;
 }
 
 export async function main(argv: readonly string[] = process.argv.slice(2)): Promise<void> {

@@ -294,6 +294,13 @@ export async function addRegistrySource(options: RegistrySourceAddOptions): Prom
   return { config: nextConfig, source: options.source, lock, catalog };
 }
 
+/** Validate a local addition without activating it or changing the config. */
+export async function validateFileRegistrySourceAddition(configPath: string, source: ApprovedFileRegistrySource): Promise<void> {
+  const config = await readConfig(configPath);
+  const lock = await resolveSourceLock(configPath, source, new Date().toISOString(), false);
+  await loadCatalogForConfig(configPath, withSource(config, source, lock));
+}
+
 export async function removeRegistrySource(configPath: string, id: string): Promise<ApprovedRegistrySourcesConfig> {
   const config = await readConfig(configPath);
   const source = config.sources.find((entry) => entry.id === id);
@@ -336,6 +343,14 @@ export async function inspectRegistrySources(configPath: string): Promise<Regist
 export async function loadRegistryCatalogForSourcesConfig(configPath: string): Promise<RegistryCatalog> {
   const config = await readConfig(configPath);
   return loadCatalogForConfig(configPath, config);
+}
+
+/** Read the approved effective catalog shared by CLI, MCP, and adapter exports. */
+export async function loadConfiguredRegistryCatalog(configPath = defaultRegistrySourcesConfigPath()): Promise<RegistryCatalog> {
+  if (!(await registrySourcesConfigExists(configPath))) {
+    throw new RegistryLoadError(`No registry sources config found at ${configPath}. Run capykit sources add --config <path> or pass --config <path>.`);
+  }
+  return loadRegistryCatalogForSourcesConfig(configPath);
 }
 
 export async function registrySourcesConfigExists(configPath: string): Promise<boolean> {

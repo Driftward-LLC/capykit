@@ -1,5 +1,6 @@
 import {
   addRegistrySource,
+  applyEnvironmentProfile,
   CAPYKIT_VERSION,
   checkCommandAvailability,
   defaultRegistrySourcesConfigPath,
@@ -7,10 +8,11 @@ import {
   doctorRegistryFile,
   generateDiscoveryAdapterBundle,
   inspectRegistrySources,
+  inspectEnvironmentProfile,
+  loadConfiguredRegistryCatalog,
   loadRegistryCatalog,
-  loadRegistryCatalogForSourcesConfig,
   removeRegistrySource,
-  registrySourcesConfigExists,
+  searchRegistryTools,
   syncRegistrySources,
   type ApprovedRegistrySource,
   type CommandAvailabilityReport,
@@ -23,10 +25,10 @@ import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export function helpText(): string {
-  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command>\n\nCommands:\n  help                       Show this help\n  version                    Print the version\n  completion <shell>         Print shell completion for bash, zsh, or fish\n  doctor <registry.json>     Validate a registry and print capykit.registryDoctor.v0.1 JSON\n  adapters <registry.json>   Print generated Codex, Hermes, and AGENTS discovery adapters as JSON\n  discover host --json       Generate a host registry from live discovery\n  sources <action>           Add, remove, sync, or inspect approved registry sources\n  tools [list|show]          List or inspect tools from the effective catalog\n`;
+  return `capykit ${CAPYKIT_VERSION}\n\nUsage: capykit <command>\n\nCommands:\n  help                       Show this help\n  version                    Print the version\n  completion <shell>         Print shell completion for bash, zsh, or fish\n  doctor <registry.json>     Validate a registry and print capykit.registryDoctor.v0.1 JSON\n  adapters [registry.json]   Export discovery adapters (defaults to configured sources)\n  discover host --json       Generate a host registry from live discovery\n  sources <action>           Add, remove, sync, or inspect approved registry sources\n  tools [list|search|show|check]  Find tools and inspect invocation details\n  profile [inspect|apply]    Set up a portable registry, skills, and dependencies\n`;
 }
 
-const completionCommands = ["help", "version", "completion", "doctor", "adapters", "discover", "sources", "tools"] as const;
+const completionCommands = ["help", "version", "completion", "doctor", "adapters", "discover", "sources", "tools", "profile"] as const;
 
 function completionUsage(): string {
   return "Usage: capykit completion <bash|zsh|fish>\n";
@@ -63,7 +65,7 @@ function doctorUsage(): string {
 }
 
 function adaptersUsage(): string {
-  return "Usage: capykit adapters <registry.json>\n";
+  return "Usage: capykit adapters [<registry.json> | --config <path>]\n";
 }
 
 function discoverUsage(): string {
@@ -88,7 +90,17 @@ function toolsUsage(): string {
     "Usage:",
     "  capykit tools [list] [--config <path>] [--json] [--check] [--path <path>]",
     "  capykit tools check [--config <path>] [--json] [--path <path>]",
+    "  capykit tools search <query> [--config <path>] [--json] [--check] [--path <path>]",
     "  capykit tools show <tool-id> [--config <path>] [--json] [--check] [--path <path>]",
+    "",
+  ].join("\n");
+}
+
+function profileUsage(): string {
+  return [
+    "Usage:",
+    "  capykit profile inspect <profile.json> [--config <path>] [--skills-dir <path>] [--path <path>] [--json]",
+    "  capykit profile apply <profile.json> [--config <path>] [--skills-dir <path>] [--path <path>] [--install-tools] [--json]",
     "",
   ].join("\n");
 }
@@ -187,13 +199,8 @@ function parseAddSource(parsed: ParsedFlags): ApprovedRegistrySource {
   return { ...base, type: "http", url: requireFlag(parsed, "--http-url") };
 }
 
-async function resolveConfigPath(parsed: ParsedFlags, requireExisting: boolean): Promise<string> {
-  const explicit = flag(parsed, "--config");
-  const configPath = explicit ?? defaultRegistrySourcesConfigPath();
-  if (explicit === undefined && requireExisting && !(await registrySourcesConfigExists(configPath))) {
-    throw new Error(`No registry sources config found at ${configPath}. Run capykit sources add --config <path> or pass --config <path>.`);
-  }
-  return configPath;
+function resolveConfigPath(parsed: ParsedFlags): string {
+  return flag(parsed, "--config") ?? defaultRegistrySourcesConfigPath();
 }
 
 interface ToolSummary {
@@ -203,6 +210,7 @@ interface ToolSummary {
   readonly summary: string;
   readonly sourceId: string;
   readonly layer: RegistryLayer;
+  readonly access: "unverified";
   readonly availability?: ToolAvailabilitySummary;
 }
 
@@ -231,6 +239,7 @@ function toolSummary(tool: ResolvedRegistryTool): ToolSummary {
     summary: typeof tool.record.summary === "string" ? tool.record.summary : "",
     sourceId: tool.provenance.sourceId,
     layer: tool.provenance.layer,
+    access: "unverified",
   };
 }
 
@@ -253,13 +262,14 @@ function formatToolsHuman(tools: readonly ToolSummary[]): string {
   }).join("\n")}\n`;
 }
 
-async function writeToolsList(catalog: RegistryCatalog, configPath: string, options: { readonly json: boolean; readonly check: boolean; readonly path: string | undefined }): Promise<void> {
+async function writeToolsList(catalog: RegistryCatalog, configPath: string, options: { readonly json: boolean; readonly check: boolean; readonly path: string | undefined }, query?: string): Promise<void> {
   const tools = await Promise.all(catalog.tools.map((tool) => toolSummaryWithAvailability(tool, options.check, options.path)));
   if (options.json) {
-    process.stdout.write(`${JSON.stringify({ format: "capykit.tools.list.v0.1", configPath, availability: { checked: options.check, pathSource: options.path === undefined ? "process" : "option" }, tools }, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify({ format: query === undefined ? "capykit.tools.list.v0.1" : "capykit.tools.search.v0.1", ...(query === undefined ? {} : { query, count: tools.length }), configPath, availability: { checked: options.check, pathSource: options.path === undefined ? "process" : "option" }, tools }, null, 2)}\n`);
     return;
   }
   process.stdout.write(formatToolsHuman(tools));
+  if (query !== undefined && tools.length > 0) process.stdout.write("Inspect a match with capykit tools show <tool-id> --check, reusing any --config and --path options.\n");
 }
 
 async function writeToolShow(tool: ResolvedRegistryTool, configPath: string, options: { readonly json: boolean; readonly check: boolean; readonly path: string | undefined }): Promise<void> {
@@ -269,7 +279,8 @@ async function writeToolShow(tool: ResolvedRegistryTool, configPath: string, opt
     return;
   }
   const availability = summary.availability === undefined ? [] : [`availability: ${summary.availability.status}`];
-  process.stdout.write([summary.id, `command: ${summary.command}`, ...availability, `summary: ${summary.summary}`, `source: ${summary.sourceId} (${summary.layer})`, ""].join("\n"));
+  const details = ["interfaces", "authentication", "safety", "examples", "documentation"].map((field) => `${field}: ${JSON.stringify(tool.record[field], null, 2)}`);
+  process.stdout.write([summary.id, `command: ${summary.command}`, ...availability, "access: unverified (command presence does not verify access)", `summary: ${summary.summary}`, `source: ${summary.sourceId} (${summary.layer})`, ...details, ""].join("\n"));
 }
 
 async function runSources(argv: readonly string[]): Promise<number> {
@@ -294,7 +305,7 @@ async function runSources(argv: readonly string[]): Promise<number> {
       return 0;
     }
     if (action === "inspect") {
-      const result = await inspectRegistrySources(await resolveConfigPath(parsed, false));
+      const result = await inspectRegistrySources(resolveConfigPath(parsed));
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
       return 0;
     }
@@ -309,15 +320,24 @@ async function runSources(argv: readonly string[]): Promise<number> {
 async function runTools(argv: readonly string[]): Promise<number> {
   const first = argv[0];
   const action = first === undefined || first.startsWith("--") ? "list" : first;
-  const flagOffset = first === undefined || first.startsWith("--") ? 0 : action === "show" ? 2 : 1;
+  if (!["list", "check", "show", "search"].includes(action)) { process.stderr.write(`Unknown tools action: ${action}\n\n${toolsUsage()}`); return 2; }
+  const needsValue = action === "show" || action === "search";
+  if (needsValue && (argv[1] === undefined || argv[1].startsWith("--") || argv[1].trim().length === 0)) { process.stderr.write(toolsUsage()); return 2; }
+  const flagOffset = first === undefined || first.startsWith("--") ? 0 : needsValue ? 2 : 1;
   const parsed = parseFlags(argv.slice(flagOffset), ["--json", "--check"]);
   if (parsed.error !== undefined) { process.stderr.write(`${parsed.error}\n\n${toolsUsage()}`); return 2; }
+  if ([...parsed.values.keys()].some((key) => !["--config", "--path"].includes(key)) || parsed.repeated.size > 0) { process.stderr.write(`Unknown or repeated tools option.\n\n${toolsUsage()}`); return 2; }
   try {
-    const configPath = await resolveConfigPath(parsed, true);
-    const catalog = await loadRegistryCatalogForSourcesConfig(configPath);
+    const configPath = resolveConfigPath(parsed);
+    const catalog = await loadConfiguredRegistryCatalog(configPath);
     const options = { json: parsed.switches.has("--json"), check: parsed.switches.has("--check") || action === "check", path: flag(parsed, "--path") };
     if (action === "list" || action === "check") {
       await writeToolsList(catalog, configPath, options);
+      return 0;
+    }
+    if (action === "search") {
+      const query = argv[1] as string;
+      await writeToolsList({ ...catalog, tools: searchRegistryTools(catalog.tools, query) }, configPath, options, query);
       return 0;
     }
     if (action === "show") {
@@ -330,6 +350,61 @@ async function runTools(argv: readonly string[]): Promise<number> {
     }
     process.stderr.write(`Unknown tools action: ${action}\n\n${toolsUsage()}`);
     return 2;
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    return 1;
+  }
+}
+
+async function runAdapters(argv: readonly string[]): Promise<number> {
+  const registryPath = argv[0]?.startsWith("--") ? undefined : argv[0];
+  const parsed = parseFlags(registryPath === undefined ? argv : argv.slice(1));
+  if (parsed.error !== undefined || parsed.repeated.size > 0 || [...parsed.values.keys()].some((key) => key !== "--config") || (registryPath !== undefined && parsed.values.size > 0)) {
+    process.stderr.write(adaptersUsage());
+    return 2;
+  }
+  try {
+    const absolutePath = registryPath === undefined ? undefined : resolve(registryPath);
+    const catalog = absolutePath === undefined
+      ? await loadConfiguredRegistryCatalog(resolveConfigPath(parsed))
+      : await loadRegistryCatalog([{ id: basename(absolutePath), layer: "user", type: "file", root: dirname(absolutePath), path: basename(absolutePath) }]);
+    process.stdout.write(`${JSON.stringify(generateDiscoveryAdapterBundle(catalog), null, 2)}\n`);
+    return 0;
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    return 1;
+  }
+}
+
+async function runProfile(argv: readonly string[]): Promise<number> {
+  const [action, profilePath] = argv;
+  if (!["inspect", "apply"].includes(action ?? "") || profilePath === undefined || profilePath.startsWith("--") || profilePath.trim().length === 0) { process.stderr.write(profileUsage()); return 2; }
+  const parsed = parseFlags(argv.slice(2), action === "apply" ? ["--json", "--install-tools"] : ["--json"]);
+  if (parsed.error !== undefined || parsed.repeated.size > 0 || [...parsed.values.keys()].some((key) => !["--config", "--skills-dir", "--path"].includes(key))) { process.stderr.write(profileUsage()); return 2; }
+  const configPath = flag(parsed, "--config");
+  const skillsDirectory = flag(parsed, "--skills-dir");
+  const path = flag(parsed, "--path");
+  if (configPath?.trim() === "" || skillsDirectory?.trim() === "") { process.stderr.write(profileUsage()); return 2; }
+  const options = { ...(configPath === undefined ? {} : { configPath }), ...(skillsDirectory === undefined ? {} : { skillsDirectory }), ...(path === undefined ? {} : { path }) };
+  try {
+    const report = action === "apply"
+      ? await applyEnvironmentProfile(profilePath, { ...options, installTools: parsed.switches.has("--install-tools") })
+      : await inspectEnvironmentProfile(profilePath, options);
+    if (parsed.switches.has("--json")) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    else {
+      const lines = [
+        `${report.profile.name} (${report.profile.id}@${report.profile.version}) — ${action === "apply" ? "applied" : "installation plan"}`,
+        `Sources: ${report.configPath}`,
+        ...report.skills.map((skill) => `Skill ${skill.id}: ${skill.destination}`),
+        ...report.tools.map((tool) => `Tool ${tool.command}: ${tool.availability.status}; version and access unverified${tool.instructions === undefined ? "" : ` — ${tool.instructions}`}`),
+        ...(report.npm.packages.length === 0 ? [] : [`Pinned dependencies (--install-tools): ${report.npm.packages.join(", ")}`, `Dependency PATH: ${report.npm.binPath}`]),
+        ...report.connections.map((connection) => `Setup ${connection.id}: ${connection.summary}\n${connection.instructions}`),
+        `Capykit MCP connection: ${JSON.stringify(report.mcp)}`,
+        ...report.nextSteps,
+      ];
+      process.stdout.write(`${lines.join("\n")}\n`);
+    }
+    return 0;
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     return 1;
@@ -357,14 +432,7 @@ export function run(argv: readonly string[]): number {
     if (shell === undefined || argv.length !== 2) { process.stderr.write(completionUsage()); return 2; }
     try { process.stdout.write(completionText(shell)); return 0; } catch (error) { process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n\n${completionUsage()}`); return 2; }
   }
-  if (command === "adapters") {
-    const registryPath = argv[1];
-    if (registryPath === undefined || argv.length !== 2) {
-      process.stderr.write(adaptersUsage());
-      return 2;
-    }
-    return 0;
-  }
+  if (command === "adapters") return 0;
   if (command === "doctor") {
     const parsed = parseDoctorArgs(argv.slice(1));
     if (parsed.registryPath === undefined || parsed.error !== undefined) {
@@ -376,6 +444,7 @@ export function run(argv: readonly string[]): number {
   if (command === "sources") return 0;
   if (command === "discover") return 0;
   if (command === "tools") return 0;
+  if (command === "profile") return 0;
   process.stderr.write(`Unknown command: ${command}\n\n${helpText()}`); return 2;
 }
 
@@ -384,17 +453,8 @@ export async function runAsync(argv: readonly string[]): Promise<number> {
   if (command === "sources") return runSources(argv.slice(1));
   if (command === "discover") return runDiscover(argv.slice(1));
   if (command === "tools") return runTools(argv.slice(1));
-  if (command === "adapters") {
-    const registryPath = argv[1];
-    if (registryPath === undefined || argv.length !== 2) {
-      process.stderr.write(adaptersUsage());
-      return 2;
-    }
-    const absoluteRegistryPath = resolve(registryPath);
-    const catalog = await loadRegistryCatalog([{ id: basename(absoluteRegistryPath), layer: "user", type: "file", root: dirname(absoluteRegistryPath), path: basename(absoluteRegistryPath) }]);
-    process.stdout.write(`${JSON.stringify(generateDiscoveryAdapterBundle(catalog), null, 2)}\n`);
-    return 0;
-  }
+  if (command === "profile") return runProfile(argv.slice(1));
+  if (command === "adapters") return runAdapters(argv.slice(1));
   if (command !== "doctor") return run(argv);
   const parsed = parseDoctorArgs(argv.slice(1));
   if (parsed.registryPath === undefined || parsed.error !== undefined) {

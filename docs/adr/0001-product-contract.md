@@ -5,6 +5,11 @@
 - Decision owner: Driftward LLC
 - Linear issue: [ENG-2](https://linear.app/driftward/issue/ENG-2/define-product-contract-final-name-and-v01-scope)
 
+Amended on 2026-09-21 by [ADR 0004](0004-hosted-capability-platform.md): the
+product target includes hosted connections, functions, and access for users and
+agents. The scope below records the original discovery package; its hosting,
+credential-brokering, and execution exclusions no longer limit the whole product.
+
 ## Context
 
 Agents on the same host or inside the same company often discover tools through

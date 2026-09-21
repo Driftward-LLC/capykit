@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "0.1.0",
+  "registry": { "id": "portable-toolkit", "name": "Portable JSON toolkit" },
+  "tools": [
+    {
+      "id": "json-review",
+      "name": "JSON review skill",
+      "summary": "Validate JSON files and review their structure using a portable skill.",
+      "owners": [{ "id": "capykit", "name": "Capykit" }],
+      "interfaces": [{ "id": "json-review-skill", "type": "skill", "format": "agents-skill", "location": "skills/json-review/SKILL.md", "capabilities": [{ "name": "validate-json", "summary": "Check JSON syntax without modifying files.", "usage": "Load the skill and run its bundled scripts/check-json.mjs with Node.js." }] }],
+      "scope": { "visibility": "public", "audiences": ["agent", "human"], "platforms": ["linux", "macos", "windows"] },
+      "authentication": { "mode": "none", "requirements": [] },
+      "safety": { "risk": "read-only", "approval": "never" },
+      "lifecycle": { "status": "active", "version": "1.0.0" },
+      "healthChecks": [],
+      "documentation": [{ "label": "JSON syntax", "url": "https://www.json.org/json-en.html" }],
+      "relationships": [],
+      "examples": [{ "title": "Validate a JSON file", "interfaceId": "json-review-skill", "usage": "Load SKILL.md, then run node scripts/check-json.mjs /absolute/path/to/input.json from the skill directory." }]
+    },
+    {
+      "id": "prettier",
+      "name": "Prettier",
+      "summary": "Check or format JSON and source files consistently across environments.",
+      "owners": [{ "id": "prettier", "name": "Prettier" }],
+      "interfaces": [{ "id": "prettier-cli", "type": "cli", "command": "prettier", "capabilities": [{ "name": "check-format", "summary": "Check formatting without writing changes.", "usage": "prettier --check input.json" }] }],
+      "scope": { "visibility": "public", "audiences": ["agent", "human"], "platforms": ["linux", "macos", "windows"] },
+      "authentication": { "mode": "none", "requirements": [] },
+      "safety": { "risk": "writes-data", "approval": "on-write", "notes": "--check reads files; --write changes them and requires a matching user request." },
+      "lifecycle": { "status": "active", "version": "3.9.8" },
+      "healthChecks": [{ "id": "prettier-installed", "kind": "command-available", "command": "prettier" }],
+      "documentation": [{ "label": "Prettier CLI", "url": "https://prettier.io/docs/cli" }],
+      "relationships": [],
+      "examples": [{ "title": "Check a JSON file", "interfaceId": "prettier-cli", "usage": "prettier --check input.json" }]
+    }
+  ]
+}

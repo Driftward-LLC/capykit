@@ -183,7 +183,7 @@ function requireGitPath(path: string): void {
 const forbiddenKey = /(^|[_-])(api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|refresh[_-]?token|session[_-]?(cookie|token)|private[_-]?key|token|secret|password|passwd|cookie|authorization)([_-].*|$)/iu;
 const forbiddenValue = /-----BEGIN [A-Z ]*PRIVATE KEY-----|(^|\s)(Bearer|Basic)\s+\S+|(^|[^A-Za-z0-9])(gh[pousr]_|github_pat_|sk-|xox[baprs]-|AKIA|ASIA)[A-Za-z0-9_-]+|https:\/\/(discord(app)?\.com)(:0*443)?\/api\/webhooks\/[0-9]+\/\S+|https:\/\/hooks\.slack\.com(:0*443)?\/services\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+/iu;
 
-function rejectCredentials(value: unknown, sourceId: string, path = "$"): void {
+export function rejectCredentials(value: unknown, sourceId: string, path = "$"): void {
   if (typeof value === "string" && forbiddenValue.test(value)) {
     throw new RegistryLoadError(`Registry source ${JSON.stringify(sourceId)} contains forbidden credential-like material at ${path}; the value was redacted.`);
   }
@@ -497,18 +497,23 @@ function redactedMessage(error: unknown): string {
 }
 
 function pathDirectories(pathValue: string | undefined): readonly string[] {
-  return (pathValue ?? process.env.PATH ?? "").split(delimiter).filter((entry) => entry.length > 0);
+  return (pathValue ?? process.env.PATH ?? "").split(process.platform === "win32" ? ";" : delimiter).filter((entry) => entry.length > 0);
 }
 
 async function executableAvailable(command: string, pathValue: string | undefined): Promise<boolean> {
+  const windows = process.platform === "win32";
+  const extensions = windows ? (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").map((extension) => extension.trim().toLowerCase()).filter((extension) => /^\.[a-z0-9]+$/u.test(extension)) : [];
+  const names = [command, ...extensions.map((extension) => `${command}${extension}`)];
   for (const directory of pathDirectories(pathValue)) {
-    const candidate = join(directory, command);
-    try {
-      await access(candidate, constants.X_OK);
-      const metadata = await stat(candidate);
-      if (metadata.isFile()) return true;
-    } catch {
-      // Try the next PATH entry without leaking filesystem details into the report.
+    for (const name of names) {
+      const candidate = join(directory, name);
+      try {
+        await access(candidate, windows ? constants.F_OK : constants.X_OK);
+        const metadata = await stat(candidate);
+        if (metadata.isFile()) return true;
+      } catch {
+        // Try the next PATH entry without leaking filesystem details into the report.
+      }
     }
   }
   return false;

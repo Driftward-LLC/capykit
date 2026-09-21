@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -89,6 +89,35 @@ try {
   `, "utf8");
   execFileSync(process.execPath, [installedValidatorSmoke], { cwd: installRoot, stdio: "pipe" });
 
+  const profileRoot = join(temporaryRoot, "portable-profile");
+  await cp(join(repositoryRoot, "examples", "portable-toolkit"), profileRoot, { recursive: true });
+  const profilePath = join(profileRoot, "profile.json");
+  const profileConfig = join(temporaryRoot, "profile-config", "registry-sources.json");
+  const installedCliJson = (args) => JSON.parse(execFileSync(join(binRoot, `capykit${binSuffix}`), args, {
+    cwd: installRoot,
+    encoding: "utf8",
+    shell: process.platform === "win32",
+  }));
+  const profilePlan = installedCliJson(["profile", "inspect", profilePath, "--config", profileConfig, "--json"]);
+  assert.equal(profilePlan.format, "capykit.profilePlan.v0.1");
+  assert.equal(profilePlan.profile.id, "portable-toolkit");
+  await assert.rejects(readFile(profileConfig), { code: "ENOENT" }, "profile inspect must not activate a source");
+  const profileApplied = installedCliJson(["profile", "apply", profilePath, "--config", profileConfig, "--json"]);
+  assert.equal(profileApplied.applied, true);
+  assert.equal(profileApplied.dependenciesInstalled, false, "package smoke must not install profile dependencies");
+  await rm(profileRoot, { recursive: true });
+  const installedSkill = installedCliJson(["tools", "show", "json-review", "--config", profileConfig, "--json"]);
+  const skillDirectory = profileApplied.skills.find(({ id }) => id === "json-review")?.destination;
+  assert.ok(skillDirectory, "applied profile must report its installed skill destination");
+  assert.equal(installedSkill.tool.record.interfaces.find(({ type }) => type === "skill")?.location, join(skillDirectory, "SKILL.md"));
+  for (const file of ["SKILL.md", "scripts/check-json.mjs", "references/checklist.md"]) {
+    assert.equal(
+      await readFile(join(skillDirectory, file), "utf8"),
+      await readFile(join(repositoryRoot, "examples", "portable-toolkit", "skills", "json-review", file), "utf8"),
+      "installed profile must preserve its skill and support files after the original bundle is removed",
+    );
+  }
+
   const request = JSON.stringify({
     jsonrpc: "2.0",
     id: 1,
@@ -127,7 +156,7 @@ try {
   assert.equal(checksums.artifacts.length, 4);
   assert.ok(checksums.artifacts.every((artifact) => /^[a-f0-9]{64}$/.test(artifact.sha256)), "standalone artifacts must publish sha256 checksums");
 
-  console.log("Packed package smoke test passed: CLI, completions, imports, schema asset, installed validator, MCP server, and standalone artifacts.");
+  console.log("Packed package smoke test passed: CLI, completions, imports, schema asset, installed validator, portable profile, MCP server, and standalone artifacts.");
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
 }

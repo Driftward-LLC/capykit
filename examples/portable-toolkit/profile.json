@@ -1,0 +1,15 @@
+{
+  "format": "capykit.environmentProfile.v0.1",
+  "id": "portable-toolkit",
+  "version": "1.0.0",
+  "name": "Portable JSON toolkit",
+  "registry": "registry.json",
+  "skills": [
+    { "id": "json-review", "path": "skills/json-review" }
+  ],
+  "tools": [
+    { "command": "node", "instructions": "Install Node.js 22 or newer in this environment." },
+    { "command": "prettier", "npm": { "package": "prettier", "version": "3.9.8" } }
+  ],
+  "connections": []
+}
