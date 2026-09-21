@@ -210,4 +210,60 @@ describe("portable environment profiles", () => {
     const after = await inspectEnvironmentProfile(profilePath, { configPath, path: directory });
     expect(after.profile.digest).not.toBe(before.profile.digest);
   });
+
+  it("reapplies a 512-file bundle and stops before reading a later skill beyond the shared limit", async () => {
+    const skillRoot = join(bundle, "skills", "research");
+    for (let index = 0; index < 506; index += 1) await writeFile(join(skillRoot, `file-${String(index)}.txt`), "");
+    const options = { configPath, path: directory };
+    await expect(applyEnvironmentProfile(profilePath, options)).resolves.toMatchObject({ applied: true });
+    await expect(applyEnvironmentProfile(profilePath, options)).resolves.toMatchObject({ applied: true });
+
+    const extra = join(bundle, "skills", "extra");
+    await mkdir(extra);
+    await writeFile(join(extra, "SKILL.md"), "---\nname: extra\ndescription: Extra skill.\n---\n");
+    await writeFile(join(extra, "z-private.txt"), `access_token=${"x".repeat(32)}\n`);
+    await writeJson(profilePath, { ...profile, skills: [...profile.skills, { id: "extra", path: "skills/extra" }] });
+
+    // The old per-skill budget reached the credential sentinel before checking the total.
+    await expect(inspectEnvironmentProfile(profilePath, options)).rejects.toThrow(/512-file/u);
+  }, 30_000);
+
+  it("reapplies a 32 MiB bundle including generated snapshot metadata and rejects one extra byte", async () => {
+    const fileLimit = 8 * 1024 * 1024;
+    const bundleLimit = 32 * 1024 * 1024;
+    const firstTool = registry.tools[0];
+    if (firstTool === undefined) throw new Error("Missing registry fixture tool");
+    const originalRegistrySize = (await stat(join(bundle, profile.registry))).size;
+    const padding = "x".repeat(fileLimit - originalRegistrySize);
+    await writeJson(join(bundle, profile.registry), { ...registry, tools: [{ ...firstTool, summary: `${String(firstTool.summary)}${padding}` }, ...registry.tools.slice(1)] });
+    expect((await stat(join(bundle, profile.registry))).size).toBe(fileLimit);
+
+    const existingPaths = ["profile.json", profile.registry, "skills/research/SKILL.md", "skills/research/scripts/check.sh", "skills/research/references/guide.md", "skills/research/assets/fixture.bin"];
+    const existingSizes = await Promise.all(existingPaths.map(async (path) => (await stat(join(bundle, path))).size));
+    let remaining = bundleLimit - existingSizes.reduce((total, size) => total + size, 0);
+    let lastAsset = "";
+    let lastSize = 0;
+    for (let index = 0; remaining > 0; index += 1) {
+      lastAsset = join(bundle, "skills", "research", "assets", `large-${String(index)}.bin`);
+      lastSize = Math.min(fileLimit, remaining);
+      await writeFile(lastAsset, Buffer.alloc(lastSize));
+      remaining -= lastSize;
+    }
+    const options = { configPath, path: directory };
+    const installed = await applyEnvironmentProfile(profilePath, options);
+    expect((await stat(join(installed.directory, "registry.json"))).size).toBeGreaterThan(fileLimit);
+    await expect(applyEnvironmentProfile(profilePath, options)).resolves.toMatchObject({ applied: true });
+
+    await writeFile(lastAsset, Buffer.alloc(lastSize + 1));
+    await expect(inspectEnvironmentProfile(profilePath, options)).rejects.toThrow(/33554432-byte/u);
+  }, 30_000);
+
+  it("reapplies skills at the accepted nesting limit after adding snapshot parent directories", async () => {
+    const nested = join(bundle, "skills", "research", ...Array.from({ length: 32 }, (_, index) => `d${String(index)}`));
+    await mkdir(nested, { recursive: true });
+    await writeFile(join(nested, "guide.txt"), "Nested guidance\n");
+    const options = { configPath, path: directory };
+    await expect(applyEnvironmentProfile(profilePath, options)).resolves.toMatchObject({ applied: true });
+    await expect(applyEnvironmentProfile(profilePath, options)).resolves.toMatchObject({ applied: true });
+  });
 });

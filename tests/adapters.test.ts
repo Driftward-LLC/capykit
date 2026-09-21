@@ -20,8 +20,9 @@ describe("platform discovery adapters", () => {
     expect(first.format).toBe("capykit.discoveryAdapters.v0.1");
     expect(first.catalogDigest).toMatch(/^sha256:[a-f0-9]{64}$/u);
     expect(first.files.map(({ path }) => path)).toEqual(["AGENTS.md", ".codex/capykit.discovery.json", ".hermes/references/capykit-discovery.md"]);
-    expect(first.files[0]?.content).toContain('capykit tools search "<task keywords>"');
-    expect(first.files[0]?.content).toContain("capykit tools show <id> --json --check");
+    expect(first.files[0]?.content).toContain(".codex/capykit.discovery.json");
+    expect(first.files[0]?.content).toContain("same source configuration as this export");
+    for (const file of first.files) expect(file.content).not.toMatch(/capykit tools (?:search|show)/u);
     expect(first.files[0]?.content).not.toContain("update the catalog first");
     expect(first.files[1]?.content).toContain("capykit.codexDiscovery.v0.1");
     expect(first.files[2]?.content).toContain("Capykit discovery reference");
@@ -52,7 +53,7 @@ describe("platform discovery adapters", () => {
         examples: tool?.examples,
         documentation: tool?.documentation,
       });
-      expect(hermes).toContain(`capykit tools show ${record.id} --json --check`);
+      expect(hermes).toContain(`- id: ${record.id}`);
     }
   });
 

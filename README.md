@@ -64,8 +64,8 @@ npm exec --package @driftward/capykit@latest -- capykit --help
 
 ## Quick start
 
-Download the public example registry, validate it, and add it to your configured
-sources. These examples demonstrate discovery; most describe fictional tools.
+Download the public example registry, validate it, and generate discovery
+adapters. These examples demonstrate discovery; most describe fictional tools.
 
 ```bash
 REGISTRY_URL="https://raw.githubusercontent.com/Driftward-LLC/capykit/main"
@@ -74,14 +74,28 @@ curl -fsSL "$REGISTRY_URL/examples/all-interfaces.registry.json" \
   -o capykit.registry.json
 
 capykit doctor capykit.registry.json
+capykit adapters capykit.registry.json > capykit.discovery.json
+capykit-mcp --registry "$PWD/capykit.registry.json"
+```
 
-capykit sources add \
+The published package can read an explicit registry. Task search and shared
+source configuration below require a build of the current checkout.
+
+## Try task discovery from source
+
+Run these commands from the repository checkout:
+
+```bash
+npm ci
+npm run build
+
+node dist/cli.js sources add \
   --config "${XDG_CONFIG_HOME:-$HOME/.config}/capykit/registry-sources.json" \
   --id public.examples --layer user \
-  --file-root "$PWD" --file-path capykit.registry.json
+  --file-root "$PWD/examples" --file-path all-interfaces.registry.json
 
-capykit tools search "filter JSON"
-capykit tools show jq --check
+node dist/cli.js tools search "filter JSON"
+node dist/cli.js tools show jq --check
 ```
 
 Search finds tools by task keywords. Inspect a match to get its invocation
@@ -92,8 +106,8 @@ or execute the tool. Add `--json` for machine-readable search or detail output.
 The CLI, adapters, and read-only MCP server share your configured sources:
 
 ```bash
-capykit adapters > capykit.discovery.json
-capykit-mcp
+node dist/cli.js adapters > capykit.discovery.json
+node dist/mcp.js
 ```
 
 Pass `--config <path>` to any of those entry points to choose another sources
@@ -174,7 +188,9 @@ paths and never credential values.
 
 Exports are returned as `{path, content}` entries; the command does not install
 them or overwrite agent configuration. `.codex/capykit.discovery.json` is a
-reference that must be read explicitly. Use `--config <path>` for alternate
+reference that must be read explicitly. Generated guidance uses the embedded
+catalog; a later live CLI query needs the same source configuration to avoid
+querying a different catalog. Use `--config <path>` for alternate
 configured sources, or a positional registry file for an isolated export.
 
 Agents that need a reusable discovery workflow can follow the

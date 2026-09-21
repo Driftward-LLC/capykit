@@ -32,6 +32,21 @@ const maxFileBytes = 8 * 1024 * 1024;
 const maxBundleBytes = 32 * 1024 * 1024;
 const maxFiles = 512;
 
+interface ReadBudget {
+  files: number;
+  bytes: number;
+  entries: number;
+  readonly fileLimit: number;
+  readonly byteLimit: number;
+  readonly fileByteLimit: number;
+  readonly entryLimit: number;
+  readonly depthLimit: number;
+}
+
+function checkReadBudget(budget: ReadBudget, size: number): void {
+  if (budget.files >= budget.fileLimit || budget.bytes + size > budget.byteLimit) throw new RegistryLoadError(`Profile exceeds its ${String(budget.fileLimit)}-file or ${String(budget.byteLimit)}-byte limit.`);
+}
+
 function digest(bytes: Buffer | string): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -57,40 +72,46 @@ async function safePath(root: string, path: string): Promise<string> {
   return canonical;
 }
 
-async function readBundleFile(root: string, path: string, executables?: Set<string>): Promise<Buffer> {
+async function readBundleFile(root: string, path: string, executables?: Set<string>, budget?: ReadBudget): Promise<Buffer> {
   const file = await safePath(root, path);
   const before = await lstat(file);
-  if (!before.isFile() || before.size > maxFileBytes) throw new RegistryLoadError("Profile entries must be regular files of at most 8 MiB.");
+  const fileByteLimit = budget?.fileByteLimit ?? maxFileBytes;
+  if (!before.isFile() || before.size > fileByteLimit) throw new RegistryLoadError(`Profile entries must be regular files of at most ${String(fileByteLimit)} bytes.`);
   const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const opened = await handle.stat();
-    if (!opened.isFile() || before.dev !== opened.dev || before.ino !== opened.ino) throw new RegistryLoadError("Profile file changed while opening; retry with a stable bundle.");
-    const bytes = await handle.readFile();
+    if (!opened.isFile() || before.dev !== opened.dev || before.ino !== opened.ino || before.size !== opened.size || opened.size > fileByteLimit) throw new RegistryLoadError("Profile file changed while opening; retry with a stable bundle.");
+    if (budget !== undefined) checkReadBudget(budget, opened.size);
+    // A concurrently growing file must not allocate beyond the validated size.
+    const bytes = Buffer.alloc(opened.size + 1);
+    let length = 0;
+    while (length < bytes.length) {
+      const { bytesRead } = await handle.read(bytes, length, bytes.length - length, length);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
     const after = await handle.stat();
-    if (bytes.length > maxFileBytes || opened.size !== after.size || opened.mtimeMs !== after.mtimeMs) throw new RegistryLoadError("Profile file changed while reading; retry with a stable bundle.");
+    if (length !== opened.size || opened.size !== after.size || opened.mtimeMs !== after.mtimeMs) throw new RegistryLoadError("Profile file changed while reading; retry with a stable bundle.");
+    if (budget !== undefined) { budget.files += 1; budget.bytes += length; }
     if ((opened.mode & 0o111) !== 0) executables?.add(path);
-    return bytes;
+    return bytes.subarray(0, length);
   } finally { await handle.close(); }
 }
 
-async function directoryFiles(root: string, path: string, files = new Map<string, Buffer>(), executables = new Set<string>(), depth = 0, budget = { entries: 0 }): Promise<Map<string, Buffer>> {
-  if (depth > 32) throw new RegistryLoadError("Skill directory nesting exceeds 32 levels.");
+async function directoryFiles(root: string, path: string, files: Map<string, Buffer>, executables: Set<string>, budget: ReadBudget, depth = 0): Promise<Map<string, Buffer>> {
+  if (depth > budget.depthLimit) throw new RegistryLoadError(`Skill directory nesting exceeds ${String(budget.depthLimit)} levels.`);
   const directory = await safePath(root, path);
   if (!(await lstat(directory)).isDirectory()) throw new RegistryLoadError("A skill path must be a directory.");
   const names = (await readdir(directory)).sort();
   budget.entries += names.length;
-  if (budget.entries > maxFiles * 2 + 2) throw new RegistryLoadError("Profile directory contains too many entries.");
+  if (budget.entries > budget.entryLimit) throw new RegistryLoadError("Profile directory contains too many entries.");
   if (new Set(names.map((name) => name.toLowerCase())).size !== names.length) throw new RegistryLoadError("Profile directory entries collide on case-insensitive filesystems.");
   for (const name of names) {
     if (/^(?:\.env(?:\..*)?|\.npmrc|\.git|node_modules|credentials?\.json|cookies?\.json)$/iu.test(name)) throw new RegistryLoadError("Skill bundles must not contain credentials, environment files, or dependency directories.");
     const child = `${path}/${name}`;
     const info = await lstat(await safePath(root, child));
-    if (info.isDirectory()) await directoryFiles(root, child, files, executables, depth + 1, budget);
-    else {
-      if (files.size >= maxFiles + 2) throw new RegistryLoadError("A profile may contain at most 512 files.");
-      files.set(child, await readBundleFile(root, child, executables));
-      if ([...files.values()].reduce((total, bytes) => total + bytes.length, 0) > maxBundleBytes + 2 * maxFileBytes) throw new RegistryLoadError("Profile bundle exceeds its size limit.");
-    }
+    if (info.isDirectory()) await directoryFiles(root, child, files, executables, budget, depth + 1);
+    else files.set(child, await readBundleFile(root, child, executables, budget));
   }
   return files;
 }
@@ -115,8 +136,9 @@ async function readProfileBundle(profilePath: string): Promise<ProfileBundle> {
   if (profile.registry.toLowerCase() === "profile.json" || profile.registry.toLowerCase().startsWith("profile.json/")) throw new RegistryLoadError("profile.json is reserved for the portable manifest.");
   const executables = new Set<string>();
   const files = new Map<string, Buffer>([["profile.json", Buffer.from(`${JSON.stringify(profile, null, 2)}\n`)], [profile.registry, registryBytes]]);
+  const budget: ReadBudget = { files: files.size, bytes: [...files.values()].reduce((total, bytes) => total + bytes.length, 0), entries: 0, fileLimit: maxFiles, byteLimit: maxBundleBytes, fileByteLimit: maxFileBytes, entryLimit: maxFiles * 2 + 2, depthLimit: 32 };
   for (const skill of profile.skills) {
-    const skillFiles = await directoryFiles(root, skill.path, new Map(), executables);
+    const skillFiles = await directoryFiles(root, skill.path, new Map(), executables, budget);
     const text = skillFiles.get(`${skill.path}/SKILL.md`)?.toString("utf8");
     const frontmatter = text?.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u)?.[1];
     const name = frontmatter?.match(/^name:\s*["']?([a-z0-9-]+)["']?\s*$/mu)?.[1];
@@ -201,7 +223,13 @@ function installedRegistry(bundle: ProfileBundle, skills: ReturnType<typeof prof
 async function matchesFiles(directory: string, files: ReadonlyMap<string, Buffer>, executables: ReadonlySet<string> = new Set()): Promise<boolean> {
   const parent = await realpath(dirname(directory));
   const actualExecutables = new Set<string>();
-  const actual = await directoryFiles(parent, basename(directory), new Map(), actualExecutables);
+  const depthLimit = Math.max(0, ...[...files.keys()].map((path) => path.split("/").length - 1));
+  const budget: ReadBudget = { files: 0, bytes: 0, entries: 0, fileLimit: files.size, byteLimit: [...files.values()].reduce((total, bytes) => total + bytes.length, 0), fileByteLimit: Math.max(0, ...[...files.values()].map((bytes) => bytes.length)), entryLimit: files.size * (depthLimit + 1), depthLimit };
+  let actual: Map<string, Buffer>;
+  try { actual = await directoryFiles(parent, basename(directory), new Map(), actualExecutables, budget); } catch (error) {
+    if (error instanceof RegistryLoadError) return false;
+    throw error;
+  }
   const expectedExecutables = new Set([...executables].map((path) => `${basename(directory)}/${path}`));
   const expected = new Map([...files].map(([path, bytes]) => [`${basename(directory)}/${path}`, bytes]));
   return actual.size === expected.size && [...actual].every(([path, bytes]) => expected.get(path)?.equals(bytes) && (process.platform === "win32" || actualExecutables.has(path) === expectedExecutables.has(path)));

@@ -214,8 +214,8 @@ function renderAgentsGuidance(tools: readonly DiscoveryAdapterTool[], catalogDig
     `Catalog digest: ${catalogDigest}`,
     "",
     "Find a capability for your task:",
-    '- Run `capykit tools search "<task keywords>"` to find relevant tools.',
-    "- Run `capykit tools show <id> --json --check` for invocation details, examples, documentation, safety metadata, and local availability checks.",
+    "- Match your task against the declared tools below, then read that tool's full record in .codex/capykit.discovery.json or .hermes/references/capykit-discovery.md.",
+    "- Use the exported invocation details, examples, documentation, and safety metadata. A live CLI query can use a different catalog; it requires the same source configuration as this export.",
     "- Follow the selected interface or skill instructions and the authorization already given for the task. Catalog metadata does not grant permission or verify access.",
     "- Treat credential references as boundaries: use only the referenced provider, environment variable, or file path; never copy or print credential values.",
     "- The .codex/capykit.discovery.json file is a reference export; load it explicitly when needed.",
@@ -233,7 +233,8 @@ function codexConfig(tools: readonly DiscoveryAdapterTool[], catalogDigest: stri
     format: "capykit.codexDiscovery.v0.1",
     catalogDigest,
     instructions: [
-      'Run capykit tools search "<task keywords>" to find a capability, then capykit tools show <id> --json --check for invocation details and local availability checks.',
+      "Match your task against the tools in this export and use the selected record's invocation details, examples, documentation, and safety metadata.",
+      "A live CLI query can use a different catalog; it requires the same source configuration as this export.",
       "Follow the selected interface or skill instructions and the authorization already given for the task. Catalog metadata does not grant permission or verify access.",
       "This file is a reference export and must be loaded explicitly.",
       "Use authentication references only as boundaries; never expose credential values.",
@@ -249,7 +250,8 @@ function hermesReference(tools: readonly DiscoveryAdapterTool[], catalogDigest: 
     "Generated from Capykit catalog metadata.",
     `Catalog digest: ${catalogDigest}`,
     "",
-    'Run `capykit tools search "<task keywords>"` to find a capability, then `capykit tools show <id> --json --check` for invocation details and local availability checks.',
+    "Match your task against the tools below and use their exported invocation details, examples, documentation, and safety metadata.",
+    "A live CLI query can use a different catalog; it requires the same source configuration as this export.",
     "Follow the selected interface or skill instructions and the authorization already given for the task. Catalog metadata does not grant permission or verify access.",
     "Credential entries below are references only; they are not credential values.",
     "",
@@ -259,7 +261,7 @@ function hermesReference(tools: readonly DiscoveryAdapterTool[], catalogDigest: 
     lines.push(`- id: ${tool.id}`);
     lines.push(`- summary: ${tool.summary}`);
     lines.push(`- visibility: ${tool.visibility}`);
-    lines.push(`- next step: \`capykit tools show ${tool.id} --json --check\``);
+    lines.push("- next step: inspect the declared invocation details below before using the selected interface.");
     lines.push("", "Declared invocation details:", "", "```json", stableJson({
       interfaces: tool.interfaces,
       authentication: tool.authentication,

@@ -88,6 +88,19 @@ describe("task discovery through configured sources", () => {
     const bundle = JSON.parse(String(stdout.mock.calls.at(-1)?.[0])) as DiscoveryAdapterBundle;
     expect(bundle.generatedFrom.toolCount).toBe(1);
     expect(bundle.files[0]?.content).toContain("user definition");
+    // The default catalog has jq, but the exported catalog contains only shared-tool.
+    const exported = JSON.parse(bundle.files[1]?.content ?? "{}") as { tools: { id: string }[] };
+    expect(exported.tools.map(({ id }) => id)).toEqual(["shared-tool"]);
+    for (const file of bundle.files) expect(file.content).not.toMatch(/capykit tools (?:search|show)/u);
+
+    // A standalone export must also remain usable without any sources configuration.
+    await rm(configPath);
+    expect(await runAsync(["adapters", join(fixtures, "builtin.registry.json")])).toBe(0);
+    const standalone = JSON.parse(String(stdout.mock.calls.at(-1)?.[0])) as DiscoveryAdapterBundle;
+    const records = JSON.parse(standalone.files[1]?.content ?? "{}") as { tools: { id: string; interfaces: unknown[] }[] };
+    expect(records.tools.map(({ id }) => id)).toEqual(["shared-tool"]);
+    expect(records.tools[0]?.interfaces.length).toBeGreaterThan(0);
+    for (const file of standalone.files) expect(file.content).not.toMatch(/capykit tools (?:search|show)/u);
   });
 
   it("rejects invalid discovery arguments and missing configurations without silently falling back", async () => {
