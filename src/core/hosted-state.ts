@@ -1,5 +1,5 @@
 export type HostedPrincipalKind = "human" | "agent";
-export type HostedMembershipRole = "owner" | "admin" | "member" | "agent";
+export type HostedMembershipRole = "owner" | "member";
 
 export interface HostedWorkspaceRow {
   readonly id: string;
@@ -55,16 +55,15 @@ export function createHostedSessionContext(state: HostedStateSnapshot, request: 
   if (principal === undefined) throw new HostedAccessError("Authenticated subject is not a hosted principal.", "unknown_principal");
   if (principal.status !== "active") throw new HostedAccessError("Hosted principal is disabled.", "inactive_principal");
 
-  const memberships = state.memberships.filter((membership) => membership.principalId === principal.id && membership.status === "active");
+  const memberships = state.memberships.filter((membership) => membership.principalId === principal.id
+    && membership.status === "active"
+    && state.workspaces.some((workspace) => workspace.id === membership.workspaceId && workspace.status === "active"));
   if (memberships.length === 0) throw new HostedAccessError("Hosted principal has no active workspace membership.", "no_active_membership");
 
   const activeWorkspaceId = request.requestedWorkspaceId ?? memberships[0]?.workspaceId;
   if (activeWorkspaceId === undefined || !memberships.some((membership) => membership.workspaceId === activeWorkspaceId)) {
     throw new HostedAccessError("Requested workspace is not available to the authenticated principal.", "workspace_forbidden");
   }
-
-  const workspace = state.workspaces.find((entry) => entry.id === activeWorkspaceId);
-  if (workspace?.status !== "active") throw new HostedAccessError("Requested workspace is not active.", "workspace_forbidden");
 
   return { principal, memberships, activeWorkspaceId };
 }

@@ -103,11 +103,7 @@ async function smokeMcp() {
   console.log("MCP smoke passed.");
 }
 
-function smokeAdapters(helpText) {
-  if (!helpText.includes("adapters <registry.json>")) {
-    console.log("Adapter smoke skipped: built CLI does not expose adapters command.");
-    return;
-  }
+function smokeAdapters() {
   const raw = output(nodeCommand, ["dist/cli.js", "adapters", exampleRegistry]);
   const bundle = JSON.parse(raw);
   assert.equal(bundle.format, "capykit.discoveryAdapters.v0.1");
@@ -124,7 +120,7 @@ function smokeCli() {
   const doctor = spawnSync(nodeCommand, ["dist/cli.js", "doctor", exampleRegistry], { cwd: repositoryRoot, encoding: "utf8", shell: process.platform === "win32" });
   assert.equal(doctor.status, 0, doctor.stderr);
   assert.equal(JSON.parse(doctor.stdout).format, "capykit.registryDoctor.v0.1");
-  smokeAdapters(help);
+  smokeAdapters();
   console.log("CLI smoke passed.");
 }
 

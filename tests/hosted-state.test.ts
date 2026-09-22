@@ -19,7 +19,7 @@ const hostedState: HostedStateSnapshot = {
   ],
   memberships: [
     { workspaceId: "workspace-a", principalId: "human-a", role: "owner", status: "active" },
-    { workspaceId: "workspace-a", principalId: "agent-a", role: "agent", status: "active" },
+    { workspaceId: "workspace-a", principalId: "agent-a", role: "member", status: "active" },
     { workspaceId: "workspace-b", principalId: "human-b", role: "owner", status: "active" },
   ],
 };
@@ -30,7 +30,7 @@ const records = [
 ] as const;
 
 describe("hosted workspace access", () => {
-  it("derives the active workspace from durable membership rows", () => {
+  it("derives the active workspace from the supplied membership snapshot", () => {
     const session = createHostedSessionContext(hostedState, { externalSubject: "otp:derek@example.invalid" });
 
     expect(session.activeWorkspaceId).toBe("workspace-a");
@@ -43,7 +43,7 @@ describe("hosted workspace access", () => {
     const session = createHostedSessionContext(hostedState, { externalSubject: "agent:capykit-bot" });
 
     expect(session.principal).toMatchObject({ id: "agent-a", kind: "agent" });
-    expect(requireHostedWorkspaceAccess(session, "workspace-a").role).toBe("agent");
+    expect(requireHostedWorkspaceAccess(session, "workspace-a").role).toBe("member");
   });
 
   it("rejects request-supplied workspace values without server-side membership", () => {
@@ -58,5 +58,44 @@ describe("hosted workspace access", () => {
 
     expect(selectHostedWorkspaceRecords(session, records)).toEqual([records[1]]);
     expect(() => requireHostedWorkspaceAccess(session, "workspace-a")).toThrow(/Workspace access denied/u);
+  });
+
+  it.each([undefined, "workspace-b"])("excludes disabled workspaces when selecting %s", (requestedWorkspaceId) => {
+    const state: HostedStateSnapshot = {
+      ...hostedState,
+      workspaces: hostedState.workspaces.map((workspace) => workspace.id === "workspace-a" ? { ...workspace, status: "disabled" } : workspace),
+      memberships: [...hostedState.memberships, { workspaceId: "workspace-b", principalId: "human-a", role: "member", status: "active" }],
+    };
+    const session = createHostedSessionContext(state, { externalSubject: "otp:derek@example.invalid", requestedWorkspaceId });
+
+    expect(session.activeWorkspaceId).toBe("workspace-b");
+    expect(session.memberships.map((membership) => membership.workspaceId)).toEqual(["workspace-b"]);
+    expect(selectHostedWorkspaceRecords(session, records)).toEqual([records[1]]);
+    expect(() => requireHostedWorkspaceAccess(session, "workspace-a")).toThrow(/Workspace access denied/u);
+    expect(() => createHostedSessionContext(state, {
+      externalSubject: "otp:derek@example.invalid",
+      requestedWorkspaceId: "workspace-a",
+    })).toThrow(/Requested workspace is not available/u);
+  });
+
+  it.each(["disabled", "missing"] as const)("rejects a snapshot with only a %s workspace", (status) => {
+    const state: HostedStateSnapshot = {
+      ...hostedState,
+      workspaces: status === "missing" ? [] : hostedState.workspaces.map((workspace) => ({ ...workspace, status })),
+    };
+
+    expect(() => createHostedSessionContext(state, { externalSubject: "otp:derek@example.invalid" }))
+      .toThrow(/no active workspace membership/u);
+  });
+
+  it("rejects disabled membership and principal rows", () => {
+    expect(() => createHostedSessionContext({
+      ...hostedState,
+      memberships: hostedState.memberships.map((membership) => ({ ...membership, status: "disabled" })),
+    }, { externalSubject: "otp:derek@example.invalid" })).toThrow(/no active workspace membership/u);
+    expect(() => createHostedSessionContext({
+      ...hostedState,
+      principals: hostedState.principals.map((principal) => ({ ...principal, status: "disabled" })),
+    }, { externalSubject: "otp:derek@example.invalid" })).toThrow(/Hosted principal is disabled/u);
   });
 });

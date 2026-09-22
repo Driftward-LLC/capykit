@@ -1,96 +1,52 @@
-# Hosted workspace and durable application state
+# Hosted workspace access contract
 
-This is the implementation baseline for Linear ENG-121. It keeps public catalog
-metadata separate from hosted application state: catalog records stay in the
-existing registry paths, while workspace membership, credentials, and runtime
-configuration live in Supabase-managed storage.
+This draft covers an in-memory authorization contract related to Linear ENG-121.
+It does not implement durable storage, authentication, a hosted API, a worker,
+or a browser console, and does not complete ENG-121. The hosted service,
+migrations, and deployment configuration are implemented separately in
+[PR #47](https://github.com/Driftward-LLC/capykit/pull/47). Reconcile this contract
+with that implementation before treating it as a service integration.
 
-## Service choices
+Public catalog metadata stays in the existing registry paths. Hosted membership,
+credentials, and runtime configuration belong in private application storage;
+this module does not read or write that storage.
 
-- Web/API: one Railway-hosted TypeScript service. Fastify serves the API and the
-  Vite console from the same origin so session cookies and CSRF checks share one
-  trust boundary.
-- Worker: one separate Railway worker process using the same codebase and
-  Supabase project. The worker accepts jobs only after resolving the stored
-  workspace/principal membership.
-- Identity: Supabase email OTP for humans. Agent principals are first-class rows
-  with distinct membership roles and cannot borrow a human principal ID.
-- Durable state: Supabase Postgres for workspaces, principals, memberships, and
-  application records. Supabase private Storage is reserved for private artifacts.
-- Downstream integrations: GitHub App installation access and offline E2B
-  execution are deferred to ENG-123 and ENG-125 integration tests.
+## Snapshot contract
 
-## Bootstrap order
+`src/core/hosted-state.ts` accepts a trusted snapshot of workspace, principal, and
+membership rows. It resolves an already authenticated external subject to an
+active principal, then includes only active memberships in active workspaces.
+Missing and disabled workspaces cannot be selected or authorized through the
+resulting context. The default selection is the first accessible workspace;
+request-supplied workspace IDs are selectors and never grant access.
 
-1. Create the Supabase project and Railway project outside the repository.
-2. Apply the migration below to the Supabase Postgres database.
-3. Seed exactly one invite-only pilot workspace, one owner human principal, and
-   one agent principal for the first rollout.
-4. Configure Railway variables for the Supabase URL and service credentials in
-   Railway only. Do not commit secrets, env files, or generated tokens.
-5. Deploy the API and worker from the same commit. The API refuses protected
-   requests unless the Supabase-authenticated subject maps to an active principal
-   and active workspace membership.
+Principal kind distinguishes humans from agents. Both use the scoped `owner`
+and `member` roles; an agent does not borrow a human principal ID or need a
+separate membership role. The helper checks workspace access only; it does not
+implement role-specific operations or agent credential authentication.
 
-## Initial migration
+`requireHostedWorkspaceAccess` checks the memberships resolved into this context.
+`selectHostedWorkspaceRecords` filters supplied records to the selected workspace.
+Neither helper queries a database or authenticates a request. A service must
+construct this context from trusted, current rows on each protected request,
+never from client-supplied rows or a cached context that survives deactivation.
 
-```sql
-create type hosted_principal_kind as enum ('human', 'agent');
-create type hosted_membership_role as enum ('owner', 'admin', 'member', 'agent');
-create type hosted_record_status as enum ('active', 'disabled');
+## Service integration requirements
 
-create table hosted_workspaces (
-  id uuid primary key default gen_random_uuid(),
-  slug text not null unique,
-  name text not null,
-  status hosted_record_status not null default 'active',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
+The hosted implementation must resolve authenticated identity and current
+workspace membership on the server, enforce workspace scope in its database
+queries, and reject disabled principals, memberships, and workspaces. In-memory
+filtering alone is not a database isolation boundary.
 
-create table hosted_principals (
-  id uuid primary key default gen_random_uuid(),
-  kind hosted_principal_kind not null,
-  external_subject text not null unique,
-  display_name text not null,
-  status hosted_record_status not null default 'active',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table hosted_memberships (
-  workspace_id uuid not null references hosted_workspaces(id) on delete cascade,
-  principal_id uuid not null references hosted_principals(id) on delete cascade,
-  role hosted_membership_role not null,
-  status hosted_record_status not null default 'active',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  primary key (workspace_id, principal_id)
-);
-
-create index hosted_memberships_principal_idx
-  on hosted_memberships (principal_id, status);
-```
-
-Every protected application table must carry `workspace_id uuid not null
-references hosted_workspaces(id)` and query through the authenticated membership
-context. Request-supplied workspace IDs are selectors only; they never grant
-access by themselves.
-
-## Same-origin session and CSRF contract
-
-- The API exchanges Supabase OTP identity for an HTTP-only, `SameSite=Lax`,
-  secure session cookie.
-- Unsafe methods require a CSRF token bound to that session. Missing or mismatched
-  tokens fail before application handlers run.
-- Handlers resolve the principal from the server-side session subject, load active
-  memberships from Postgres, and then choose the active workspace from those rows.
-- The console may request a workspace switch, but the backend accepts it only
-  when the membership row is active.
+The same-origin API and console must use secure HTTP-only session cookies and
+enforce a session-bound CSRF token for unsafe browser requests. These are service
+requirements, not functionality provided by this module. Use the hosted service's
+migrations and bootstrap commands rather than a separate schema from this draft.
 
 ## Local verification scope
 
-`src/core/hosted-state.ts` is the dependency-free contract used by tests and
-future Fastify handlers. It models the server-side membership resolution that the
-hosted API and worker must share, including human/agent distinction and
-second-workspace isolation.
+`tests/hosted-state.test.ts` covers subject-to-principal resolution, human/agent
+distinction, cross-workspace rejection, disabled principals and memberships,
+disabled or missing workspaces, and fallback to an accessible workspace. These
+tests verify the snapshot contract only; they do not demonstrate persistence,
+OTP login, sessions, CSRF enforcement, or browser behavior.
