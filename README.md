@@ -114,6 +114,18 @@ Pass `--config <path>` to any of those entry points to choose another sources
 configuration. For a single file without registration, use
 `capykit adapters <registry.json>` or `capykit-mcp --registry <registry.json>`.
 
+## Discover this host
+
+`capykit discover host --json` generates a registry from executable PATH entries,
+including bootstrap helpers, without running them. Codex MCP and plugin metadata
+requires explicit `--allow-codex-auth` because Codex can use stored authentication
+and contact providers while listing integrations. Use a current source build; this
+discovery workflow is not in the published package yet.
+
+Keep the generated file private and register it separately from operator
+annotations. See [host discovery](docs/host-discovery.md) for refresh, source
+precedence, and the limits of Codex metadata discovery.
+
 ## Use the same skills and tools in another environment
 
 A versioned environment profile bundles a registry, complete skill folders,

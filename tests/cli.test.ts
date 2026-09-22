@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { completionText, helpText, run } from "../src/cli/index.js";
+import { completionText, helpText, run, runAsync } from "../src/cli/index.js";
 import { CAPYKIT_VERSION } from "../src/core/index.js";
 
 afterEach(() => vi.restoreAllMocks());
@@ -53,5 +53,28 @@ describe("CLI scaffold", () => {
 
     expect(run(["doctor"])).toBe(2);
     expect(stderr).toHaveBeenCalledWith(expect.stringContaining("Usage: capykit doctor <registry.json>"));
+  });
+
+  it.each([
+    ["--json", "--paths", "SENSITIVE_ARGUMENT"],
+    ["--json", "--path", "/one", "--path", "/two"],
+    ["--json", "unexpected"],
+    ["--json", "--path"],
+    [],
+  ])("rejects invalid discovery options without inspecting the default host: %j", async (...options) => {
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    expect(await runAsync(["discover", "host", ...options])).toBe(2);
+    expect(stdout).not.toHaveBeenCalled();
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining("Usage: capykit discover host --json [--path <path>] [--allow-codex-auth]\n"));
+  });
+
+  it("reports discovery format support without inspecting host metadata", async () => {
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    expect(await runAsync(["discover", "host", "--format-version"])).toBe(0);
+    expect(stdout).toHaveBeenCalledExactlyOnceWith("2\n");
+    expect(stderr).not.toHaveBeenCalled();
   });
 });

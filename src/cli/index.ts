@@ -5,6 +5,7 @@ import {
   checkCommandAvailability,
   defaultRegistrySourcesConfigPath,
   discoverHostRegistry,
+  HOST_DISCOVERY_VERSION,
   doctorRegistryFile,
   generateDiscoveryAdapterBundle,
   inspectRegistrySources,
@@ -69,7 +70,7 @@ function adaptersUsage(): string {
 }
 
 function discoverUsage(): string {
-  return "Usage: capykit discover host --json [--path <path>]\n";
+  return "Usage: capykit discover host --json [--path <path>] [--allow-codex-auth]\n       capykit discover host --format-version\n";
 }
 
 function sourcesUsage(): string {
@@ -414,13 +415,21 @@ async function runProfile(argv: readonly string[]): Promise<number> {
 async function runDiscover(argv: readonly string[]): Promise<number> {
   const target = argv[0];
   if (target !== "host") { process.stderr.write(discoverUsage()); return 2; }
-  const parsed = parseFlags(argv.slice(1), ["--json"]);
-  if (parsed.error !== undefined) { process.stderr.write(`${parsed.error}\n\n${discoverUsage()}`); return 2; }
-  if (!parsed.switches.has("--json")) { process.stderr.write(discoverUsage()); return 2; }
+  if (argv.length === 2 && argv[1] === "--format-version") {
+    process.stdout.write(`${String(HOST_DISCOVERY_VERSION)}\n`);
+    return 0;
+  }
+  const parsed = parseFlags(argv.slice(1), ["--json", "--allow-codex-auth"]);
+  if (parsed.error !== undefined || parsed.repeated.size > 0 || [...parsed.values.keys()].some((key) => key !== "--path") || !parsed.switches.has("--json")) { process.stderr.write(discoverUsage()); return 2; }
   const path = flag(parsed, "--path");
-  const registry = await discoverHostRegistry(path === undefined ? {} : { path });
-  process.stdout.write(`${JSON.stringify(registry, null, 2)}\n`);
-  return 0;
+  try {
+    const registry = await discoverHostRegistry({ ...(path === undefined ? {} : { path }), allowCodexAuth: parsed.switches.has("--allow-codex-auth") });
+    process.stdout.write(`${JSON.stringify(registry, null, 2)}\n`);
+    return 0;
+  } catch {
+    process.stderr.write("Host discovery failed; no registry was emitted. Check Codex metadata availability and support.\n");
+    return 1;
+  }
 }
 
 export function run(argv: readonly string[]): number {
