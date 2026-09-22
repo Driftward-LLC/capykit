@@ -6,6 +6,10 @@ An installed build exposes the same command as `capykit discover host --json`.
 executable symlinks are included; directories, broken links, and non-executable
 files are omitted.
 
+Host discovery currently targets Linux hosts. Executable checks use filesystem
+permissions without running commands; Windows does not implement POSIX execute
+permission bits, and its shell/launcher discovery is not covered by this flow.
+
 Default discovery does not execute any subprocess, read credential stores, or
 contact providers. It records PATH commands and helpers only. When Codex is
 present, `extensions["x-codex-metadata-status"]` is `not-requested`; otherwise it

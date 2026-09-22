@@ -67,15 +67,18 @@ describe("host registry discovery", () => {
       writeExecutable(binDirectory, "alpha-tool"),
       writeExecutable(binDirectory, "openseo-env"),
       writeExecutable(binDirectory, "browserbase-env"),
-      writeFile(join(binDirectory, "not-executable"), "data", { mode: 0o644 }),
       mkdir(join(binDirectory, "not-a-command")),
     ]);
     await Promise.all([
       symlink(join(root, "codex-target"), join(binDirectory, "codex")),
       symlink(join(binDirectory, "not-a-command"), join(binDirectory, "directory-link")),
       symlink(join(binDirectory, "missing"), join(binDirectory, "broken-link")),
-      symlink(join(binDirectory, "not-executable"), join(binDirectory, "non-executable-link")),
     ]);
+    // Windows does not implement POSIX execute permission bits.
+    if (process.platform !== "win32") {
+      await writeFile(join(binDirectory, "not-executable"), "data", { mode: 0o644 });
+      await symlink(join(binDirectory, "not-executable"), join(binDirectory, "non-executable-link"));
+    }
     const execFile = metadata({
       "mcp list": `${stdioHeader}filesystem  npx  ARG_VALUE_SENTINEL  FILE_TOKEN=*****  -  enabled  Unsupported\n\n${httpHeader}linear  https://example.test/PATH_VALUE_SENTINEL?key=URL_VALUE_SENTINEL  LINEAR_API_KEY  enabled  Bearer token\n`,
       "mcp get filesystem": "filesystem\n  enabled: true\n  transport: stdio\n  command: COMMAND_VALUE_SENTINEL\n  args: ARG_VALUE_SENTINEL --api-key VALUE_IS_NOT_A_REFERENCE\n  cwd: /fixture-root\n  env: FILE_TOKEN=*****, APP_SECRET=*****, APP_PASSWORD=*****\n",
@@ -200,7 +203,8 @@ describe("host registry discovery", () => {
   it("preserves distinct tools after normalization and keeps long identifiers schema-valid", async () => {
     const path = await directory();
     const longName = "long".repeat(55);
-    await Promise.all([writeExecutable(path, "Some-Tool"), writeExecutable(path, "some-tool"), writeExecutable(path, longName)]);
+    // Distinct even on case-insensitive filesystems, but identical under the old normalization.
+    await Promise.all([writeExecutable(path, "some+tool"), writeExecutable(path, "some-tool"), writeExecutable(path, longName)]);
     const registry = await discoverHostRegistry({ path, hostname: longName });
     expect(registry.tools).toHaveLength(3);
     expect(new Set(registry.tools.map(({ id }) => id)).size).toBe(3);
@@ -209,7 +213,7 @@ describe("host registry discovery", () => {
     expect(registry.tools.map(({ id }) => id)).toEqual((await discoverHostRegistry({ path, hostname: longName })).tools.map(({ id }) => id));
     const registryPath = join(path, "registry.json");
     await writeFile(registryPath, JSON.stringify(registry));
-    expect((await doctorRegistryFile(registryPath, { path, approvedCommands: ["Some-Tool", "some-tool", longName] })).ok).toBe(true);
+    expect((await doctorRegistryFile(registryPath, { path, approvedCommands: ["some+tool", "some-tool", longName] })).ok).toBe(true);
   });
 
   it("returns a failing CLI exit with no partial JSON when Codex metadata is unsupported", async () => {
