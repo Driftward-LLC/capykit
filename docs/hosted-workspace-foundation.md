@@ -54,9 +54,9 @@ Before deployment, use a schema owner for migrations and a separate runtime logi
 without schema ownership, role management, replication, or RLS-bypass privileges.
 Migration `002_hosted_database_access.sql` enables RLS on all five application
 tables, revokes table privileges from `PUBLIC` and existing Supabase Data API
-roles, and creates a `capykit_runtime` NOLOGIN role. That role has schema usage and
-`SELECT` policies only for the four identity tables. It cannot write application
-data or read the future capability-publication table. The migration also removes
+roles, and creates a `capykit_runtime` NOLOGIN role. That role has schema usage
+and `SELECT` policies only for the four identity tables. It cannot write
+application data or read the future capability-publication table. It also removes
 schema creation rights from `PUBLIC`; use a dedicated Capykit database/schema.
 
 Create the managed application login separately, grant it `capykit_runtime`, and
@@ -105,9 +105,10 @@ constraints reject cross-workspace substitutions in PostgreSQL.
 and requires `/health/ready` before routing traffic. Create one service in an
 explicit staging environment, with `RAILPACK_NODE_VERSION=22`,
 `RAILPACK_NODE_NPM_INSTALL=npm ci --include=dev` for a locked dependency install,
-and `RAILPACK_NO_SPA=1` so Vite detection does not replace the API with a static server.
-Use the service's HTTPS domain as `CAPYKIT_PUBLIC_BASE_URL` and Supabase's site URL
-and exact redirect allow-list. Railway supplies `PORT`; the API binds `0.0.0.0`.
+and `RAILPACK_NO_SPA=1` so Vite detection does not replace the API with a static
+server. Use the service's HTTPS domain as `CAPYKIT_PUBLIC_BASE_URL`, Supabase's
+site URL, and its exact redirect allow-list. Railway supplies `PORT`; the API
+binds `0.0.0.0`.
 
 Apply migrations and bootstrap through a separate privileged operator session
 before deploying the API with the scoped runtime connection. Do not use an API
@@ -160,8 +161,9 @@ To include actual PostgreSQL migration, bootstrap, persistence, revocation, and
 foreign-key tests, set `CAPYKIT_TEST_POSTGRES_URL` to a **disposable test database**
 with permission to create schemas, extensions, and roles, then run the same
 command. Each test run creates and drops its own randomly named schema and test
-roles. Without that variable the PostgreSQL tests are explicitly skipped; pure HTTP tests use
-fake provider/database boundaries and do not prove live SMTP or Supabase access.
+roles. Without that variable the PostgreSQL tests are explicitly skipped; pure
+HTTP tests use fake provider/database boundaries and do not prove live SMTP or
+Supabase access.
 
 Before hosted rollout, separately verify live invited-user email delivery,
 provider verification, managed database privileges, browser Data API isolation,
