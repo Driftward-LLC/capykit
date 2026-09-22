@@ -45,23 +45,40 @@ entry and server-side verification, following the
 [Supabase email OTP flow](https://supabase.com/docs/guides/auth/auth-email-passwordless#with-otp).
 No access or refresh token is returned to browser JavaScript or stored in browser
 storage. Restrict Supabase callback URLs to the deployed allow-list as well.
+New free-tier projects created from June 3, 2026 cannot customize templates with
+Supabase's default email provider. The code-entry flow therefore requires custom
+SMTP, or a plan that permits template customization; see
+[Supabase's template change](https://supabase.com/changelog/46599-changes-to-email-template-customisation-on-free-tier).
 
-Before deployment, use a schema owner for migrations and a separate runtime role
-without schema ownership or DDL privileges. The current API needs `SELECT` on
-`workspaces`, `principals`, `identity_bindings`, and `workspace_memberships` and
-schema usage. Bootstrap uses separate credentials permitted to insert/update
-those records. Disable browser Data API access to application tables, revoke
-access from Supabase's `anon` and `authenticated` roles, and provision private
-Storage without public-read policies. These managed grants and policies require
-separate deployment verification; the migration does not provision them.
+Before deployment, use a schema owner for migrations and a separate runtime login
+without schema ownership, role management, replication, or RLS-bypass privileges.
+Migration `002_hosted_database_access.sql` enables RLS on all five application
+tables, revokes table privileges from `PUBLIC` and existing Supabase Data API
+roles, and creates a `capykit_runtime` NOLOGIN role. That role has schema usage and
+`SELECT` policies only for the four identity tables. It cannot write application
+data or read the future capability-publication table. The migration also removes
+schema creation rights from `PUBLIC`; use a dedicated Capykit database/schema.
+
+Create the managed application login separately, grant it `capykit_runtime`, and
+use its connection URL for the API. Give it `INHERIT` but no elevated role
+attributes or memberships. Set its search path to the application schema and
+Supabase's `extensions` schema if `citext` is installed there. Bootstrap uses the
+schema-owner connection only during setup. Do not store schema-owner credentials
+on Railway. Disable the Supabase Data API for this dedicated project as an
+additional boundary; Auth and Storage do not require it. Provision a private
+Storage bucket without public-read policies before the artifact feature is
+enabled. The current foundation does not read or write Storage objects.
 
 ## Database and bootstrap
 
 1. Take a database backup and stop application writers before a migration.
-2. Apply `scripts/migrations/001_hosted_workspace_identity.sql` with the schema
-   owner, using `psql --single-transaction --set ON_ERROR_STOP=1 --file` and the
-   migration path. Supply the database connection through managed configuration.
-   A failure rolls back the migration transaction; correct it before retrying.
+2. Apply `scripts/migrations/001_hosted_workspace_identity.sql` followed by
+   `scripts/migrations/002_hosted_database_access.sql` with the schema owner in
+   **one transaction**, using `psql --single-transaction --set ON_ERROR_STOP=1`
+   and one `--file` argument for each migration in that order. Supply the database
+   connection through managed configuration. A failure rolls back the transaction;
+   correct it before retrying. Keep both migrations together so tables are never
+   committed without their access controls.
 3. Run `node scripts/bootstrap-hosted-owner.mjs` with the bootstrap variables and
    separate bootstrap credentials. Confirm the Supabase user ID belongs to the
    intended pre-created user; bootstrap is an operator trust boundary.
@@ -69,7 +86,7 @@ separate deployment verification; the migration does not provision them.
    It will not reactivate a disabled workspace, principal, or membership, or move
    an existing identity into a different workspace. A failed bootstrap rolls back
    its transaction.
-5. Start API and worker with the runtime database role. Both database connection
+5. Start the API with the runtime database role. Both database connection
    establishment and queries have five-second deadlines; API pools have at most
    five connections.
 
@@ -81,6 +98,30 @@ run a destructive table-drop rollback against a database with application data.
 Downstream workspace-owned tables must use compound `(workspace_id, id)` keys and
 compound foreign keys. The included membership, principal-creator, and publication
 constraints reject cross-workspace substitutions in PostgreSQL.
+
+## Railway staging
+
+`railway.json` builds the application, starts the same-origin API/web process,
+and requires `/health/ready` before routing traffic. Create one service in an
+explicit staging environment, with `RAILPACK_NODE_VERSION=22`,
+`RAILPACK_NODE_NPM_INSTALL=npm ci --include=dev` for a locked dependency install,
+and `RAILPACK_NO_SPA=1` so Vite detection does not replace the API with a static server.
+Use the service's HTTPS domain as `CAPYKIT_PUBLIC_BASE_URL` and Supabase's site URL
+and exact redirect allow-list. Railway supplies `PORT`; the API binds `0.0.0.0`.
+
+Apply migrations and bootstrap through a separate privileged operator session
+before deploying the API with the scoped runtime connection. Do not use an API
+pre-deploy command for schema-owner tasks or deploy the one-shot worker as an
+always-running service. Validate root HTML, its assets, `/health/live`, and
+`/health/ready`, then verify real email-code login, `/v1/me`, logout, inactive
+membership rejection, and anonymous Data API denial. A green readiness check
+alone does not prove SMTP delivery or private Storage isolation.
+
+Deployment configuration follows Railway's
+[configuration reference](https://docs.railway.com/config-as-code/reference) and
+[Railpack Node.js behavior](https://railpack.com/languages/node). Database access
+uses both grants and RLS as described in
+[Supabase's RLS guide](https://supabase.com/docs/guides/database/postgres/row-level-security).
 
 ## Browser authentication and request safety
 
@@ -117,9 +158,9 @@ provider-boundary tests, and packed-package CLI/MCP/hosted asset/worker smoke.
 
 To include actual PostgreSQL migration, bootstrap, persistence, revocation, and
 foreign-key tests, set `CAPYKIT_TEST_POSTGRES_URL` to a **disposable test database**
-with permission to create schemas and extensions, then run the same command.
-Each test run creates and drops its own randomly named schema. Without that
-variable the five PostgreSQL tests are explicitly skipped; pure HTTP tests use
+with permission to create schemas, extensions, and roles, then run the same
+command. Each test run creates and drops its own randomly named schema and test
+roles. Without that variable the PostgreSQL tests are explicitly skipped; pure HTTP tests use
 fake provider/database boundaries and do not prove live SMTP or Supabase access.
 
 Before hosted rollout, separately verify live invited-user email delivery,

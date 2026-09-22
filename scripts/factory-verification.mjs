@@ -55,6 +55,7 @@ function checkChangedFileScope() {
     "eslint.config.mjs",
     "package-lock.json",
     "package.json",
+    "railway.json",
     "tsconfig.json",
     "tsup.config.ts",
     "vitest.config.ts",
