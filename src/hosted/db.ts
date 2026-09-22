@@ -15,13 +15,19 @@ export interface HostedDatabase {
 
 export function createHostedDatabase(databaseUrl: string | undefined): HostedDatabase | undefined {
   if (databaseUrl === undefined) return undefined;
-  const pool = new Pool({ connectionString: databaseUrl, max: 5 });
+  const pool = new Pool({ connectionString: databaseUrl, max: 5, connectionTimeoutMillis: 5000, query_timeout: 5000 });
   return {
     pool,
     async close() { await pool.end(); },
     async readiness() {
       try {
-        await pool.query("select 1");
+        await pool.query(`select b.provider, b.provider_subject, b.verified_at,
+                                 p.kind, p.active, m.role, m.active, w.active
+                            from identity_bindings b
+                            join principals p on p.id = b.principal_id
+                            join workspace_memberships m on m.principal_id = p.id and m.workspace_id = p.workspace_id
+                            join workspaces w on w.id = m.workspace_id
+                           limit 0`);
         return { status: "ready", reason: "ok" };
       } catch {
         return { status: "unavailable", reason: "connection_failed" };
@@ -36,8 +42,10 @@ export function createHostedDatabase(databaseUrl: string | undefined): HostedDat
                 m.active
            from identity_bindings b
            join principals p on p.id = b.principal_id
-           join workspace_memberships m on m.principal_id = p.id
+           join workspace_memberships m on m.principal_id = p.id and m.workspace_id = p.workspace_id
+           join workspaces w on w.id = m.workspace_id
           where b.provider = $1 and b.provider_subject = $2 and b.verified_at is not null
+            and p.active and m.active and w.active
           order by m.created_at asc
           limit 1`,
         [identity.provider, identity.subject],

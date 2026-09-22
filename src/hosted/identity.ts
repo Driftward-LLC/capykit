@@ -27,6 +27,8 @@ export type StableErrorCode =
   | "MEMBERSHIP_INACTIVE"
   | "FORBIDDEN"
   | "NOT_FOUND"
+  | "INVALID_REQUEST"
+  | "INTERNAL_ERROR"
   | "CONFIGURATION_UNAVAILABLE";
 
 export function stableError(code: StableErrorCode, requestId: string): { readonly error: { readonly code: StableErrorCode; readonly requestId: string } } {

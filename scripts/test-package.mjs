@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -58,6 +58,35 @@ try {
   `, "utf8");
   execFileSync(process.execPath, [importSmoke], { cwd: installRoot, stdio: "pipe" });
 
+  const hostedSmoke = join(installRoot, "hosted-smoke.mjs");
+  await writeFile(hostedSmoke, `
+    import { strict as assert } from "node:assert";
+    import { createHostedServer } from "@driftward/capykit/hosted";
+    const app = createHostedServer({ config: {
+      port: 0, publicBaseUrl: "http://localhost:3000", allowedCallbackOrigins: ["http://localhost:3000"],
+      databaseUrl: undefined, supabaseUrl: undefined, supabaseServiceRoleKey: undefined,
+      sessionCookieName: "capykit_session", csrfCookieName: "capykit_csrf", secureCookies: false,
+    } });
+    try {
+      const root = await app.inject({ url: "/" });
+      assert.equal(root.statusCode, 200);
+      const assetPath = root.body.match(/src="([^"]+)"/)?.[1];
+      assert.ok(assetPath?.startsWith("/assets/"), "installed console must load its built script");
+      const asset = await app.inject({ url: assetPath });
+      assert.equal(asset.statusCode, 200);
+      assert.match(asset.headers["content-type"], /javascript/);
+      assert.equal((await app.inject({ url: "/health/ready" })).statusCode, 503);
+    } finally { await app.close(); }
+  `, "utf8");
+  execFileSync(process.execPath, [hostedSmoke], { cwd: installRoot, stdio: "pipe" });
+  const worker = spawnSync(join(binRoot, `capykit-hosted-worker${binSuffix}`), [], {
+    cwd: installRoot, encoding: "utf8", shell: process.platform === "win32", timeout: 10000,
+    env: { ...process.env, DATABASE_URL: "", SUPABASE_URL: "", SUPABASE_SERVICE_ROLE_KEY: "", CAPYKIT_PUBLIC_BASE_URL: "http://localhost:3000", CAPYKIT_ALLOWED_CALLBACK_ORIGINS: "", PORT: "0" },
+  });
+  assert.ifError(worker.error);
+  assert.equal(worker.status, 1, "installed worker must fail readiness without configuration");
+  assert.equal(JSON.parse(worker.stdout).status, "unavailable");
+
   const maliciousSchemaRoot = join(installRoot, "node_modules", "@driftward", "schemas", "v0.1");
   await mkdir(maliciousSchemaRoot, { recursive: true });
   await writeFile(join(maliciousSchemaRoot, "registry.schema.json"), JSON.stringify({
@@ -88,6 +117,35 @@ try {
     assert.doesNotMatch(String(rejection), /node_modules[\\\\/]@driftward[\\\\/]schemas[\\\\/]v0\\.1[\\\\/]registry\\.schema\\.json/);
   `, "utf8");
   execFileSync(process.execPath, [installedValidatorSmoke], { cwd: installRoot, stdio: "pipe" });
+
+  const profileRoot = join(temporaryRoot, "portable-profile");
+  await cp(join(repositoryRoot, "examples", "portable-toolkit"), profileRoot, { recursive: true });
+  const profilePath = join(profileRoot, "profile.json");
+  const profileConfig = join(temporaryRoot, "profile-config", "registry-sources.json");
+  const installedCliJson = (args) => JSON.parse(execFileSync(join(binRoot, `capykit${binSuffix}`), args, {
+    cwd: installRoot,
+    encoding: "utf8",
+    shell: process.platform === "win32",
+  }));
+  const profilePlan = installedCliJson(["profile", "inspect", profilePath, "--config", profileConfig, "--json"]);
+  assert.equal(profilePlan.format, "capykit.profilePlan.v0.1");
+  assert.equal(profilePlan.profile.id, "portable-toolkit");
+  await assert.rejects(readFile(profileConfig), { code: "ENOENT" }, "profile inspect must not activate a source");
+  const profileApplied = installedCliJson(["profile", "apply", profilePath, "--config", profileConfig, "--json"]);
+  assert.equal(profileApplied.applied, true);
+  assert.equal(profileApplied.dependenciesInstalled, false, "package smoke must not install profile dependencies");
+  await rm(profileRoot, { recursive: true });
+  const installedSkill = installedCliJson(["tools", "show", "json-review", "--config", profileConfig, "--json"]);
+  const skillDirectory = profileApplied.skills.find(({ id }) => id === "json-review")?.destination;
+  assert.ok(skillDirectory, "applied profile must report its installed skill destination");
+  assert.equal(installedSkill.tool.record.interfaces.find(({ type }) => type === "skill")?.location, join(skillDirectory, "SKILL.md"));
+  for (const file of ["SKILL.md", "scripts/check-json.mjs", "references/checklist.md"]) {
+    assert.equal(
+      await readFile(join(skillDirectory, file), "utf8"),
+      await readFile(join(repositoryRoot, "examples", "portable-toolkit", "skills", "json-review", file), "utf8"),
+      "installed profile must preserve its skill and support files after the original bundle is removed",
+    );
+  }
 
   const request = JSON.stringify({
     jsonrpc: "2.0",
@@ -127,7 +185,7 @@ try {
   assert.equal(checksums.artifacts.length, 4);
   assert.ok(checksums.artifacts.every((artifact) => /^[a-f0-9]{64}$/.test(artifact.sha256)), "standalone artifacts must publish sha256 checksums");
 
-  console.log("Packed package smoke test passed: CLI, completions, imports, schema asset, installed validator, MCP server, and standalone artifacts.");
+  console.log("Packed package smoke test passed: CLI, completions, imports, schema asset, installed validator, portable profile, MCP server, hosted console/worker, and standalone artifacts.");
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
 }

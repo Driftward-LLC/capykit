@@ -49,17 +49,24 @@ execute a health check that is not declared as safe and non-destructive.
    CLI or MCP interface when available:
 
    ```bash
-   capykit adapters /absolute/path/to/registry.json
-   capykit doctor /absolute/path/to/registry.json
+   capykit tools search "<task keywords>" --json
+   capykit tools show <tool-id> --json --check
    ```
 
    With the read-only MCP server, search first and inspect the exact tool record
    before acting:
 
    - `search_tools` for the requested capability or domain.
-   - `get_tool` for candidate records.
+   - `get_tool` for complete invocation details, examples, and access requirements.
    - `list_capabilities` to compare tool capabilities.
-   - `check_availability` only for declarative availability information.
+   - `check_availability` for catalog declarations: `available: null` means
+     runtime availability is unknown, even when `declared` is true.
+
+   CLI, MCP, and adapters share the default sources configuration. Pass
+   `--config <path>` for an alternate catalog. MCP queries default to public
+   records; supply matching visibility and context for non-public records.
+   Search uses all whitespace-separated keywords in any order; try concise
+   task terms and synonyms rather than a full question.
 
    Completion criterion: every plausible catalog match is either selected or
    rejected with a concrete reason.
@@ -105,22 +112,22 @@ execute a health check that is not declared as safe and non-destructive.
 
 ## Codex Example
 
-Before adding a GitHub integration in a repository, Codex should inspect the
-catalog export generated for the workspace:
+Before adding a GitHub integration in a repository, search the active catalog
+and inspect a selected record:
 
 ```bash
-capykit adapters /absolute/path/to/registry.json > /tmp/capykit-adapters.json
-node <<'EOF'
-const fs = require("node:fs");
-const bundle = JSON.parse(
-  fs.readFileSync("/tmp/capykit-adapters.json", "utf8"),
-);
-const codexFile = bundle.files.find(
-  (file) => file.path === ".codex/capykit.discovery.json",
-);
-console.log(codexFile.content);
-EOF
+capykit tools search "pull requests" --json
+capykit tools show <matching-tool-id> --json --check
 ```
+
+If using the MCP interface, make the equivalent `search_tools` and `get_tool`
+calls. Use the returned command, API operation, MCP server, or canonical skill
+location. A skill location is a reference to load when appropriate, not a second
+copy of the skill instructions.
+
+For an offline reference, `capykit adapters` exports `{path, content}` entries.
+The `.codex/capykit.discovery.json` export must be read explicitly; generating it
+does not install an integration or cause Codex to load it automatically.
 
 Then Codex should select an existing `cli`, `mcp`, or `api` interface when it
 covers the requested operation. If the record says authentication is required,
@@ -135,11 +142,16 @@ Before creating a custom script, Hermes should search the Capykit reference made
 from the active catalog:
 
 ```bash
-capykit adapters /absolute/path/to/registry.json
+capykit tools search "<task keywords>" --json
+capykit tools show <matching-tool-id> --json --check
 ```
 
-Use the generated `.hermes/references/capykit-discovery.md` content as a routing
-reference. If a matching MCP server is declared, prefer the MCP tool call over a
+Alternatively, use the generated `.hermes/references/capykit-discovery.md`
+content as a routing reference. The export includes invocation details,
+examples, safety metadata, and documentation. Install the CLI or configure the
+MCP server inside the agent environment that will consume it; a host installation
+does not establish availability inside a container. If a matching MCP server is
+declared, prefer the MCP tool call over a
 new script. If only a CLI interface is declared, use the listed command and then
 run the relevant local validation. If the task is a repeated agent workflow and
 the catalog declares a `skill` interface, load that skill before writing new
