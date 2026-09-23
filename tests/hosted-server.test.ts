@@ -12,9 +12,9 @@ import { createHostedServer } from "../src/hosted/server.js";
 const origin = "https://capykit.example.test";
 const config: HostedConfig = loadHostedConfig({
   CAPYKIT_PUBLIC_BASE_URL: origin, DATABASE_URL: "postgres://unused",
-  SUPABASE_URL: "https://supabase.example.test", SUPABASE_SERVICE_ROLE_KEY: "test-only-placeholder",
+  CAPYKIT_AUTH_URL: "http://auth:9999",
 });
-const identity = { provider: "supabase" as const, subject: "owner-1", email: "owner@example.test" };
+const identity = { provider: "gotrue" as const, subject: "owner-1", email: "owner@example.test" };
 const context: AuthenticatedContext = {
   identity, membership: { workspaceId: "workspace-a", principalId: "owner-1", principalKind: "human", role: "owner", active: true },
 };
@@ -33,6 +33,7 @@ function fixture(overrides: { config?: HostedConfig; consoleDirectory?: string }
   };
   const auth = {
     requestOtp: vi.fn(async () => {}),
+    signOut: vi.fn(async () => {}),
     verifyOtp: vi.fn((): Promise<string | undefined> => Promise.resolve("verified-token")),
     verifyBearer: vi.fn((token: string) => Promise.resolve(token === "verified-token" ? identity : undefined)),
   };
@@ -78,7 +79,7 @@ describe("hosted HTTP boundaries", () => {
   });
 
   it("requires same-origin CSRF for cookie-authenticated mutations, including session renewal", async () => {
-    const { app } = fixture();
+    const { app, auth } = fixture();
     const cookie = "capykit_session=verified-token; capykit_csrf=csrf-proof";
     for (const headers of [
       { cookie }, { cookie, origin }, { cookie, origin, "x-csrf-token": "wrong" },
@@ -95,6 +96,7 @@ describe("hosted HTTP boundaries", () => {
     expect(logout.statusCode).toBe(200);
     expect(logout.cookies).toHaveLength(2);
     expect(logout.cookies.every(({ value }) => value === "")).toBe(true);
+    expect(auth.signOut).toHaveBeenCalledWith("verified-token");
     expect((await app.inject({ method: "POST", url: "/v1/auth/verify", headers: { origin: "https://other.example.test" }, payload: { email: identity.email, token: "123456" } })).statusCode).toBe(403);
   });
 
@@ -120,10 +122,10 @@ describe("hosted HTTP boundaries", () => {
     const failure = await app.inject({ url: "/health/ready" });
     expect(failure.statusCode).toBe(500);
     expect(failure.body).not.toContain("SENTINEL");
-    const incomplete = fixture({ config: { ...config, supabaseServiceRoleKey: undefined } });
+    const incomplete = fixture({ config: { ...config, authUrl: undefined } });
     const unready = await incomplete.app.inject({ url: "/health/ready" });
     expect(unready.statusCode).toBe(503);
-    expect(unready.json<unknown>()).toMatchObject({ status: "unavailable", missing: ["SUPABASE_SERVICE_ROLE_KEY"] });
+    expect(unready.json<unknown>()).toMatchObject({ status: "unavailable", missing: ["CAPYKIT_AUTH_URL"] });
     const unconfigured = createHostedServer({ config: loadHostedConfig({}) });
     apps.push(unconfigured);
     expect((await unconfigured.inject({ url: "/health/ready" })).statusCode).toBe(503);
@@ -154,6 +156,11 @@ describe("hosted HTTP boundaries", () => {
     await writeFile(join(directory, "assets/index-test.js"), "document.title = 'Console';");
     await writeFile(join(directory, "private.txt"), "SENTINEL_PRIVATE_FILE");
     const { app } = fixture({ consoleDirectory: directory });
+    const template = await app.inject({ url: "/auth/email-template" });
+    expect(template.statusCode).toBe(200);
+    expect(template.headers["content-type"]).toContain("text/html");
+    expect(template.body).toContain("{{ .Token }}");
+    expect(template.body).not.toContain("{{ .ConfirmationURL }}");
     const root = await app.inject({ url: "/" });
     expect(root.statusCode).toBe(200);
     expect(root.body).toContain("/assets/index-test.js");
@@ -173,6 +180,9 @@ describe("hosted HTTP boundaries", () => {
     }
     expect(loadHostedConfig({ CAPYKIT_PUBLIC_BASE_URL: "https://capykit.example.test/" }).publicBaseUrl).toBe(origin);
     expect(loadHostedConfig({ CAPYKIT_PUBLIC_BASE_URL: "http://localhost:3000" }).secureCookies).toBe(false);
-    expect(() => loadHostedConfig({ SUPABASE_URL: "invalid-provider-url" })).toThrow(/Hosted URLs/u);
+    expect(loadHostedConfig({ CAPYKIT_AUTH_URL: "http://auth:9999/" }).authUrl).toBe("http://auth:9999");
+    for (const value of ["invalid-provider-url", "ftp://auth:9999", "http://user:secret@auth:9999", "http://auth:9999/path", "http://auth:9999?secret=value", "http://auth:9999#fragment"]) {
+      expect(() => loadHostedConfig({ CAPYKIT_AUTH_URL: value })).toThrow(/Authentication URL/u);
+    }
   });
 });

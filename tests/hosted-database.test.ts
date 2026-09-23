@@ -48,7 +48,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
         DATABASE_URL: scopedUrl,
         CAPYKIT_BOOTSTRAP_WORKSPACE_SLUG: slug,
         CAPYKIT_BOOTSTRAP_WORKSPACE_NAME: "Test workspace",
-        CAPYKIT_BOOTSTRAP_SUPABASE_USER_ID: subject,
+        CAPYKIT_BOOTSTRAP_AUTH_USER_ID: subject,
         CAPYKIT_BOOTSTRAP_OWNER_EMAIL: email,
       },
     });
@@ -67,7 +67,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
     const reopened = createHostedDatabase(scopedUrl);
     if (reopened === undefined) throw new Error("Expected configured test database");
     try {
-      const context = await reopened.resolveContext({ provider: "supabase", subject, email: "updated@example.test" });
+      const context = await reopened.resolveContext({ provider: "gotrue", subject, email: "updated@example.test" });
       expect(context?.membership).toEqual({ ...initial, active: true, principalKind: "human", role: "owner" });
     } finally {
       await reopened.close();
@@ -83,7 +83,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
     if (runtime === undefined) throw new Error("Expected configured runtime database");
     try {
       expect(await runtime.readiness()).toEqual({ status: "ready", reason: "ok" });
-      expect((await runtime.resolveContext({ provider: "supabase", subject, email: "owner@example.test" }))?.membership.workspaceId).toBe(owner.workspaceId);
+      expect((await runtime.resolveContext({ provider: "gotrue", subject, email: "owner@example.test" }))?.membership.workspaceId).toBe(owner.workspaceId);
       await expect(runtime.pool.query("update workspaces set active = false")).rejects.toMatchObject({ code: "42501" });
       await expect(runtime.pool.query("select * from capability_publications")).rejects.toMatchObject({ code: "42501" });
       await expect(runtime.pool.query("create table unexpected_table (id integer)")).rejects.toMatchObject({ code: "42501" });
@@ -111,7 +111,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
   it("rejects revoked principals, workspaces, memberships, and unverified bindings", async () => {
     const subject = randomUUID();
     const owner = await bootstrap(randomUUID(), subject);
-    const identity: VerifiedIdentity = { provider: "supabase", subject, email: "owner@example.test" };
+    const identity: VerifiedIdentity = { provider: "gotrue", subject, email: "owner@example.test" };
     expect(await database.resolveContext(identity)).toBeDefined();
     for (const [table, column, id] of [
       ["principals", "id", owner.principalId],
@@ -135,7 +135,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
     await expect(bootstrap(otherSlug, subject)).rejects.toThrow("Owner identity must be an active human in the selected workspace");
     const result = await database.pool.query("select id from workspaces where slug = $1", [otherSlug]);
     expect(result.rows).toHaveLength(0);
-    const context = await database.resolveContext({ provider: "supabase", subject, email: "owner@example.test" });
+    const context = await database.resolveContext({ provider: "gotrue", subject, email: "owner@example.test" });
     expect(context?.membership.workspaceId).toBe(owner.workspaceId);
   });
 

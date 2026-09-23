@@ -64,7 +64,7 @@ try {
     import { createHostedServer } from "@driftward/capykit/hosted";
     const app = createHostedServer({ config: {
       port: 0, publicBaseUrl: "http://localhost:3000", allowedCallbackOrigins: ["http://localhost:3000"],
-      databaseUrl: undefined, supabaseUrl: undefined, supabaseServiceRoleKey: undefined,
+      databaseUrl: undefined, authUrl: undefined,
       sessionCookieName: "capykit_session", csrfCookieName: "capykit_csrf", secureCookies: false,
     } });
     try {
@@ -81,7 +81,7 @@ try {
   execFileSync(process.execPath, [hostedSmoke], { cwd: installRoot, stdio: "pipe" });
   const worker = spawnSync(join(binRoot, `capykit-hosted-worker${binSuffix}`), [], {
     cwd: installRoot, encoding: "utf8", shell: process.platform === "win32", timeout: 10000,
-    env: { ...process.env, DATABASE_URL: "", SUPABASE_URL: "", SUPABASE_SERVICE_ROLE_KEY: "", CAPYKIT_PUBLIC_BASE_URL: "http://localhost:3000", CAPYKIT_ALLOWED_CALLBACK_ORIGINS: "", PORT: "0" },
+    env: { ...process.env, DATABASE_URL: "", CAPYKIT_AUTH_URL: "", CAPYKIT_PUBLIC_BASE_URL: "http://localhost:3000", CAPYKIT_ALLOWED_CALLBACK_ORIGINS: "", PORT: "0" },
   });
   assert.ifError(worker.error);
   assert.equal(worker.status, 1, "installed worker must fail readiness without configuration");

@@ -22,6 +22,15 @@ permission contracts, stored artifacts, execution limits, and completion checks.
 It resolves the open implementation choices described below without asserting
 that the hosted backend has been built or provisioned.
 
+## Staging infrastructure decision
+
+On 2026-09-23, the operator selected the existing VPS for inexpensive web testing.
+Use one portable Docker Compose deployment with ordinary PostgreSQL and a
+self-hosted authentication service. Railway and managed Supabase are no longer
+staging prerequisites. The application image and service topology remain the
+same when moved to another Docker host; configuration, ingress, and persisted
+data move with it. See the [deployment guide](../hosted-workspace-foundation.md).
+
 ## Product contract
 
 Capykit is being built as a hosted capability platform. A workspace stores its
