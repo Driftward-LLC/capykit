@@ -14,7 +14,7 @@ import type { ConnectionRecord, PendingConnectionSetup } from "../src/hosted/con
 const databaseUrl = process.env.CAPYKIT_TEST_POSTGRES_URL;
 const origin = "https://capykit.example.test";
 const githubConfig: GithubConfig = {
-  appId: "42", appSlug: "capykit-test", clientId: "Iv1.test", clientSecret: "CLIENT_SECRET_SENTINEL", privateKey: "PRIVATE_KEY_SENTINEL",
+  appId: "42", appSlug: "capykit-test", clientId: "Iv1.test", clientSecret: "CLIENT_SENTINEL", privateKey: "PRIVATE_KEY_SENTINEL",
   webhookSecret: "http-test-webhook-secret-at-least-32-characters", encryptionKey: Buffer.alloc(32, 6), keyVersion: "v1", callbackUrl: `${origin}/v1/connections/github/callback`,
 };
 interface Started { connectionId: string; setupId: string; authorizationUrl: string; installationUrl: string }
@@ -88,7 +88,7 @@ describe.skipIf(databaseUrl === undefined)("GitHub connection HTTP and PostgreSQ
     if (directory) await rm(directory, { recursive: true, force: true });
   });
   function noCredentials(body: string): void {
-    for (const secret of ["USER_TOKEN_SENTINEL", "REFRESH_TOKEN_SENTINEL", "CLIENT_SECRET_SENTINEL", "PRIVATE_KEY_SENTINEL", "PROVIDER_DETAIL_SENTINEL"]) expect(body).not.toContain(secret);
+    for (const secret of ["USER_TOKEN_SENTINEL", "REFRESH_TOKEN_SENTINEL", "CLIENT_SENTINEL", "PRIVATE_KEY_SENTINEL", "PROVIDER_DETAIL_SENTINEL"]) expect(body).not.toContain(secret);
   }
   async function start(): Promise<Started> {
     const response = await app.inject({ method: "POST", url: "/v1/connections/github/start", headers: browserHeaders, payload: {} });
