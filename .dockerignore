@@ -1,0 +1,15 @@
+**
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsup.config.ts
+!src/
+!src/**
+!scripts/
+!scripts/build-hosted.mjs
+!scripts/bootstrap-hosted-owner.mjs
+!scripts/provision-hosted-owner.mjs
+!scripts/migrations/
+!scripts/migrations/**
+!schemas/
+!schemas/**

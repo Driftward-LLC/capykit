@@ -8,12 +8,12 @@ import { fileURLToPath } from "node:url";
 import { callbackOriginAllowed, loadHostedConfig, missingHostedConfig, type HostedConfig } from "./config.js";
 import { checkDatabaseReadiness, createHostedDatabase, type HostedDatabase } from "./db.js";
 import { stableError, type AuthenticatedContext } from "./identity.js";
-import { createSupabaseAuthGateway, type SupabaseAuthGateway } from "./supabase.js";
+import { createAuthGateway, type AuthGateway } from "./auth.js";
 
 interface ServerDeps {
   readonly config?: HostedConfig;
   readonly database?: HostedDatabase | undefined;
-  readonly auth?: SupabaseAuthGateway | undefined;
+  readonly auth?: AuthGateway | undefined;
   readonly consoleDirectory?: string;
 }
 
@@ -41,7 +41,7 @@ function csrfValid(request: FastifyRequest, config: HostedConfig): boolean {
   return token !== undefined && token.length > 0 && typeof header === "string" && header === token;
 }
 
-async function authenticatedContext(token: string | undefined, database: HostedDatabase | undefined, auth: SupabaseAuthGateway | undefined): Promise<AuthenticatedContext | undefined> {
+async function authenticatedContext(token: string | undefined, database: HostedDatabase | undefined, auth: AuthGateway | undefined): Promise<AuthenticatedContext | undefined> {
   if (token === undefined || auth === undefined || database === undefined) return undefined;
   const identity = await auth.verifyBearer(token);
   return identity === undefined ? undefined : database.resolveContext(identity);
@@ -75,7 +75,7 @@ const errorResponseSchema = {
 export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   const config = deps.config ?? loadHostedConfig();
   const database = deps.database ?? createHostedDatabase(config.databaseUrl);
-  const auth = deps.auth ?? createSupabaseAuthGateway(config);
+  const auth = deps.auth ?? createAuthGateway(config);
   const consoleDirectory = deps.consoleDirectory ?? fileURLToPath(new URL("./console/", import.meta.url));
   const publicOrigin = new URL(config.publicBaseUrl).origin;
   const app = Fastify({ logger: false, genReqId: () => randomUUID(), bodyLimit: 16 * 1024 });
@@ -99,6 +99,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   });
 
   app.get("/health/live", () => ({ status: "ok" }));
+  app.get("/auth/email-template", (_request, reply) => reply.type("text/html").send("<!doctype html><html lang=\"en\"><body><h1>Your Capykit sign-in code</h1><p>Enter this six-digit code in Capykit:</p><p><strong>{{ .Token }}</strong></p><p>If you did not request this code, you can ignore this email.</p></body></html>"));
   app.get("/health/ready", async (_request, reply) => {
     const db = await checkDatabaseReadiness(database);
     const missing = missingHostedConfig(config);
@@ -149,6 +150,8 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   app.post("/v1/auth/logout", async (request, reply) => {
     if (request.headers.origin !== publicOrigin || !csrfValid(request, config)) return reply.code(403).send(stableError("CSRF_REQUIRED", request.id));
     clearSessionCookies(reply, config);
+    const token = bearerToken(request, config);
+    if (token !== undefined) await auth?.signOut(token);
     return reply.send({ status: "logged_out" });
   });
   app.get("/v1/me", { schema: { response: { 200: meResponseSchema, 401: errorResponseSchema } } }, async (request, reply) => {

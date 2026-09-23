@@ -13,6 +13,8 @@ const execute = promisify(execFile);
 
 describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () => {
   const schema = `capykit_test_${randomUUID().replaceAll("-", "")}`;
+  const runtimeRole = `${schema}_runtime`;
+  const browserRole = `${schema}_browser`;
   const url = new URL(databaseUrl ?? "postgres://localhost/capykit_test");
   url.searchParams.set("options", `-c search_path=${schema},public`);
   const scopedUrl = url.toString();
@@ -24,14 +26,18 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
     await admin.query(`create schema ${schema}`);
     expect(await database.readiness()).toEqual({ status: "unavailable", reason: "connection_failed" });
     const migration = await readFile(new URL("../scripts/migrations/001_hosted_workspace_identity.sql", import.meta.url), "utf8");
-    await database.pool.query(migration);
-    await database.pool.query(migration);
+    const access = (await readFile(new URL("../scripts/migrations/002_hosted_database_access.sql", import.meta.url), "utf8"))
+      .replaceAll("capykit_runtime", runtimeRole).replaceAll("'anon'", `'${browserRole}'`);
+    await admin.query(`create role ${browserRole} nologin`);
+    await database.pool.query(`begin; ${migration}\n${access}\ncommit;`);
+    await database.pool.query(`begin; ${migration}\n${access}\ncommit;`);
     expect(await database.readiness()).toEqual({ status: "ready", reason: "ok" });
   });
 
   afterAll(async () => {
     await database.close();
     await admin.query(`drop schema if exists ${schema} cascade`);
+    await admin.query(`drop role if exists ${runtimeRole}, ${browserRole}`);
     await admin.end();
   });
 
@@ -42,7 +48,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
         DATABASE_URL: scopedUrl,
         CAPYKIT_BOOTSTRAP_WORKSPACE_SLUG: slug,
         CAPYKIT_BOOTSTRAP_WORKSPACE_NAME: "Test workspace",
-        CAPYKIT_BOOTSTRAP_SUPABASE_USER_ID: subject,
+        CAPYKIT_BOOTSTRAP_AUTH_USER_ID: subject,
         CAPYKIT_BOOTSTRAP_OWNER_EMAIL: email,
       },
     });
@@ -61,17 +67,51 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
     const reopened = createHostedDatabase(scopedUrl);
     if (reopened === undefined) throw new Error("Expected configured test database");
     try {
-      const context = await reopened.resolveContext({ provider: "supabase", subject, email: "updated@example.test" });
+      const context = await reopened.resolveContext({ provider: "gotrue", subject, email: "updated@example.test" });
       expect(context?.membership).toEqual({ ...initial, active: true, principalKind: "human", role: "owner" });
     } finally {
       await reopened.close();
     }
   });
 
+  it("restricts runtime to identity reads and denies browser access even if table grants are restored", async () => {
+    const subject = randomUUID();
+    const owner = await bootstrap(randomUUID(), subject);
+    const runtimeUrl = new URL(scopedUrl);
+    runtimeUrl.searchParams.set("options", `-c search_path=${schema},public -c role=${runtimeRole}`);
+    const runtime = createHostedDatabase(runtimeUrl.toString());
+    if (runtime === undefined) throw new Error("Expected configured runtime database");
+    try {
+      expect(await runtime.readiness()).toEqual({ status: "ready", reason: "ok" });
+      expect((await runtime.resolveContext({ provider: "gotrue", subject, email: "owner@example.test" }))?.membership.workspaceId).toBe(owner.workspaceId);
+      await expect(runtime.pool.query("update workspaces set active = false")).rejects.toMatchObject({ code: "42501" });
+      await expect(runtime.pool.query("select * from capability_publications")).rejects.toMatchObject({ code: "42501" });
+      await expect(runtime.pool.query("create table unexpected_table (id integer)")).rejects.toMatchObject({ code: "42501" });
+    } finally {
+      await runtime.close();
+    }
+    const protectedTables = await database.pool.query<{ relrowsecurity: boolean; can_select: boolean }>(
+      `select c.relrowsecurity, has_table_privilege($1, c.oid, 'select') as can_select
+         from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = $2 and c.relkind = 'r'`, [browserRole, schema],
+    );
+    expect(protectedTables.rows).toHaveLength(5);
+    expect(protectedTables.rows.every((table) => table.relrowsecurity && !table.can_select)).toBe(true);
+    await admin.query(`grant usage on schema ${schema} to ${browserRole}; grant select on ${schema}.workspaces to ${browserRole}`);
+    const client = await admin.connect();
+    try {
+      await client.query(`set role ${browserRole}`);
+      expect((await client.query(`select * from ${schema}.workspaces`)).rows).toEqual([]);
+    } finally {
+      await client.query("reset role");
+      client.release();
+    }
+  });
+
   it("rejects revoked principals, workspaces, memberships, and unverified bindings", async () => {
     const subject = randomUUID();
     const owner = await bootstrap(randomUUID(), subject);
-    const identity: VerifiedIdentity = { provider: "supabase", subject, email: "owner@example.test" };
+    const identity: VerifiedIdentity = { provider: "gotrue", subject, email: "owner@example.test" };
     expect(await database.resolveContext(identity)).toBeDefined();
     for (const [table, column, id] of [
       ["principals", "id", owner.principalId],
@@ -95,7 +135,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
     await expect(bootstrap(otherSlug, subject)).rejects.toThrow("Owner identity must be an active human in the selected workspace");
     const result = await database.pool.query("select id from workspaces where slug = $1", [otherSlug]);
     expect(result.rows).toHaveLength(0);
-    const context = await database.resolveContext({ provider: "supabase", subject, email: "owner@example.test" });
+    const context = await database.resolveContext({ provider: "gotrue", subject, email: "owner@example.test" });
     expect(context?.membership.workspaceId).toBe(owner.workspaceId);
   });
 

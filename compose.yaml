@@ -1,0 +1,156 @@
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  app:
+    image: ${CAPYKIT_IMAGE:-capykit-hosted:local}
+    build:
+      context: .
+      dockerfile: Dockerfile.hosted
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+    cpus: 0.5
+    mem_limit: 512m
+    pids_limit: 128
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgresql://capykit_api:${CAPYKIT_DB_PASSWORD:?Set a generated hex database password}@postgres:5432/capykit
+      CAPYKIT_AUTH_URL: http://auth:9999
+      CAPYKIT_PUBLIC_BASE_URL: ${CAPYKIT_PUBLIC_BASE_URL:?Set the exact HTTPS origin}
+    ports:
+      - "127.0.0.1:${CAPYKIT_HTTP_PORT:-19121}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *logging
+
+  postgres:
+    image: postgres:17.11-alpine3.24@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    cpus: 0.5
+    mem_limit: 768m
+    pids_limit: 128
+    environment:
+      POSTGRES_DB: capykit
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a generated hex administrator password}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      CAPYKIT_DB_PASSWORD: ${CAPYKIT_DB_PASSWORD:?Set a generated hex database password}
+      CAPYKIT_AUTH_DB_PASSWORD: ${CAPYKIT_AUTH_DB_PASSWORD:?Set a generated hex auth database password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./deploy/init-postgres.sh:/docker-entrypoint-initdb.d/10-capykit.sh:ro
+      - ./scripts/migrations:/opt/capykit/migrations:ro
+    healthcheck:
+      test: [CMD, pg_isready, -h, 127.0.0.1, -U, postgres, -d, capykit]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    logging: *logging
+
+  auth:
+    image: supabase/gotrue:v2.197.0@sha256:1736a63078f5922b198c4cbe50f80ab9a2d3b54fe8b7b6cfb2e9dc5dbbc12c6b
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+    cpus: 0.5
+    mem_limit: 256m
+    pids_limit: 128
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: ${CAPYKIT_PUBLIC_BASE_URL:?Set the exact HTTPS origin}
+      GOTRUE_SITE_URL: ${CAPYKIT_PUBLIC_BASE_URL:?Set the exact HTTPS origin}
+      GOTRUE_URI_ALLOW_LIST: ${CAPYKIT_PUBLIC_BASE_URL:?Set the exact HTTPS origin}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgresql://capykit_auth:${CAPYKIT_AUTH_DB_PASSWORD:?Set a generated hex auth database password}@postgres:5432/capykit?sslmode=disable
+      GOTRUE_DB_NAMESPACE: auth
+      GOTRUE_DB_MAX_POOL_SIZE: "5"
+      GOTRUE_DISABLE_SIGNUP: "true"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_MAILER_OTP_LENGTH: "6"
+      GOTRUE_MAILER_OTP_EXP: "600"
+      GOTRUE_MAILER_TEMPLATES_MAGIC_LINK: http://app:3000/auth/email-template
+      GOTRUE_MAILER_SUBJECTS_MAGIC_LINK: Your Capykit sign-in code
+      GOTRUE_JWT_SECRET: ${CAPYKIT_AUTH_JWT_SECRET:?Set a generated hex JWT signing secret}
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: "true"
+      GOTRUE_SECURITY_REFRESH_TOKEN_REUSE_INTERVAL: "10"
+      GOTRUE_RATE_LIMIT_EMAIL_SENT: "30"
+      GOTRUE_RATE_LIMIT_OTP: "30"
+      GOTRUE_RATE_LIMIT_VERIFY: "30"
+      GOTRUE_RATE_LIMIT_HEADER: X-Capykit-Auth-Client
+      GOTRUE_SMTP_HOST: mailpit
+      GOTRUE_SMTP_PORT: "1025"
+      GOTRUE_SMTP_ADMIN_EMAIL: no-reply@capykit.test
+      GOTRUE_SMTP_SENDER_NAME: Capykit staging
+      GOTRUE_SMTP_MAX_FREQUENCY: 60s
+      GOTRUE_LOG_LEVEL: warn
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:9999/health]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    logging: *logging
+
+  mailpit:
+    image: axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+    cpus: 0.25
+    mem_limit: 128m
+    pids_limit: 64
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: "100"
+      MP_MAX_AGE: 24h
+      MP_DISABLE_VERSION_CHECK: "true"
+    ports:
+      - "127.0.0.1:${CAPYKIT_MAIL_PORT:-19122}:8025"
+    volumes:
+      - mailpit-data:/data
+    healthcheck:
+      test: [CMD, /mailpit, readyz]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+
+volumes:
+  postgres-data:
+  mailpit-data:

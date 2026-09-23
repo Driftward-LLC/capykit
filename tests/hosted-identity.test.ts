@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { canManageWorkspace, canReadWorkspaceScopedRecord, workspaceScopedStatus, type AuthenticatedContext } from "../src/hosted/identity.js";
 
 const owner: AuthenticatedContext = {
-  identity: { provider: "supabase", subject: "user-1", email: "owner@example.com" },
+  identity: { provider: "gotrue", subject: "user-1", email: "owner@example.com" },
   membership: { workspaceId: "workspace-a", principalId: "principal-1", principalKind: "human", role: "owner", active: true },
 };
 
 const agent: AuthenticatedContext = {
-  identity: { provider: "supabase", subject: "agent-1", email: "agent@example.com" },
+  identity: { provider: "gotrue", subject: "agent-1", email: "agent@example.com" },
   membership: { workspaceId: "workspace-a", principalId: "principal-2", principalKind: "agent", role: "member", active: true },
 };
 
