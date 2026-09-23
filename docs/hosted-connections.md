@@ -57,7 +57,7 @@ inside a private directory. Supply all of these together:
 | `CAPYKIT_GITHUB_CLIENT_SECRET` | App client secret |
 | `CAPYKIT_GITHUB_PRIVATE_KEY` | Full RSA PEM, at least 2048 bits |
 | `CAPYKIT_GITHUB_WEBHOOK_SECRET` | Same secret configured on GitHub |
-| `CONNECT_STATE_ENCRYPTION_KEY` | Independent 32 random bytes in canonical base64 |
+| `CONNECT_STATE_ENCRYPTION_KEY` | 32 fresh random bytes, canonical base64 |
 | `CONNECT_STATE_ENCRYPTION_KEY_VERSION` | Explicit label, such as `v1` |
 
 Compose env files support quoted multiline values for the PEM. Alternatively, set
