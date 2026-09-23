@@ -42,21 +42,22 @@ Cookie writes also require the same origin and `x-csrf-token`.
 
 | Method and path | Request / result |
 | --- | --- |
-| `GET /v1/capabilities` | `{capabilities: [...]}` within the current workspace |
+| `GET /v1/capabilities` | Workspace list |
 | `POST /v1/capabilities` | `{slug, name, kind}` creates a stable UUID |
-| `GET /v1/capabilities/:id` | Header, draft summary, and published summaries |
+| `GET /v1/capabilities/:id` | Header, draft, versions |
 | `PUT /v1/capabilities/:id/draft` | `{version, artifact: {files: [...]}}` |
-| `POST /v1/capabilities/:id/publish` | `{version, digest}` binds the inspected draft |
-| `GET /v1/capabilities/:id/versions/:version/download` | Protected complete manifest attachment |
-| `DELETE /v1/capabilities/:id` | Invalidates the capability and removes its bytes |
+| `POST /v1/capabilities/:id/publish` | `{version, digest}` |
+| `GET /v1/capabilities/:id/versions/:version/download` | Manifest attachment |
+| `DELETE /v1/capabilities/:id` | Invalidates and removes bytes |
 
 Each uploaded file declares exactly `{path, type: "file", executable,
 contentBase64}`. There are no archive links or extraction hooks. Limits are 512
 files, 8 MiB per skill file, and 32 MiB total decoded bytes. Paths must be portable,
 relative, NFC-normalized, at most 1,024 characters and 33 components deep. The API
 rejects links, unsupported types, credential files, detected secrets, path/case
-collisions, invalid base64, and incomplete skill metadata. It processes at most one
-large upload, publication, or download per API process; another transfer receives `ARTIFACT_BUSY` and can retry.
+collisions, invalid base64, and incomplete skill metadata. It processes at most
+one large upload, publication, or download per API process; another transfer
+receives `ARTIFACT_BUSY` and can retry.
 
 Function artifacts contain exactly one UTF-8 ESM `index.mjs`, at most 1 MiB,
 exporting an async `handler`. Acorn parses syntax without evaluating it. Imports,
