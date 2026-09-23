@@ -12,13 +12,21 @@ import { createAuthGateway, type AuthGateway } from "./auth.js";
 import { ArtifactError } from "./artifacts.js";
 import { CapabilityError, CapabilityStore } from "./capabilities.js";
 import { Readable } from "node:stream";
+import { HostedAccessError } from "./workspace-access.js";
+import { ConnectionError, ConnectionStore } from "./connections.js";
+import { GithubError, GithubProvider, loadGithubConfig, verifyGithubWebhook, type GithubConfig } from "./github.js";
+import { createWebhookIngress } from "./webhook-ingress.js";
 export { verifyArtifact } from "./artifacts.js";
+export { ConnectionStore } from "./connections.js";
+export { GithubProvider, loadGithubConfig } from "./github.js";
 
 interface ServerDeps {
   readonly config?: HostedConfig;
   readonly database?: HostedDatabase | undefined;
   readonly auth?: AuthGateway | undefined;
   readonly consoleDirectory?: string;
+  readonly githubConfig?: GithubConfig | undefined;
+  readonly githubProvider?: GithubProvider | undefined;
 }
 
 function bearerToken(request: FastifyRequest, config: HostedConfig): string | undefined {
@@ -82,6 +90,9 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   const auth = deps.auth ?? createAuthGateway(config);
   const consoleDirectory = deps.consoleDirectory ?? fileURLToPath(new URL("./console/", import.meta.url));
   const publicOrigin = new URL(config.publicBaseUrl).origin;
+  const githubConfig = deps.githubConfig ?? loadGithubConfig({ ...process.env, CAPYKIT_PUBLIC_BASE_URL: config.publicBaseUrl });
+  const github = deps.githubProvider ?? (githubConfig === undefined ? undefined : new GithubProvider(githubConfig));
+  const connections = database === undefined ? undefined : new ConnectionStore(database.pool, github, githubConfig);
   const app = Fastify({ logger: false, genReqId: () => randomUUID(), bodyLimit: 16 * 1024,
     requestTimeout: 120_000, connectionTimeout: 30_000, ajv: { customOptions: { removeAdditional: false } } });
   const capabilities = database === undefined ? undefined : new CapabilityStore(database.pool);
@@ -95,7 +106,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     reply.header("x-request-id", request.id).header("cache-control", "no-store").header("x-content-type-options", "nosniff");
   });
   app.setErrorHandler((error, request, reply) => {
-    if (error instanceof ArtifactError || error instanceof CapabilityError) {
+    if (error instanceof ArtifactError || error instanceof CapabilityError || error instanceof HostedAccessError || error instanceof ConnectionError || error instanceof GithubError) {
       return reply.code(error.statusCode).send(stableError(error.code as StableErrorCode, request.id));
     }
     const status = error instanceof Error && "statusCode" in error && typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
@@ -122,11 +133,17 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     const ready = missing.length === 0 && db.status === "ready";
     return reply.code(ready ? 200 : 503).send({ status: ready ? "ready" : "unavailable", database: db.reason, missing });
   });
-  app.get("/", async (_request, reply) => {
+  async function serveConsole(_request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> {
     reply.header("content-security-policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     reply.header("referrer-policy", "no-referrer");
     return reply.type("text/html").send(await readFile(join(consoleDirectory, "index.html")));
-  });
+  }
+  app.get("/", serveConsole);
+  // Render a same-origin document before the authenticated POST continuation.
+  // SameSite=Strict session cookies intentionally do not accompany GitHub's
+  // initial cross-site GET. The console immediately removes code/state from its URL.
+  app.get("/v1/connections/github/callback", serveConsole);
+  app.get("/v1/connections/github/setup", serveConsole);
   app.get<{ Params: { file: string } }>("/assets/:file", async (request, reply) => {
     const { file } = request.params;
     if (!/^[a-zA-Z0-9_-]+\.(?:js|css)$/u.test(file)) return reply.code(404).send(stableError("NOT_FOUND", request.id));
@@ -180,7 +197,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     };
   });
 
-  async function requireCapabilityIdentity(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  async function requireIdentity(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     if (capabilities === undefined) { reply.code(503).send(stableError("CONFIGURATION_UNAVAILABLE", request.id)); return; }
     const context = await authenticatedContext(bearerToken(request, config), database, auth);
     if (context === undefined || !context.membership.active) { reply.code(401).send(stableError("AUTHENTICATION_REQUIRED", request.id)); return; }
@@ -188,19 +205,19 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   }
   function contextFor(request: FastifyRequest): AuthenticatedContext {
     const context = contexts.get(request);
-    if (context === undefined) throw new Error("Missing authenticated capability context");
+    if (context === undefined) throw new Error("Missing authenticated context");
     return context;
   }
   function capabilityStore(): CapabilityStore {
     if (capabilities === undefined) throw new Error("Missing capability database");
     return capabilities;
   }
-  const authenticated = { onRequest: requireCapabilityIdentity };
+  const authenticated = { onRequest: requireIdentity };
   app.get("/v1/capabilities", authenticated, async (request) => ({ capabilities: await capabilityStore().list(contextFor(request)) }));
   app.post("/v1/capabilities", authenticated, async (request, reply) => reply.code(201).send(await capabilityStore().create(contextFor(request), request.body)));
   app.get<{ Params: { id: string } }>("/v1/capabilities/:id", authenticated, async (request) => capabilityStore().detail(contextFor(request), request.params.id));
   async function beginArtifactTransfer(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-    await requireCapabilityIdentity(request, reply);
+    await requireIdentity(request, reply);
     if (reply.sent) return;
     // Scope and authorize the exact record before accepting or reading bytes.
     await capabilityStore().detail(contextFor(request), (request.params as { id: string }).id);
@@ -230,13 +247,79 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     await capabilityStore().delete(contextFor(request), request.params.id);
     return reply.code(204).send();
   });
+
+  function connectionStore(): ConnectionStore {
+    if (connections === undefined) throw new Error("Missing connection database");
+    return connections;
+  }
+  function sessionFor(request: FastifyRequest): string {
+    const token = bearerToken(request, config);
+    if (token === undefined) throw new Error("Missing authenticated session");
+    return token;
+  }
+  app.get("/v1/connections", authenticated, async (request) => ({
+    configured: github !== undefined,
+    installationUrl: github?.installationUrl() ?? null,
+    connections: await connectionStore().list(contextFor(request)),
+  }));
+  app.get<{ Params: { id: string } }>("/v1/connections/:id", authenticated, async (request) => connectionStore().detail(contextFor(request), request.params.id));
+  app.post("/v1/connections/github/start", authenticated, async (request) => connectionStore().start(contextFor(request), sessionFor(request), request.id, request.body));
+  app.post("/v1/connections/github/callback", authenticated, async (request) => connectionStore().callback(contextFor(request), sessionFor(request), request.id, request.body));
+  app.get<{ Params: { setupId: string } }>("/v1/connections/github/pending/:setupId", authenticated, async (request) => connectionStore().pending(contextFor(request), sessionFor(request), request.params.setupId));
+  app.post("/v1/connections/github/confirm", authenticated, async (request) => connectionStore().confirm(contextFor(request), sessionFor(request), request.id, request.body));
+  app.delete<{ Params: { setupId: string } }>("/v1/connections/github/pending/:setupId", authenticated, async (request, reply) => {
+    await connectionStore().cancel(contextFor(request), sessionFor(request), request.id, request.params.setupId);
+    return reply.code(204).send();
+  });
+  app.delete<{ Params: { id: string } }>("/v1/connections/:id", authenticated, async (request, reply) => {
+    await connectionStore().disconnect(contextFor(request), request.id, request.params.id);
+    return reply.code(204).send();
+  });
+
+  // Encapsulation preserves the normal JSON parser for all authenticated APIs.
+  void app.register((webhooks, _options, done) => {
+    webhooks.removeContentTypeParser("application/json");
+    webhooks.addContentTypeParser("application/json", { parseAs: "buffer", bodyLimit: 1024 * 1024 }, (_request, body, done) => { done(null, body); });
+    webhooks.post<{ Body: Buffer }>("/v1/webhooks/github", { bodyLimit: 1024 * 1024 }, async (request, reply) => {
+      if (githubConfig === undefined || connections === undefined) return reply.code(503).send(stableError("GITHUB_NOT_CONFIGURED", request.id));
+      if (!Buffer.isBuffer(request.body) || !verifyGithubWebhook(githubConfig.webhookSecret, request.body, request.headers["x-hub-signature-256"])) {
+        return reply.code(401).send(stableError("WEBHOOK_INVALID", request.id));
+      }
+      const deliveryId = request.headers["x-github-delivery"];
+      const event = request.headers["x-github-event"];
+      if (typeof deliveryId !== "string" || !/^[a-zA-Z0-9-]{1,128}$/u.test(deliveryId) || typeof event !== "string" || !/^[a-z_]{1,64}$/u.test(event)) {
+        return reply.code(400).send(stableError("INVALID_REQUEST", request.id));
+      }
+      let payload: unknown;
+      try { payload = JSON.parse(request.body.toString("utf8")) as unknown; }
+      catch { return reply.code(400).send(stableError("INVALID_REQUEST", request.id)); }
+      await connections.webhook(event, deliveryId, payload);
+      return reply.code(202).send({ status: "accepted" });
+    });
+    done();
+  });
   return app;
 }
 
 export async function startHostedServer(): Promise<void> {
   const config = loadHostedConfig();
+  const webhookPort = process.env.CAPYKIT_WEBHOOK_PORT === undefined ? undefined : Number(process.env.CAPYKIT_WEBHOOK_PORT);
+  if (webhookPort !== undefined && (!Number.isInteger(webhookPort) || webhookPort < 1 || webhookPort > 65535 || webhookPort === config.port)) {
+    throw new Error("Invalid webhook listener port");
+  }
   const app = createHostedServer({ config });
-  await app.listen({ host: "0.0.0.0", port: config.port });
+  const ingress = webhookPort === undefined ? undefined : createWebhookIngress(app);
+  try {
+    await app.listen({ host: "0.0.0.0", port: config.port });
+    if (ingress && webhookPort !== undefined) await ingress.listen({ host: "0.0.0.0", port: webhookPort });
+  } catch (error) {
+    await ingress?.close();
+    await app.close();
+    throw error;
+  }
+  for (const signal of ["SIGTERM", "SIGINT"] as const) process.once(signal, () => {
+    void (async () => { await ingress?.close(); await app.close(); })().catch(() => { process.exitCode = 1; });
+  });
 }
 
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) void startHostedServer();

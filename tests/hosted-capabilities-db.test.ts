@@ -57,7 +57,7 @@ describe.skipIf(databaseUrl === undefined)("private PostgreSQL capability store"
 
   beforeAll(async () => {
     await admin.query(`create schema ${schema}; create role ${browser} nologin`);
-    const migrations = await Promise.all(["001_hosted_workspace_identity.sql", "002_hosted_database_access.sql", "003_hosted_capabilities.sql"].map(async (name) =>
+    const migrations = await Promise.all(["001_hosted_workspace_identity.sql", "002_hosted_database_access.sql", "003_hosted_capabilities.sql", "004_hosted_connections.sql"].map(async (name) =>
       (await readFile(new URL(`../scripts/migrations/${name}`, import.meta.url), "utf8")).replaceAll("capykit_runtime", role).replaceAll("'anon'", `'${browser}'`),
     ));
     await ownerDb.query(`begin; ${migrations.join("\n")} commit;`);

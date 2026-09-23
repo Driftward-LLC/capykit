@@ -28,6 +28,7 @@ grant connect on database capykit to capykit_auth;
 \i /opt/capykit/migrations/001_hosted_workspace_identity.sql
 \i /opt/capykit/migrations/002_hosted_database_access.sql
 \i /opt/capykit/migrations/003_hosted_capabilities.sql
+\i /opt/capykit/migrations/004_hosted_connections.sql
 
 create role capykit_api login nosuperuser nocreatedb nocreaterole
   inherit noreplication nobypassrls password :'api_password';

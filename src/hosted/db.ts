@@ -37,6 +37,14 @@ export function createHostedDatabase(databaseUrl: string | undefined): HostedDat
                             left join capability_artifact_files f on f.workspace_id = a.workspace_id and f.artifact_id = a.id
                             left join capability_audit e on e.workspace_id = c.workspace_id and e.capability_id = c.id
                            limit 0`);
+        await pool.query(`select c.id, r.repository_id, s.phase, a.action, d.id, e.revision
+                            from provider_connections c
+                            left join connection_repositories r on r.workspace_id = c.workspace_id and r.connection_id = c.id
+                            left join connection_setups s on s.workspace_id = c.workspace_id and s.connection_id = c.id
+                            left join connection_audit a on a.workspace_id = c.workspace_id and a.connection_id = c.id
+                            left join connection_webhook_deliveries d on false
+                            left join connection_installation_events e on e.installation_id = c.installation_id
+                           limit 0`);
         return { status: "ready", reason: "ok" };
       } catch {
         return { status: "unavailable", reason: "connection_failed" };

@@ -12,7 +12,7 @@
   "engines": { "node": ">=22" },
   "bin": { "capykit": "dist/cli.js", "capykit-mcp": "dist/mcp.js", "capykit-hosted-api": "dist/hosted-api.js", "capykit-hosted-worker": "dist/hosted-worker.js" },
   "exports": { ".": "./dist/core.js", "./core": "./dist/core.js", "./schemas": "./dist/schemas.js", "./mcp": "./dist/mcp.js", "./hosted": "./dist/hosted-api.js" },
-  "files": ["dist", "schemas", "scripts/migrations", "scripts/unpack-hosted-artifact.mjs", "README.md", "LICENSE"],
+  "files": ["dist", "schemas", "scripts/migrations", "scripts/unpack-hosted-artifact.mjs", "scripts/cleanup-hosted-connections.mjs", "README.md", "LICENSE"],
   "scripts": {
     "build": "tsup && node scripts/build-hosted.mjs && vite build src/console --outDir ../../dist/console --emptyOutDir false", "build:standalone": "node scripts/build-standalone.mjs", "lint": "eslint .", "typecheck": "tsc --noEmit", "test": "vitest run", "test:package": "node scripts/test-package.mjs",
     "check:schema": "node scripts/test-schema.mjs && node scripts/test-security-policy.mjs",
