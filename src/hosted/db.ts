@@ -28,6 +28,15 @@ export function createHostedDatabase(databaseUrl: string | undefined): HostedDat
                             join workspace_memberships m on m.principal_id = p.id and m.workspace_id = p.workspace_id
                             join workspaces w on w.id = m.workspace_id
                            limit 0`);
+        // Fail readiness before serving a release whose artifact migration is missing.
+        await pool.query(`select c.id, d.version, v.version, a.digest, f.path, e.action
+                            from capabilities c
+                            left join capability_drafts d on d.workspace_id = c.workspace_id and d.capability_id = c.id
+                            left join capability_versions v on v.workspace_id = c.workspace_id and v.capability_id = c.id
+                            left join capability_artifacts a on a.workspace_id = c.workspace_id and a.capability_id = c.id
+                            left join capability_artifact_files f on f.workspace_id = a.workspace_id and f.artifact_id = a.id
+                            left join capability_audit e on e.workspace_id = c.workspace_id and e.capability_id = c.id
+                           limit 0`);
         return { status: "ready", reason: "ok" };
       } catch {
         return { status: "unavailable", reason: "connection_failed" };

@@ -6,9 +6,10 @@ provision authorized access and execution when requested from the web app,
 API, CLI, or MCP. See the
 [hosted product direction](docs/adr/0004-hosted-capability-platform.md).
 
-The current implementation is the installable discovery and local setup
-foundation. Hosted connections, function execution, and the web app are not yet
-implemented. The existing catalog answers three questions:
+The source checkout includes a Docker-hosted web app with invited-user sign-in
+and a [versioned skill and function library](docs/hosted-capabilities.md).
+GitHub connections, recipient grants, and hosted function execution are the next
+milestones. The installable discovery catalog answers three questions:
 
 - What tools are available?
 - What can each tool do?

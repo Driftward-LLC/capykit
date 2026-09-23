@@ -28,9 +28,13 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
     const migration = await readFile(new URL("../scripts/migrations/001_hosted_workspace_identity.sql", import.meta.url), "utf8");
     const access = (await readFile(new URL("../scripts/migrations/002_hosted_database_access.sql", import.meta.url), "utf8"))
       .replaceAll("capykit_runtime", runtimeRole).replaceAll("'anon'", `'${browserRole}'`);
+    const artifacts = (await readFile(new URL("../scripts/migrations/003_hosted_capabilities.sql", import.meta.url), "utf8"))
+      .replaceAll("capykit_runtime", runtimeRole).replaceAll("'anon'", `'${browserRole}'`);
     await admin.query(`create role ${browserRole} nologin`);
     await database.pool.query(`begin; ${migration}\n${access}\ncommit;`);
-    await database.pool.query(`begin; ${migration}\n${access}\ncommit;`);
+    expect(await database.readiness()).toEqual({ status: "unavailable", reason: "connection_failed" });
+    await database.pool.query(`begin; ${artifacts}\ncommit;`);
+    await database.pool.query(`begin; ${migration}\n${access}\n${artifacts}\ncommit;`);
     expect(await database.readiness()).toEqual({ status: "ready", reason: "ok" });
   });
 
@@ -74,7 +78,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
     }
   });
 
-  it("restricts runtime to identity reads and denies browser access even if table grants are restored", async () => {
+  it("keeps identity reads immutable, scopes artifacts, and denies browser access even if table grants are restored", async () => {
     const subject = randomUUID();
     const owner = await bootstrap(randomUUID(), subject);
     const runtimeUrl = new URL(scopedUrl);
@@ -85,7 +89,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
       expect(await runtime.readiness()).toEqual({ status: "ready", reason: "ok" });
       expect((await runtime.resolveContext({ provider: "gotrue", subject, email: "owner@example.test" }))?.membership.workspaceId).toBe(owner.workspaceId);
       await expect(runtime.pool.query("update workspaces set active = false")).rejects.toMatchObject({ code: "42501" });
-      await expect(runtime.pool.query("select * from capability_publications")).rejects.toMatchObject({ code: "42501" });
+      expect((await runtime.pool.query("select * from capability_artifacts")).rows).toEqual([]);
       await expect(runtime.pool.query("create table unexpected_table (id integer)")).rejects.toMatchObject({ code: "42501" });
     } finally {
       await runtime.close();
@@ -95,7 +99,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
          from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = $2 and c.relkind = 'r'`, [browserRole, schema],
     );
-    expect(protectedTables.rows).toHaveLength(5);
+    expect(protectedTables.rows).toHaveLength(10);
     expect(protectedTables.rows.every((table) => table.relrowsecurity && !table.can_select)).toBe(true);
     await admin.query(`grant usage on schema ${schema} to ${browserRole}; grant select on ${schema}.workspaces to ${browserRole}`);
     const client = await admin.connect();
@@ -167,7 +171,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
       [second.workspaceId, first.principalId],
     )).rejects.toMatchObject({ code: "23503" });
     await expect(database.pool.query(
-      "insert into capability_publications (workspace_id, created_by_principal_id, name) values ($1, $2, 'Foreign publisher')",
+      "insert into capabilities (workspace_id, created_by_principal_id, slug, name, kind) values ($1, $2, 'foreign-publisher', 'Foreign publisher', 'skill')",
       [second.workspaceId, first.principalId],
     )).rejects.toMatchObject({ code: "23503" });
   });
