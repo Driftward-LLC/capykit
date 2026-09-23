@@ -211,7 +211,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
       }
     }
     if (artifactTransfer !== undefined) { reply.code(429).header("retry-after", "2").send(stableError("ARTIFACT_BUSY", request.id)); return; }
-    if (!reply.raw.destroyed && !request.raw.aborted) {
+    if (!reply.raw.destroyed && reply.raw.socket?.destroyed !== true) {
       artifactTransfer = request;
       reply.raw.once("close", () => { if (artifactTransfer === request) artifactTransfer = undefined; });
     }
