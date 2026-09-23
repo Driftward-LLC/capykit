@@ -7,8 +7,12 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { callbackOriginAllowed, loadHostedConfig, missingHostedConfig, type HostedConfig } from "./config.js";
 import { checkDatabaseReadiness, createHostedDatabase, type HostedDatabase } from "./db.js";
-import { stableError, type AuthenticatedContext } from "./identity.js";
+import { stableError, type AuthenticatedContext, type StableErrorCode } from "./identity.js";
 import { createAuthGateway, type AuthGateway } from "./auth.js";
+import { ArtifactError } from "./artifacts.js";
+import { CapabilityError, CapabilityStore } from "./capabilities.js";
+import { Readable } from "node:stream";
+export { verifyArtifact } from "./artifacts.js";
 
 interface ServerDeps {
   readonly config?: HostedConfig;
@@ -78,16 +82,28 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   const auth = deps.auth ?? createAuthGateway(config);
   const consoleDirectory = deps.consoleDirectory ?? fileURLToPath(new URL("./console/", import.meta.url));
   const publicOrigin = new URL(config.publicBaseUrl).origin;
-  const app = Fastify({ logger: false, genReqId: () => randomUUID(), bodyLimit: 16 * 1024 });
+  const app = Fastify({ logger: false, genReqId: () => randomUUID(), bodyLimit: 16 * 1024,
+    requestTimeout: 120_000, connectionTimeout: 30_000, ajv: { customOptions: { removeAdditional: false } } });
+  const capabilities = database === undefined ? undefined : new CapabilityStore(database.pool);
+  const contexts = new WeakMap<FastifyRequest, AuthenticatedContext>();
+  // ponytail: one artifact transfer per API process bounds memory for 32 MiB bundles;
+  // use streaming storage if concurrent large transfers become necessary.
+  let artifactTransfer: FastifyRequest | undefined;
   void app.register(cookie);
   app.addHook("onClose", async () => { await database?.close(); });
   app.addHook("onRequest", async (request, reply) => {
     reply.header("x-request-id", request.id).header("cache-control", "no-store").header("x-content-type-options", "nosniff");
   });
   app.setErrorHandler((error, request, reply) => {
+    if (error instanceof ArtifactError || error instanceof CapabilityError) {
+      return reply.code(error.statusCode).send(stableError(error.code as StableErrorCode, request.id));
+    }
     const status = error instanceof Error && "statusCode" in error && typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
     return reply.code(status).type("application/json").send(stableError(status < 500 ? "INVALID_REQUEST" : "INTERNAL_ERROR", request.id));
   });
+  for (const hook of ["onResponse", "onRequestAbort", "onTimeout"] as const) {
+    app.addHook(hook, (request: FastifyRequest) => { if (artifactTransfer === request) artifactTransfer = undefined; return Promise.resolve(); });
+  }
   app.setNotFoundHandler((request, reply) => reply.code(404).send(stableError("NOT_FOUND", request.id)));
   app.addHook("preHandler", async (request, reply) => {
     if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return;
@@ -162,6 +178,57 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
       identity: { email: context.identity.email, principalKind: context.membership.principalKind },
       workspace: { id: context.membership.workspaceId, role: context.membership.role },
     };
+  });
+
+  async function requireCapabilityIdentity(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    if (capabilities === undefined) { reply.code(503).send(stableError("CONFIGURATION_UNAVAILABLE", request.id)); return; }
+    const context = await authenticatedContext(bearerToken(request, config), database, auth);
+    if (context === undefined || !context.membership.active) { reply.code(401).send(stableError("AUTHENTICATION_REQUIRED", request.id)); return; }
+    contexts.set(request, context);
+  }
+  function contextFor(request: FastifyRequest): AuthenticatedContext {
+    const context = contexts.get(request);
+    if (context === undefined) throw new Error("Missing authenticated capability context");
+    return context;
+  }
+  function capabilityStore(): CapabilityStore {
+    if (capabilities === undefined) throw new Error("Missing capability database");
+    return capabilities;
+  }
+  const authenticated = { onRequest: requireCapabilityIdentity };
+  app.get("/v1/capabilities", authenticated, async (request) => ({ capabilities: await capabilityStore().list(contextFor(request)) }));
+  app.post("/v1/capabilities", authenticated, async (request, reply) => reply.code(201).send(await capabilityStore().create(contextFor(request), request.body)));
+  app.get<{ Params: { id: string } }>("/v1/capabilities/:id", authenticated, async (request) => capabilityStore().detail(contextFor(request), request.params.id));
+  async function beginArtifactTransfer(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    await requireCapabilityIdentity(request, reply);
+    if (reply.sent) return;
+    // Scope and authorize the exact record before accepting or reading bytes.
+    await capabilityStore().detail(contextFor(request), (request.params as { id: string }).id);
+    if (!["GET", "HEAD"].includes(request.method)) {
+      const cookieAuth = request.headers.authorization?.startsWith("Bearer ") !== true;
+      if ((request.headers.origin !== undefined && request.headers.origin !== publicOrigin) || (cookieAuth && (request.headers.origin !== publicOrigin || !csrfValid(request, config)))) {
+        reply.code(403).send(stableError("CSRF_REQUIRED", request.id)); return;
+      }
+    }
+    if (artifactTransfer !== undefined) { reply.code(429).header("retry-after", "2").send(stableError("ARTIFACT_BUSY", request.id)); return; }
+    if (!reply.raw.destroyed && reply.raw.socket?.destroyed !== true) {
+      artifactTransfer = request;
+      reply.raw.once("close", () => { if (artifactTransfer === request) artifactTransfer = undefined; });
+    }
+  }
+  const transferring = { onRequest: beginArtifactTransfer };
+  app.put<{ Params: { id: string } }>("/v1/capabilities/:id/draft", {
+    ...transferring, bodyLimit: 46 * 1024 * 1024,
+  }, async (request) => capabilityStore().saveDraft(contextFor(request), request.params.id, request.body));
+  app.post<{ Params: { id: string } }>("/v1/capabilities/:id/publish", transferring, async (request) => capabilityStore().publish(contextFor(request), request.params.id, request.body));
+  app.get<{ Params: { id: string; version: string } }>("/v1/capabilities/:id/versions/:version/download", transferring, async (request, reply) => {
+    const download = await capabilityStore().download(contextFor(request), request.params.id, request.params.version);
+    reply.header("content-disposition", `attachment; filename="${download.capability.slug}-${download.version}.capykit.json"`);
+    return reply.type("application/json").send(Readable.from([JSON.stringify(download)]));
+  });
+  app.delete<{ Params: { id: string } }>("/v1/capabilities/:id", authenticated, async (request, reply) => {
+    await capabilityStore().delete(contextFor(request), request.params.id);
+    return reply.code(204).send();
   });
   return app;
 }

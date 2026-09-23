@@ -7,8 +7,9 @@ GoTrue is the open-source authentication service maintained by Supabase; it runs
 inside this deployment, rather than depending on their hosted platform.
 
 This foundation provides invited-user sign-in and durable workspace identity.
-Connections, stored skill/function artifacts, grants, execution, and run history
-remain the later ENG-122 through ENG-126 milestones. The worker executable is a
+The [capability library](hosted-capabilities.md) adds complete skill/function
+artifacts and immutable versions. Connections, grants, execution, and run history
+remain the later ENG-123 through ENG-126 milestones. The worker executable is a
 one-shot readiness check, not an execution queue consumer.
 
 ## Portable deployment
@@ -62,15 +63,16 @@ or using this deployment with real customers.
 ## Database and first owner
 
 The fresh-volume initializer creates separate database roles, then applies
-migrations 001 and 002 in one transaction. RLS protects all application tables.
-`capykit_api` inherits `capykit_runtime` and can only read the four identity
-tables; it cannot write application data, create tables, or read publications.
+migrations 001 through 003 in one transaction. RLS protects all application tables.
+`capykit_api` inherits `capykit_runtime`: the four identity tables remain read-only,
+while capability operations require transaction-scoped workspace/owner context.
+The runtime cannot create tables or act as a database owner.
 `capykit_auth` owns only its auth schema. The schema owner performs application
 migrations and owner bootstrap separately.
 
 Initialization runs only on an empty Postgres volume. For upgrades, take a backup
 and apply new migrations explicitly with operator credentials. Never delete a
-volume to force initialization. Apply 001 and 002 together when creating an
+volume to force initialization. Apply 001 through 003 together when creating an
 application schema manually, so tables are never committed without access rules.
 
 `scripts/provision-hosted-owner.mjs` is an operator-only command. It creates a
