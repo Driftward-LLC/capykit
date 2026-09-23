@@ -8,7 +8,8 @@ API, CLI, or MCP. See the
 
 The source checkout includes a Docker-hosted web app with invited-user sign-in
 and a [versioned skill and function library](docs/hosted-capabilities.md).
-GitHub connections, recipient grants, and hosted function execution are the next
+[GitHub connections](docs/hosted-connections.md) add owner consent and selected
+repositories. Recipient grants and hosted function execution are the next
 milestones. The installable discovery catalog answers three questions:
 
 - What tools are available?

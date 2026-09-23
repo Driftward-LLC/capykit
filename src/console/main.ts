@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { CapabilityLibrary, writeRequest } from "./library.js";
+import { Connections, discardGitHubReturn } from "./connections.js";
 import "./style.css";
 
 interface CurrentUser {
@@ -20,6 +21,8 @@ function callbackError(): string {
 }
 
 function App(): React.ReactElement {
+  const [tab, setTab] = useState(new URL(window.location.href).searchParams.get("tab") === "connections" ? "connections" : "capabilities");
+  const [githubNotice, setGitHubNotice] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [codeRequested, setCodeRequested] = useState(false);
@@ -35,12 +38,18 @@ function App(): React.ReactElement {
     try {
       const response = await fetch("/v1/me", { credentials: "same-origin", cache: "no-store" });
       if (response.status === 401) {
+        if (discardGitHubReturn()) setGitHubNotice("GitHub setup needs an existing signed-in session. Sign in below, then start a new GitHub authorization from Connections.");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("setup");
+        window.history.replaceState(null, "", `${url.pathname}${url.search}`);
         setCurrentUser(null);
         setStatus(initial ? "Sign in with your invited email address." : "Your session expired or access is no longer available. Sign in again.");
       } else if (!response.ok) {
         throw new Error("session unavailable");
       } else {
-        setCurrentUser(await response.json() as CurrentUser);
+        const user = await response.json() as CurrentUser;
+        if ((user.identity.principalKind !== "human" || user.workspace.role !== "owner") && discardGitHubReturn()) setGitHubNotice("Only a workspace owner can manage GitHub connections. This authorization was discarded.");
+        setCurrentUser(user);
         setStatus("You are signed in.");
         setError("");
       }
@@ -53,6 +62,10 @@ function App(): React.ReactElement {
   }, []);
 
   const sessionExpired = useCallback((): void => {
+    discardGitHubReturn();
+    const url = new URL(window.location.href);
+    url.searchParams.delete("setup");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
     setCurrentUser(null);
     setStatus("Your session expired or access is no longer available. Sign in again.");
     setError("");
@@ -121,6 +134,10 @@ function App(): React.ReactElement {
     try {
       const response = await post("/v1/auth/logout");
       if (!response.ok) throw new Error("logout failed");
+      discardGitHubReturn();
+      const url = new URL(window.location.href);
+      url.searchParams.delete("setup");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
       setCurrentUser(null);
       setCodeRequested(false);
       setCode("");
@@ -140,6 +157,7 @@ function App(): React.ReactElement {
       currentUser === null ? null : h("div", { className: "account" }, h("span", null, currentUser.identity.email), h("button", { type: "button", className: "secondary", disabled, onClick: () => { void logout(); } }, pending === "logout" ? "Signing out…" : "Sign out")),
     ),
     error === "" ? null : h("p", { className: "message error", role: "alert" }, error),
+    githubNotice === "" ? null : h("p", { className: "message", role: "status" }, githubNotice),
     currentUser === null ? h("section", { className: "panel sign-in", "aria-label": "Sign in" },
       h("p", { className: "eyebrow" }, "Your capabilities, together"),
       h("h1", null, "Welcome to Capykit"),
@@ -165,7 +183,13 @@ function App(): React.ReactElement {
       error === "" ? null : h("button", { type: "button", disabled, onClick: () => { void loadIdentity(); } }, "Retry session check"),
     ) : h(React.Fragment, null,
       currentUser.identity.principalKind === "human" && currentUser.workspace.role === "owner"
-        ? h(CapabilityLibrary, { key: currentUser.workspace.id, onSessionExpired: sessionExpired })
+        ? h(React.Fragment, { key: currentUser.workspace.id },
+          h("nav", { className: "workspace-nav", "aria-label": "Workspace" },
+            ...(["capabilities", "connections"] as const).map((name) => h("button", { key: name, type: "button", className: tab === name ? "active" : "", "aria-current": tab === name ? "page" : undefined, onClick: () => { setTab(name); setGitHubNotice(""); const url = new URL(window.location.href); url.searchParams.set("tab", name); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } }, name === "capabilities" ? "Capabilities" : "Connections")),
+          ),
+          h("div", { hidden: tab !== "capabilities" }, h(CapabilityLibrary, { onSessionExpired: sessionExpired })),
+          h("div", { hidden: tab !== "connections" }, h(Connections, { onSessionExpired: sessionExpired })),
+        )
         : h("section", { className: "panel", "aria-label": "Capability access" }, h("h1", null, "Your workspace"), h("p", null, "Your account is active. Capability access is currently available to workspace owners. Member and agent access will become available through grants.")),
       h("details", { className: "workspace-details", "aria-label": "Current identity and workspace" }, h("summary", null, "Workspace and account details"),
       h("dl", null,

@@ -19,14 +19,19 @@ services:
     cpus: 0.5
     mem_limit: 512m
     pids_limit: 128
+    env_file:
+      - path: ${CAPYKIT_GITHUB_ENV_FILE:-/etc/driftward/capykit-github.env}
+        required: false
     environment:
       NODE_ENV: production
       PORT: "3000"
+      CAPYKIT_WEBHOOK_PORT: "3001"
       DATABASE_URL: postgresql://capykit_api:${CAPYKIT_DB_PASSWORD:?Set a generated hex database password}@postgres:5432/capykit
       CAPYKIT_AUTH_URL: http://auth:9999
       CAPYKIT_PUBLIC_BASE_URL: ${CAPYKIT_PUBLIC_BASE_URL:?Set the exact HTTPS origin}
     ports:
       - "127.0.0.1:${CAPYKIT_HTTP_PORT:-19121}:3000"
+      - "127.0.0.1:${CAPYKIT_WEBHOOK_HTTP_PORT:-19123}:3001"
     depends_on:
       postgres:
         condition: service_healthy

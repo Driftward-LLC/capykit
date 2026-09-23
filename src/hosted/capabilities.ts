@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { artifactSummary, validateArtifact, verifyArtifact, type CapabilityKind, type ValidatedArtifact } from "./artifacts.js";
 import type { AuthenticatedContext } from "./identity.js";
+import { authorizeWorkspace, requireWorkspaceOwner } from "./workspace-access.js";
 
 export class CapabilityError extends Error {
   constructor(readonly code: "INVALID_REQUEST" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "MEMBERSHIP_INACTIVE" | "ARTIFACT_CORRUPT", readonly statusCode: number) {
@@ -57,21 +58,8 @@ export class CapabilityStore {
     const client = await this.pool.connect();
     try {
       await client.query("begin");
-      const { workspaceId, principalId } = context.membership;
-      await client.query("select set_config('capykit.workspace_id', $1, true), set_config('capykit.principal_id', $2, true)", [workspaceId, principalId]);
-      // Use current database facts, including the verified identity binding,
-      // instead of trusting an earlier request's membership snapshot.
-      const actor = await client.query<{ kind: string; role: string }>(
-        `select p.kind, m.role from workspace_memberships m
-         join principals p on p.workspace_id = m.workspace_id and p.id = m.principal_id
-         join workspaces w on w.id = m.workspace_id
-         join identity_bindings b on b.principal_id = p.id
-         where m.workspace_id = $1 and m.principal_id = $2
-           and m.active and p.active and w.active and b.verified_at is not null
-           and b.provider = $3 and b.provider_subject = $4`,
-        [workspaceId, principalId, context.identity.provider, context.identity.subject],
-      );
-      if (actor.rows.length !== 1) throw new CapabilityError("MEMBERSHIP_INACTIVE", 401);
+      const actor = await authorizeWorkspace(client, context);
+      const { workspaceId } = actor;
       let record: CapabilityRecord | undefined;
       if (id !== undefined) {
         record = (await client.query<CapabilityRecord>(
@@ -80,7 +68,7 @@ export class CapabilityStore {
         )).rows[0];
         if (record === undefined) throw new CapabilityError("NOT_FOUND", 404);
       }
-      if (actor.rows[0]?.kind !== "human" || actor.rows[0].role !== "owner") throw new CapabilityError("FORBIDDEN", 403);
+      requireWorkspaceOwner(actor);
       if (id !== undefined) {
         // Serialize publication, replacement, deletion and downloads of one
         // capability. A delete committed first can never hand out its bytes.

@@ -38,7 +38,7 @@ describe.skipIf(databaseUrl === undefined)("capability HTTP and PostgreSQL integ
     const client = await admin.connect();
     try {
       await client.query(`set search_path=${schema},public`);
-      for (const name of ["001_hosted_workspace_identity.sql", "002_hosted_database_access.sql", "003_hosted_capabilities.sql"]) {
+      for (const name of ["001_hosted_workspace_identity.sql", "002_hosted_database_access.sql", "003_hosted_capabilities.sql", "004_hosted_connections.sql"]) {
         await client.query((await readFile(new URL(`../scripts/migrations/${name}`, import.meta.url), "utf8")).replaceAll("capykit_runtime", runtimeRole));
       }
       for (const id of workspaces) await client.query("insert into workspaces(id,slug,name) values($1,$2,'HTTP test')", [id, id]);

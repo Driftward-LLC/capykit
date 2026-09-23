@@ -96,7 +96,7 @@ backup, reconcile deletions/revocations so the restore does not re-enable access
 
 ## Upgrade and verification
 
-Fresh Compose volumes apply all three migrations in one transaction. For an
+Fresh Compose volumes apply migrations 001–004 in one transaction. For an
 existing deployment, take and restore-test a protected PostgreSQL backup first,
 then apply **only migration 003** using the schema owner in a transaction with
 `ON_ERROR_STOP=1`. Roll out the new application image after the migration commits.

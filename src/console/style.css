@@ -90,3 +90,26 @@ dd { margin: 0; overflow-wrap: anywhere; }
 .sign-in > button { margin-top: 20px; }
 @media (max-width: 900px) { .console { padding-left: 24px; padding-right: 24px; } .library-layout { grid-template-columns: 210px minmax(0, 1fr); gap: 16px; } .panel { padding: 20px; } .library-nav { padding: 16px 10px; } .form-grid { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .console { padding: 0 16px 24px; } .app-header { align-items: flex-start; padding: 20px 0; min-height: auto; margin-bottom: 28px; } .account { flex-direction: column; align-items: flex-end; gap: 8px; font-size: .75rem; } .account button { padding: 6px 10px; } .wordmark { flex-wrap: wrap; gap: 6px; } .library-layout { grid-template-columns: 1fr; } .library-nav { max-height: 310px; overflow: auto; } .section-heading { flex-wrap: wrap; gap: 12px; } .section-heading h1 { margin-bottom: 8px; } .panel { padding: 18px; } .sign-in { padding: 24px; margin-top: 30px; } .uploads { grid-template-columns: 1fr; } dl { grid-template-columns: 100px minmax(0, 1fr); } }
+
+[hidden] { display: none !important; }
+a { color: #225c43; text-underline-offset: 3px; }
+.workspace-nav { display: flex; gap: 8px; margin: -16px 0 32px; border-bottom: 1px solid #dce3da; padding-bottom: 14px; }
+.workspace-nav button { color: #52665a; background: transparent; border-color: transparent; }
+.workspace-nav button:hover { background: #eaf0e7; }
+.workspace-nav button.active { background: #e5eee0; color: #234c35; }
+.connection-intro, .connection-setup { margin-bottom: 24px; }
+.connection-intro p { max-width: 800px; }
+.button-link { display: inline-block; border: 1px solid #cbd5cd; border-radius: 8px; padding: 10px 16px; font-weight: 600; text-decoration: none; color: #29463b; background: #fff; }
+.button-link:hover { background: #eff4ef; }
+.connection-setup form { max-width: 800px; }
+.connection-setup select { max-width: 460px; }
+.repository-picker { border: 1px solid #dce3da; border-radius: 8px; margin: 20px 0; padding: 16px; max-height: 360px; overflow: auto; }
+.repository-picker legend { font-weight: 600; font-size: .875rem; padding: 0 6px; }
+.checkbox-label { display: flex; align-items: flex-start; gap: 12px; font-weight: 400; margin: 12px 0; overflow-wrap: anywhere; }
+.checkbox-label input { flex: 0 0 auto; margin: 2px 0 0; }
+.connection-consent { padding: 16px; background: #f3f6ef; border-radius: 8px; }
+.repository-list { padding-left: 20px; font-size: .875rem; overflow-wrap: anywhere; }
+.repository-list li { margin: 8px 0; }
+.status-badge.connected { background: #e8f4e4; color: #2e6236; }
+.connection-confirm { border-top: 1px solid #dce3da; margin-top: 20px; padding-top: 20px; }
+.github-manage { margin-top: 24px; }

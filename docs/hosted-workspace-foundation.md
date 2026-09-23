@@ -8,8 +8,9 @@ inside this deployment, rather than depending on their hosted platform.
 
 This foundation provides invited-user sign-in and durable workspace identity.
 The [capability library](hosted-capabilities.md) adds complete skill/function
-artifacts and immutable versions. Connections, grants, execution, and run history
-remain the later ENG-123 through ENG-126 milestones. The worker executable is a
+artifacts and immutable versions. [GitHub connections](hosted-connections.md)
+provide the ENG-123 lifecycle; grants, execution, and run history remain
+ENG-124 through ENG-126. The worker executable is a
 one-shot readiness check, not an execution queue consumer.
 
 ## Portable deployment
@@ -28,6 +29,8 @@ Create a protected configuration file outside the repository with these values:
 - `CAPYKIT_AUTH_DB_PASSWORD`: password for the auth schema owner.
 - `CAPYKIT_AUTH_JWT_SECRET`: at least 32 random bytes for GoTrue signing.
 - Optional `CAPYKIT_HTTP_PORT` and `CAPYKIT_MAIL_PORT`: default 19121 and 19122.
+- Optional `CAPYKIT_WEBHOOK_HTTP_PORT`: default 19123, webhook-only listener.
+- Optional `CAPYKIT_GITHUB_ENV_FILE`: protected dedicated App configuration.
 - Optional `CAPYKIT_IMAGE`: an immutable application image tag for deployment and
   rollback; the default is suitable for local builds.
 
@@ -48,9 +51,9 @@ Tailscale host, use separate Serve ports pointing to the corresponding loopback
 ports; preserve existing routes. Tailnet access is the test inbox's access
 boundary. Everyone allowed into that inbox can read staging login codes.
 
-The API receives only `DATABASE_URL`, `CAPYKIT_AUTH_URL`, its public origin, and
-its port. The application does not receive database-owner credentials, an auth
-admin token, or the auth signing secret. The server-only auth URL can use HTTP
+The API receives `DATABASE_URL`, `CAPYKIT_AUTH_URL`, its public origin, listener
+ports, and optional dedicated GitHub App configuration. It receives no database
+owner credentials, auth admin token, or auth signing secret. The auth URL uses HTTP
 inside the private container network. Public URLs still require HTTPS except on
 loopback.
 
@@ -63,7 +66,7 @@ or using this deployment with real customers.
 ## Database and first owner
 
 The fresh-volume initializer creates separate database roles, then applies
-migrations 001 through 003 in one transaction. RLS protects all application tables.
+migrations 001 through 004 in one transaction. RLS protects all application tables.
 `capykit_api` inherits `capykit_runtime`: the four identity tables remain read-only,
 while capability operations require transaction-scoped workspace/owner context.
 The runtime cannot create tables or act as a database owner.
@@ -72,7 +75,7 @@ migrations and owner bootstrap separately.
 
 Initialization runs only on an empty Postgres volume. For upgrades, take a backup
 and apply new migrations explicitly with operator credentials. Never delete a
-volume to force initialization. Apply 001 through 003 together when creating an
+volume to force initialization. Apply 001 through 004 together when creating an
 application schema manually, so tables are never committed without access rules.
 
 `scripts/provision-hosted-owner.mjs` is an operator-only command. It creates a
