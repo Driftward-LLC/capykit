@@ -182,4 +182,32 @@ describe.skipIf(databaseUrl === undefined)("capability HTTP and PostgreSQL integ
     }
   });
 
+
+  it("releases the shared artifact slot when a client disconnects during a streamed download", async () => {
+    const created = await app.inject({ method: "POST", url: "/v1/capabilities", headers, payload: { slug: "interrupted-download", name: "Interrupted download", kind: "skill" } });
+    expect(created.statusCode).toBe(201);
+    const url = `/v1/capabilities/${created.json<Detail>().id}`;
+    const metadata = { type: "file", path: "SKILL.md", executable: false, contentBase64: Buffer.from("---\nname: interrupted-download\ndescription: Download interruption fixture\n---\nFixture").toString("base64") };
+    const saved = await app.inject({ method: "PUT", url: `${url}/draft`, headers, payload: { version: "1", artifact: { files: [metadata, { type: "file", path: "asset.bin", executable: false, contentBase64: Buffer.alloc(8 * 1024 * 1024).toString("base64") }] } } });
+    expect(saved.statusCode, saved.body).toBe(200);
+    const digest = saved.json<Detail>().draft?.digest;
+    expect((await app.inject({ method: "POST", url: `${url}/publish`, headers, payload: { version: "1", digest } })).statusCode).toBe(200);
+    if (!app.server.listening) await app.listen({ host: "127.0.0.1", port: 0 });
+    const address = app.server.address();
+    if (address === null || typeof address === "string") throw new Error("Expected bound HTTP port");
+    const download = httpRequest({ hostname: "127.0.0.1", port: address.port, path: `${url}/versions/1/download`, headers });
+    try {
+      const response = await new Promise<IncomingMessage>((resolve, reject) => {
+        download.once("response", resolve);
+        download.once("error", reject);
+        download.end();
+      });
+      expect(response.statusCode).toBe(200);
+      response.pause();
+      response.destroy();
+      download.destroy();
+      await expect.poll(async () => (await app.inject({ method: "PUT", url: `${url}/draft`, headers, payload: { version: "2", artifact: { files: [metadata] } } })).statusCode).toBe(200);
+    } finally { download.destroy(); }
+  });
+
 });

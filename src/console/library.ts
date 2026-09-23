@@ -19,7 +19,7 @@ export function writeRequest(path: string, method: "POST" | "PUT" | "DELETE", bo
   const csrf = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith("capykit_csrf="))?.slice("capykit_csrf=".length);
   return fetch(path, {
     method, credentials: "same-origin",
-    headers: { "content-type": "application/json", ...(csrf === undefined ? {} : { "x-csrf-token": csrf }) },
+    headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...(csrf === undefined ? {} : { "x-csrf-token": csrf }) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 }

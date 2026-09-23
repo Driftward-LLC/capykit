@@ -76,6 +76,8 @@ transaction. Replacement removes the old draft in that transaction; no separate
 object-storage garbage collector is needed. Publication verifies every file
 before inserting the immutable version. Downloads verify inventory, individual
 hashes, contract, and aggregate digest before serving any bytes.
+Digest ordering follows the portable bundle's `en-US` path order, with a raw
+string comparison breaking ties between distinct Unicode paths.
 
 `CapabilityStore.transaction` is the current authorization seam. It rechecks the
 verified identity binding, workspace, principal, membership, and owner role from
