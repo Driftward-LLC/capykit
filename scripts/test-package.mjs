@@ -58,6 +58,35 @@ try {
   `, "utf8");
   execFileSync(process.execPath, [importSmoke], { cwd: installRoot, stdio: "pipe" });
 
+  const hostedSmoke = join(installRoot, "hosted-smoke.mjs");
+  await writeFile(hostedSmoke, `
+    import { strict as assert } from "node:assert";
+    import { createHostedServer } from "@driftward/capykit/hosted";
+    const app = createHostedServer({ config: {
+      port: 0, publicBaseUrl: "http://localhost:3000", allowedCallbackOrigins: ["http://localhost:3000"],
+      databaseUrl: undefined, supabaseUrl: undefined, supabaseServiceRoleKey: undefined,
+      sessionCookieName: "capykit_session", csrfCookieName: "capykit_csrf", secureCookies: false,
+    } });
+    try {
+      const root = await app.inject({ url: "/" });
+      assert.equal(root.statusCode, 200);
+      const assetPath = root.body.match(/src="([^"]+)"/)?.[1];
+      assert.ok(assetPath?.startsWith("/assets/"), "installed console must load its built script");
+      const asset = await app.inject({ url: assetPath });
+      assert.equal(asset.statusCode, 200);
+      assert.match(asset.headers["content-type"], /javascript/);
+      assert.equal((await app.inject({ url: "/health/ready" })).statusCode, 503);
+    } finally { await app.close(); }
+  `, "utf8");
+  execFileSync(process.execPath, [hostedSmoke], { cwd: installRoot, stdio: "pipe" });
+  const worker = spawnSync(join(binRoot, `capykit-hosted-worker${binSuffix}`), [], {
+    cwd: installRoot, encoding: "utf8", shell: process.platform === "win32", timeout: 10000,
+    env: { ...process.env, DATABASE_URL: "", SUPABASE_URL: "", SUPABASE_SERVICE_ROLE_KEY: "", CAPYKIT_PUBLIC_BASE_URL: "http://localhost:3000", CAPYKIT_ALLOWED_CALLBACK_ORIGINS: "", PORT: "0" },
+  });
+  assert.ifError(worker.error);
+  assert.equal(worker.status, 1, "installed worker must fail readiness without configuration");
+  assert.equal(JSON.parse(worker.stdout).status, "unavailable");
+
   const maliciousSchemaRoot = join(installRoot, "node_modules", "@driftward", "schemas", "v0.1");
   await mkdir(maliciousSchemaRoot, { recursive: true });
   await writeFile(join(maliciousSchemaRoot, "registry.schema.json"), JSON.stringify({
@@ -156,7 +185,7 @@ try {
   assert.equal(checksums.artifacts.length, 4);
   assert.ok(checksums.artifacts.every((artifact) => /^[a-f0-9]{64}$/.test(artifact.sha256)), "standalone artifacts must publish sha256 checksums");
 
-  console.log("Packed package smoke test passed: CLI, completions, imports, schema asset, installed validator, portable profile, MCP server, and standalone artifacts.");
+  console.log("Packed package smoke test passed: CLI, completions, imports, schema asset, installed validator, portable profile, MCP server, hosted console/worker, and standalone artifacts.");
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
 }
