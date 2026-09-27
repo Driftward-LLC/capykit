@@ -1,0 +1,16 @@
+{
+  "name": "capykit-activepieces-poc",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test test.mjs",
+    "demo": "node demo.mjs",
+    "live": "node live.mjs"
+  },
+  "dependencies": {
+    "@activepieces/piece-github": "0.9.0",
+    "@activepieces/piece-google-drive": "0.11.0"
+  },
+  "devDependencies": { "nock": "14.0.17" }
+}
