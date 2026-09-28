@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { callbackOriginAllowed, loadHostedConfig, missingHostedConfig, type HostedConfig } from "./config.js";
 import { checkDatabaseReadiness, createHostedDatabase, type HostedDatabase } from "./db.js";
 import { stableError, type AuthenticatedContext, type StableErrorCode } from "./identity.js";
-import { createAuthGateway, type AuthGateway } from "./auth.js";
+import { AuthUnavailableError, createAuthGateway, type AuthGateway } from "./auth.js";
 import { ArtifactError } from "./artifacts.js";
 import { CapabilityError, CapabilityStore } from "./capabilities.js";
 import { Readable } from "node:stream";
@@ -46,16 +46,20 @@ function bearerToken(request: FastifyRequest, config: HostedConfig): string | un
   return request.cookies[config.sessionCookieName];
 }
 
-function setSessionCookies(reply: FastifyReply, config: HostedConfig, token: string): void {
-  const csrf = randomBytes(24).toString("base64url");
-  const base = { httpOnly: true, secure: config.secureCookies, sameSite: "strict" as const, path: "/" };
+const rememberedSessionSeconds = 30 * 24 * 60 * 60;
+function setSessionCookies(reply: FastifyReply, config: HostedConfig, token: string, refreshToken?: string, existingCsrf?: string): void {
+  const csrf = existingCsrf ?? randomBytes(24).toString("base64url");
+  const base = { httpOnly: true, secure: config.secureCookies, sameSite: "strict" as const, path: "/", maxAge: refreshToken === undefined ? 3600 : rememberedSessionSeconds };
   reply.setCookie(config.sessionCookieName, token, base);
   reply.setCookie(config.csrfCookieName, csrf, { ...base, httpOnly: false });
+  if (refreshToken !== undefined) reply.setCookie(config.refreshCookieName, refreshToken, { ...base, path: "/v1/auth" });
+  else reply.clearCookie(config.refreshCookieName, { path: "/v1/auth" });
 }
 
 function clearSessionCookies(reply: FastifyReply, config: HostedConfig): void {
   reply.clearCookie(config.sessionCookieName, { path: "/" });
   reply.clearCookie(config.csrfCookieName, { path: "/" });
+  reply.clearCookie(config.refreshCookieName, { path: "/v1/auth" });
 }
 
 function csrfValid(request: FastifyRequest, config: HostedConfig): boolean {
@@ -119,7 +123,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     reply.header("x-request-id", request.id).header("cache-control", "no-store").header("x-content-type-options", "nosniff");
   });
   app.setErrorHandler((error, request, reply) => {
-    if (error instanceof ArtifactError || error instanceof CapabilityError || error instanceof HostedAccessError || error instanceof ConnectionError || error instanceof GithubError) {
+    if (error instanceof ArtifactError || error instanceof CapabilityError || error instanceof HostedAccessError || error instanceof ConnectionError || error instanceof GithubError || error instanceof AuthUnavailableError) {
       return reply.code(error.statusCode).send(stableError(error.code as StableErrorCode, request.id));
     }
     const status = error instanceof Error && "statusCode" in error && typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
@@ -132,7 +136,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   app.addHook("preHandler", async (request, reply) => {
     if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return;
     const origin = request.headers.origin;
-    const cookieAuth = request.cookies[config.sessionCookieName] !== undefined && request.headers.authorization?.startsWith("Bearer ") !== true;
+    const cookieAuth = (request.cookies[config.sessionCookieName] !== undefined || request.cookies[config.refreshCookieName] !== undefined) && request.headers.authorization?.startsWith("Bearer ") !== true;
     if ((origin !== undefined && origin !== publicOrigin) || (cookieAuth && (origin !== publicOrigin || !csrfValid(request, config)))) {
       return reply.code(403).send(stableError("CSRF_REQUIRED", request.id));
     }
@@ -180,25 +184,50 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     return reply.code(202).send({ status: "accepted" });
   });
 
-  async function establishSession(token: string | undefined, request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> {
+  async function establishSession(token: string | undefined, request: FastifyRequest, reply: FastifyReply, refreshToken?: string): Promise<FastifyReply> {
     const context = await authenticatedContext(token, database, auth);
     if (token === undefined || context === undefined) return reply.code(401).send(stableError("AUTHENTICATION_INVALID", request.id));
     if (!context.membership.active) return reply.code(401).send(stableError("MEMBERSHIP_INACTIVE", request.id));
-    setSessionCookies(reply, config, token);
+    setSessionCookies(reply, config, token, refreshToken);
     return reply.send({ status: "authenticated" });
   }
   app.post<{ Body: { email: string; token: string } }>("/v1/auth/verify", { schema: { body: verifySchema } }, async (request, reply) => {
+    if (request.headers.origin !== publicOrigin) return reply.code(403).send(stableError("CSRF_REQUIRED", request.id));
     if (auth === undefined || database === undefined) return reply.code(503).send(stableError("CONFIGURATION_UNAVAILABLE", request.id));
-    const token = await auth.verifyOtp(request.body.email.trim().toLowerCase(), request.body.token);
-    return establishSession(token, request, reply);
+    const session = await auth.verifyOtp(request.body.email.trim().toLowerCase(), request.body.token);
+    return establishSession(session?.accessToken, request, reply, session?.refreshToken);
   });
-  app.post("/v1/auth/session", async (request, reply) => establishSession(bearerToken(request, config), request, reply));
+  app.post("/v1/auth/session", async (request, reply) => {
+    if (request.headers.origin !== publicOrigin) return reply.code(403).send(stableError("CSRF_REQUIRED", request.id));
+    const authorization = request.headers.authorization;
+    return establishSession(authorization?.startsWith("Bearer ") === true ? authorization.slice(7) : undefined, request, reply);
+  });
+
+  app.post("/v1/auth/refresh", { schema: { body: { type: "object", additionalProperties: false, properties: {} } } }, async (request, reply) => {
+    if (request.headers.origin !== publicOrigin || !csrfValid(request, config) || request.headers.authorization !== undefined) return reply.code(403).send(stableError("CSRF_REQUIRED", request.id));
+    if (auth === undefined || database === undefined) return reply.code(503).send(stableError("CONFIGURATION_UNAVAILABLE", request.id));
+    const refreshToken = request.cookies[config.refreshCookieName];
+    const session = refreshToken === undefined ? undefined : await auth.refresh(refreshToken);
+    const context = await authenticatedContext(session?.accessToken, database, auth);
+    if (session === undefined || context === undefined || !context.membership.active) {
+      clearSessionCookies(reply, config);
+      return reply.code(401).send(stableError("AUTHENTICATION_REQUIRED", request.id));
+    }
+    // Preserve CSRF across token rotation so other tabs and concurrent writes stay valid.
+    setSessionCookies(reply, config, session.accessToken, session.refreshToken, request.cookies[config.csrfCookieName]);
+    return reply.send({ status: "authenticated" });
+  });
 
   app.post("/v1/auth/logout", async (request, reply) => {
     if (request.headers.origin !== publicOrigin || !csrfValid(request, config)) return reply.code(403).send(stableError("CSRF_REQUIRED", request.id));
+    if (auth === undefined) return reply.code(503).send(stableError("CONFIGURATION_UNAVAILABLE", request.id));
+    // Join any pending rotation, then revoke the provider session with a fresh token.
+    // Expired access tokens alone cannot revoke a still-valid refresh session.
+    const refreshToken = request.cookies[config.refreshCookieName];
+    const renewed = refreshToken === undefined ? undefined : await auth.refresh(refreshToken);
+    const token = renewed?.accessToken ?? bearerToken(request, config);
+    if (token !== undefined) await auth.signOut(token);
     clearSessionCookies(reply, config);
-    const token = bearerToken(request, config);
-    if (token !== undefined) await auth?.signOut(token);
     return reply.send({ status: "logged_out" });
   });
   app.get("/v1/me", { schema: { response: { 200: meResponseSchema, 401: errorResponseSchema } } }, async (request, reply) => {
@@ -267,6 +296,8 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     return connections;
   }
   function sessionFor(request: FastifyRequest): string {
+    const identity = contextFor(request).identity;
+    if (identity.sessionId !== undefined) return `${identity.provider}:${identity.subject}:${identity.sessionId}`;
     const token = bearerToken(request, config);
     if (token === undefined) throw new Error("Missing authenticated session");
     return token;

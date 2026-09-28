@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { writeRequest } from "./library.js";
+import { sessionFetch, writeRequest } from "./session.js";
 
 const h = React.createElement;
 interface Repository { id: string; fullName: string; url: string; }
@@ -126,7 +126,7 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
   }
 
   async function refresh(): Promise<void> {
-    const response = await checked(await fetch("/v1/connections", { credentials: "same-origin", cache: "no-store" }));
+    const response = await checked(await sessionFetch("/v1/connections", { credentials: "same-origin", cache: "no-store" }));
     const result = await response.json() as { configured: boolean; setup: ProviderSetup | null; installationUrl: string | null; connections: Connection[] };
     setConnections(result.connections); setConfigured(result.configured); setProviderSetup(result.setup ?? null); setInstallationUrl(result.installationUrl);
     setSelected((previous) => previous === null ? null : result.connections.find((entry) => entry.id === previous.id) ?? null);
@@ -167,7 +167,7 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
           if (!controller.signal.aborted) setNotice(returned.notice);
         } else if (setupId !== null) {
           if (!/^[a-f0-9-]{36}$/i.test(setupId)) { setupInUrl(); throw new Error("That setup link is invalid. Start a new GitHub authorization."); }
-          const response = await checked(await fetch(`/v1/connections/github/pending/${encodeURIComponent(setupId)}`, { credentials: "same-origin", cache: "no-store" }));
+          const response = await checked(await sessionFetch(`/v1/connections/github/pending/${encodeURIComponent(setupId)}`, { credentials: "same-origin", cache: "no-store" }));
           const value = await response.json() as Setup;
           if (!controller.signal.aborted) showSetup(value);
         }
@@ -215,7 +215,7 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
 
   async function open(id: string): Promise<void> {
     await run(async () => {
-      const response = await checked(await fetch(`/v1/connections/${encodeURIComponent(id)}`, { credentials: "same-origin", cache: "no-store" }));
+      const response = await checked(await sessionFetch(`/v1/connections/${encodeURIComponent(id)}`, { credentials: "same-origin", cache: "no-store" }));
       setSelected(await response.json() as Connection); setDisconnecting(false); setReconnecting(false);
     });
   }

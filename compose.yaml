@@ -109,6 +109,7 @@ services:
       GOTRUE_MAILER_SUBJECTS_MAGIC_LINK: Your Capykit sign-in code
       GOTRUE_JWT_SECRET: ${CAPYKIT_AUTH_JWT_SECRET:?Set a generated hex JWT signing secret}
       GOTRUE_JWT_EXP: "3600"
+      GOTRUE_SESSIONS_INACTIVITY_TIMEOUT: "720h"
       GOTRUE_JWT_AUD: authenticated
       GOTRUE_JWT_ADMIN_ROLES: service_role
       GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated

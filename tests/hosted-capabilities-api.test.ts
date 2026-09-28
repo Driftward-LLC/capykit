@@ -30,7 +30,7 @@ describe.skipIf(databaseUrl === undefined)("capability HTTP and PostgreSQL integ
     if (database === undefined) throw new Error("Missing disposable test database");
     return createHostedServer({ database, config: loadHostedConfig({ DATABASE_URL: scoped.toString(), CAPYKIT_PUBLIC_BASE_URL: origin, CAPYKIT_AUTH_URL: "http://auth:9999" }), auth: {
       verifyBearer: (token) => Promise.resolve(identities.get(token)),
-      verifyOtp: () => Promise.resolve(undefined), requestOtp: async () => {}, signOut: async () => {},
+      verifyOtp: () => Promise.resolve(undefined), refresh: () => Promise.resolve(undefined), requestOtp: async () => {}, signOut: async () => {},
     } });
   }
   beforeAll(async () => {
