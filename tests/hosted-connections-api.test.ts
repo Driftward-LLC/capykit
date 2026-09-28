@@ -49,7 +49,7 @@ describe.skipIf(databaseUrl === undefined)("GitHub connection HTTP and PostgreSQ
       config: loadHostedConfig({ DATABASE_URL: scoped.toString(), CAPYKIT_PUBLIC_BASE_URL: origin, CAPYKIT_AUTH_URL: "http://auth:9999" }),
       ...(configured ? { githubConfig, githubProvider: github } : {}),
       ...(githubSetup ? { githubSetup } : {}),
-      auth: { verifyBearer: (token) => Promise.resolve(identities.get(token)), verifyOtp: () => Promise.resolve(undefined), requestOtp: async () => {}, signOut: async () => {} },
+      auth: { verifyBearer: (token) => Promise.resolve(identities.get(token)), verifyOtp: () => Promise.resolve(undefined), refresh: () => Promise.resolve(undefined), requestOtp: async () => {}, signOut: async () => {} },
     });
     apps.push(result);
     return result;

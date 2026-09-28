@@ -119,17 +119,46 @@ the static template from `/auth/email-template`; this route contains the templat
 placeholder, never a real code. Unknown and invited emails get the same public
 request response. Codes expire and have provider rate limits.
 
-Successful verification creates Secure, HttpOnly, SameSite=Strict session
-cookies. Access and refresh tokens are never returned to browser JavaScript or
-stored in browser storage. Unsafe cookie-authenticated requests require the
-matching origin and double-submit CSRF token. Callback origins are explicit.
+Successful verification remembers the browser for 30 days, renewed as the app
+is used. Access tokens still expire after one hour. Access and rotating refresh
+tokens stay in Secure, HttpOnly, SameSite=Strict cookies, never response JSON or
+JavaScript storage. The refresh cookie is scoped to `/v1/auth`; the readable
+CSRF cookie has the same persistent lifetime. Cookie issuance requires the exact
+application Origin. Unsafe cookie-authenticated requests require that Origin
+and the matching double-submit CSRF token. Callback origins are explicit.
+
+When an API rejects an expired login before executing a request, the console
+POSTs `/v1/auth/refresh` with CSRF protection and retries the request once.
+Renewal checks the provider session and current workspace membership before
+updating cookies. The CSRF token stays stable during renewal; new login rotates
+it. Concurrent requests share renewal, and supporting browsers coordinate tabs
+with Web Locks. GoTrue's native token rotation and reuse protection remain on.
+Temporary provider/network failures retain the session and unsaved work for
+retry. Confirmed expiration, revocation or inactive membership requires login.
+
+Compose sets `GOTRUE_SESSIONS_INACTIVITY_TIMEOUT=720h` so GoTrue also rejects
+renewal after 30 days without a refresh. This is a rolling inactivity limit,
+not an absolute lifetime. See the provider's
+[session behavior](https://supabase.com/docs/guides/auth/sessions) and pinned
+[GoTrue configuration](https://github.com/supabase/auth/blob/v2.197.0/internal/conf/configuration.go).
+Standalone deployments should apply the same auth-service setting.
 
 Every protected request verifies the provider session and reads current workspace
 membership. Inactive workspaces, principals, or memberships are denied on the
 next request. Owner/creator attribution does not imply an execution grant.
-Logout clears cookies and revokes the current GoTrue session; subsequent requests
-still validate with GoTrue rather than trusting a JWT offline. Sessions expire
-after one hour; this foundation does not implement silent refresh.
+Logout waits for pending renewal, revokes the current GoTrue session with a
+fresh token when necessary, and clears all three cookies. A transient failure
+keeps the session available for another sign-out attempt. Subsequent requests
+still validate the provider session rather than trusting a JWT offline. Late
+responses cannot make a revoked provider session valid again.
+
+GitHub setup binds to the provider-verified session ID and identity, which remain
+stable across token rotation. A new login is a different session and cannot
+resume another session's pending GitHub approval. Sessions created before this
+upgrade lack a refresh cookie and need one more email-code login. In-progress
+GitHub authorizations should be restarted after the upgrade. The explicit
+`/v1/auth/session` bearer import remains short-lived because it supplies no
+refresh credential.
 
 Workspace-owned relationships use compound database constraints to reject
 cross-workspace substitutions. Browser roles have no direct table access. No

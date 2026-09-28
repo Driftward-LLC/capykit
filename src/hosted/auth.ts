@@ -1,12 +1,37 @@
-import { AuthClient } from "@supabase/auth-js";
+import { AuthClient, type Session } from "@supabase/auth-js";
+import { createHash } from "node:crypto";
 import type { HostedConfig } from "./config.js";
 import type { VerifiedIdentity } from "./identity.js";
 
+export interface AuthSession { accessToken: string; refreshToken: string }
+
+export class AuthUnavailableError extends Error {
+  readonly code = "AUTHENTICATION_UNAVAILABLE";
+  readonly statusCode = 503;
+  constructor() { super("Authentication provider unavailable"); this.name = "AuthUnavailableError"; }
+}
+
 export interface AuthGateway {
   requestOtp(email: string, redirectTo: string): Promise<void>;
-  verifyOtp(email: string, token: string): Promise<string | undefined>;
+  verifyOtp(email: string, token: string): Promise<AuthSession | undefined>;
+  refresh(refreshToken: string): Promise<AuthSession | undefined>;
   verifyBearer(accessToken: string): Promise<VerifiedIdentity | undefined>;
   signOut(accessToken: string): Promise<void>;
+}
+
+function invalidCredentials(error: unknown, additionalCodes: readonly string[] = []): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { status, code, name } = error as { status?: number; code?: string; name?: string };
+  if (status === 429 || status === 0 || (status !== undefined && status >= 500) || name === "AuthRetryableFetchError") return false;
+  if (name === "AuthSessionMissingError" || status === 401 || status === 403) return true;
+  return status === 400 && typeof code === "string" && [
+    "bad_jwt", "no_authorization", "user_not_found", "session_not_found", "session_expired", "user_banned", "invalid_credentials", ...additionalCodes,
+  ].includes(code);
+}
+
+function sessionTokens(session: Session | null): AuthSession {
+  if (!session || [session.access_token, session.refresh_token].some((token) => typeof token !== "string" || !token || token.length > 16_384 || /[\r\n\0]/u.test(token))) throw new AuthUnavailableError();
+  return { accessToken: session.access_token, refreshToken: session.refresh_token };
 }
 
 export function createAuthGateway(config: HostedConfig): AuthGateway | undefined {
@@ -17,26 +42,71 @@ export function createAuthGateway(config: HostedConfig): AuthGateway | undefined
     url: authUrl, autoRefreshToken: false, persistSession: false, detectSessionInUrl: false,
     // ponytail: one shared pilot quota; introduce trusted per-client keys when usage grows.
     headers: { "x-capykit-auth-client": "capykit-api" },
+    fetch: (input, init) => fetch(input, { ...init, redirect: "error", signal: AbortSignal.timeout(10_000) }),
   });
+  // Native rotation handles stale-token reuse; this map only coalesces concurrent requests.
+  const refreshing = new Map<string, Promise<AuthSession | undefined>>();
   return {
     async requestOtp(email, redirectTo) {
       // Deliberately return the same public result for invited and unknown emails.
       await client().signInWithOtp({ email, options: { emailRedirectTo: redirectTo, shouldCreateUser: false } });
     },
     async verifyOtp(email, token) {
-      const { data, error } = await client().verifyOtp({ email, token, type: "email" });
-      return error === null ? data.session?.access_token : undefined;
+      try {
+        const { data, error } = await client().verifyOtp({ email, token, type: "email" });
+        if (error) {
+          if (invalidCredentials(error, ["otp_expired", "validation_failed"])) return undefined;
+          throw new AuthUnavailableError();
+        }
+        return sessionTokens(data.session);
+      } catch { throw new AuthUnavailableError(); }
+    },
+    async refresh(refreshToken) {
+      const key = createHash("sha256").update(refreshToken).digest("hex");
+      const existing = refreshing.get(key);
+      if (existing) return existing;
+      if (refreshing.size >= 128) throw new AuthUnavailableError();
+      const pending = (async () => {
+        try {
+          const { data, error } = await client().refreshSession({ refresh_token: refreshToken });
+          if (error) {
+            if (invalidCredentials(error, ["refresh_token_not_found", "refresh_token_already_used", "validation_failed"])) return undefined;
+            throw new AuthUnavailableError();
+          }
+          return sessionTokens(data.session);
+        } catch { throw new AuthUnavailableError(); }
+      })().finally(() => { refreshing.delete(key); });
+      refreshing.set(key, pending);
+      return pending;
     },
     async verifyBearer(accessToken) {
-      const { data, error } = await client().getUser(accessToken);
-      if (error !== null || data.user.email === undefined) return undefined;
-      return { provider: "gotrue", subject: data.user.id, email: data.user.email };
+      let user;
+      try {
+        const { data, error } = await client().getUser(accessToken);
+        if (error) {
+          if (invalidCredentials(error)) return undefined;
+          throw new AuthUnavailableError();
+        }
+        user = data.user;
+        if (typeof user.id !== "string") throw new AuthUnavailableError();
+      } catch { throw new AuthUnavailableError(); }
+      if (typeof user.email !== "string" || !user.email) return undefined;
+      try {
+        // Decode only after GoTrue has verified the JWT and checked its live session.
+        if (accessToken.length > 16_384 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(accessToken)) return undefined;
+        const claims = JSON.parse(Buffer.from(accessToken.split(".")[1] ?? "", "base64url").toString("utf8")) as Record<string, unknown>;
+        const sessionId = claims.session_id;
+        if (claims.sub !== user.id || typeof sessionId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(sessionId) || sessionId === "00000000-0000-0000-0000-000000000000") return undefined;
+        return { provider: "gotrue", subject: user.id, email: user.email, sessionId: sessionId.toLowerCase() };
+      } catch { return undefined; }
     },
     async signOut(accessToken) {
       // Despite the SDK namespace, this endpoint uses the user's token, not an admin key.
       // getUser checks the provider session on every request, including after logout.
-      const { error } = await client().admin.signOut(accessToken, "local");
-      if (error !== null && ![401, 403, 404].includes(error.status ?? 0)) throw new Error("Authentication provider unavailable");
+      try {
+        const { error } = await client().admin.signOut(accessToken, "local");
+        if (error !== null && !invalidCredentials(error) && error.status !== 404) throw new AuthUnavailableError();
+      } catch { throw new AuthUnavailableError(); }
     },
   };
 }

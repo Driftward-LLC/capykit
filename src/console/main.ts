@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { CapabilityLibrary, writeRequest } from "./library.js";
+import { CapabilityLibrary } from "./library.js";
+import { sessionFetch, writeRequest } from "./session.js";
 import { Connections, discardGitHubReturn } from "./connections.js";
 import "./style.css";
 
@@ -36,7 +37,7 @@ function App(): React.ReactElement {
     setPending("session");
     if (initial) setStatus("Checking your session…");
     try {
-      const response = await fetch("/v1/me", { credentials: "same-origin", cache: "no-store" });
+      const response = await sessionFetch("/v1/me");
       if (response.status === 401) {
         if (discardGitHubReturn()) setGitHubNotice("GitHub setup needs an existing signed-in session. Sign in below, then start a new GitHub authorization from Connections.");
         const url = new URL(window.location.href);
@@ -162,6 +163,7 @@ function App(): React.ReactElement {
       h("p", { className: "eyebrow" }, "Your capabilities, together"),
       h("h1", null, "Welcome to Capykit"),
       h("p", { className: "muted", role: "status", "aria-live": "polite" }, status),
+      h("p", { className: "small muted" }, "Stay signed in for 30 days between visits."),
       h("form", { onSubmit: (event) => { void requestCode(event); } },
         h("label", { htmlFor: "email" }, "Invited email address"),
         h("input", {

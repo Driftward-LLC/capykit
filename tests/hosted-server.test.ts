@@ -6,15 +6,21 @@ import type { FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadHostedConfig, type HostedConfig } from "../src/hosted/config.js";
 import type { DatabaseReadiness } from "../src/hosted/db.js";
-import type { AuthenticatedContext } from "../src/hosted/identity.js";
+import type { AuthenticatedContext, VerifiedIdentity } from "../src/hosted/identity.js";
 import { createHostedServer } from "../src/hosted/server.js";
+import { AuthUnavailableError, type AuthSession } from "../src/hosted/auth.js";
+import { ConnectionStore } from "../src/hosted/connections.js";
 
 const origin = "https://capykit.example.test";
 const config: HostedConfig = loadHostedConfig({
   CAPYKIT_PUBLIC_BASE_URL: origin, DATABASE_URL: "postgres://unused",
   CAPYKIT_AUTH_URL: "http://auth:9999",
 });
-const identity = { provider: "gotrue" as const, subject: "owner-1", email: "owner@example.test" };
+const identity = { provider: "gotrue" as const, subject: "owner-1", email: "owner@example.test", sessionId: "12345678-1234-4321-8123-123456789012" };
+const session: AuthSession = { accessToken: "verified-token", refreshToken: "refresh-token" };
+const renewedSession: AuthSession = { accessToken: "renewed-token", refreshToken: "rotated-refresh-token" };
+const rememberedAge = 30 * 24 * 60 * 60;
+const renewalHeaders = { cookie: "capykit_session=expired-token; capykit_refresh=refresh-token; capykit_csrf=csrf-proof", origin, "x-csrf-token": "csrf-proof" };
 const context: AuthenticatedContext = {
   identity, membership: { workspaceId: "workspace-a", principalId: "owner-1", principalKind: "human", role: "owner", active: true },
 };
@@ -29,13 +35,14 @@ function fixture(overrides: { config?: HostedConfig; consoleDirectory?: string }
   const database = {
     pool, close: () => pool.end(),
     readiness: vi.fn((): Promise<DatabaseReadiness> => Promise.resolve({ status: "ready", reason: "ok" })),
-    resolveContext: vi.fn((): Promise<AuthenticatedContext | undefined> => Promise.resolve(context)),
+    resolveContext: vi.fn((verified: VerifiedIdentity): Promise<AuthenticatedContext | undefined> => Promise.resolve({ ...context, identity: verified })),
   };
   const auth = {
     requestOtp: vi.fn(async () => {}),
     signOut: vi.fn(async () => {}),
-    verifyOtp: vi.fn((): Promise<string | undefined> => Promise.resolve("verified-token")),
-    verifyBearer: vi.fn((token: string) => Promise.resolve(token === "verified-token" ? identity : undefined)),
+    verifyOtp: vi.fn((): Promise<AuthSession | undefined> => Promise.resolve(session)),
+    refresh: vi.fn<(token: string) => Promise<AuthSession | undefined>>().mockResolvedValue(renewedSession),
+    verifyBearer: vi.fn((token: string): Promise<VerifiedIdentity | undefined> => Promise.resolve([session.accessToken, renewedSession.accessToken].includes(token) ? identity : undefined)),
   };
   const app = createHostedServer({ config, database, auth, ...overrides });
   apps.push(app);
@@ -50,9 +57,15 @@ describe("hosted HTTP boundaries", () => {
     expect(auth.requestOtp).toHaveBeenCalledWith("owner@example.test", origin);
     const verified = await app.inject({ method: "POST", url: "/v1/auth/verify", headers: { origin }, payload: { email: identity.email, token: "123456" } });
     expect(verified.statusCode).toBe(200);
-    expect(verified.body).not.toContain("verified-token");
+    expect(verified.body).not.toMatch(/verified-token|refresh-token/u);
     expect(auth.verifyBearer).toHaveBeenCalledWith("verified-token");
-    expect(verified.cookies.find(({ name }) => name === "capykit_session")).toMatchObject({ httpOnly: true, secure: true, sameSite: "Strict", path: "/" });
+    expect(verified.cookies).toHaveLength(3);
+    expect(verified.cookies.find(({ name }) => name === "capykit_session")).toMatchObject({ value: session.accessToken, httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: rememberedAge });
+    expect(verified.cookies.find(({ name }) => name === "capykit_refresh")).toMatchObject({ value: session.refreshToken, httpOnly: true, secure: true, sameSite: "Strict", path: "/v1/auth", maxAge: rememberedAge });
+    const csrfCookie = verified.cookies.find(({ name }) => name === "capykit_csrf");
+    expect(csrfCookie).toMatchObject({ secure: true, sameSite: "Strict", path: "/", maxAge: rememberedAge });
+    expect(csrfCookie?.httpOnly).not.toBe(true);
+    expect(csrfCookie?.value).toBeTruthy();
     const cookie = verified.cookies.map(({ name, value }) => `${name}=${value}`).join("; ");
     const me = await app.inject({ url: "/v1/me", headers: { cookie, "x-workspace-id": "workspace-b", "x-request-id": "untrusted-supplied-id" } });
     expect(me.statusCode).toBe(200);
@@ -66,38 +79,186 @@ describe("hosted HTTP boundaries", () => {
   it("rejects expired codes, forged tokens, unknown identities, and inactive membership without cookies", async () => {
     const { app, auth, database } = fixture();
     auth.verifyOtp.mockResolvedValueOnce(undefined);
-    const invalid = await app.inject({ method: "POST", url: "/v1/auth/verify", payload: { email: identity.email, token: "654321" } });
+    const invalid = await app.inject({ method: "POST", url: "/v1/auth/verify", headers: { origin }, payload: { email: identity.email, token: "654321" } });
     expect(invalid.statusCode).toBe(401);
     expect(invalid.cookies).toHaveLength(0);
     expect((await app.inject({ url: "/v1/me", headers: { authorization: "Bearer forged" } })).statusCode).toBe(401);
     database.resolveContext.mockResolvedValueOnce(undefined);
-    expect((await app.inject({ method: "POST", url: "/v1/auth/session", headers: { authorization: "Bearer verified-token" } })).statusCode).toBe(401);
+    expect((await app.inject({ method: "POST", url: "/v1/auth/session", headers: { origin, authorization: "Bearer verified-token" } })).statusCode).toBe(401);
     database.resolveContext.mockResolvedValueOnce({ ...context, membership: { ...context.membership, active: false } });
-    const inactive = await app.inject({ method: "POST", url: "/v1/auth/session", headers: { authorization: "Bearer verified-token" } });
+    const inactive = await app.inject({ method: "POST", url: "/v1/auth/session", headers: { origin, authorization: "Bearer verified-token" } });
     expect(inactive.statusCode).toBe(401);
     expect(inactive.cookies).toHaveLength(0);
   });
 
-  it("requires same-origin CSRF for cookie-authenticated mutations, including session renewal", async () => {
+  it("requires the exact origin before issuing an initial OTP or imported bearer session", async () => {
     const { app, auth } = fixture();
-    const cookie = "capykit_session=verified-token; capykit_csrf=csrf-proof";
-    for (const headers of [
-      { cookie }, { cookie, origin }, { cookie, origin, "x-csrf-token": "wrong" },
-      { cookie, origin: "https://other.example.test", "x-csrf-token": "csrf-proof" },
-    ]) {
-      expect((await app.inject({ method: "POST", url: "/v1/auth/session", headers })).statusCode).toBe(403);
+    for (const suppliedOrigin of [undefined, "null", "https://other.example.test"]) {
+      const headers = suppliedOrigin === undefined ? {} : { origin: suppliedOrigin };
+      const verified = await app.inject({ method: "POST", url: "/v1/auth/verify", headers, payload: { email: identity.email, token: "123456" } });
+      expect(verified.statusCode).toBe(403);
+      expect(verified.cookies).toHaveLength(0);
+      const imported = await app.inject({ method: "POST", url: "/v1/auth/session", headers: { ...headers, authorization: "Bearer verified-token" } });
+      expect(imported.statusCode).toBe(403);
+      expect(imported.cookies).toHaveLength(0);
     }
-    const renewed = await app.inject({ method: "POST", url: "/v1/auth/session", headers: { cookie, origin, "x-csrf-token": "csrf-proof" } });
-    expect(renewed.statusCode).toBe(200);
-    const csrf = renewed.cookies.find(({ name }) => name === "capykit_csrf")?.value ?? "";
-    expect(csrf).not.toBe("");
-    const newCookie = renewed.cookies.map(({ name, value }) => `${name}=${value}`).join("; ");
-    const logout = await app.inject({ method: "POST", url: "/v1/auth/logout", headers: { cookie: newCookie, origin, "x-csrf-token": csrf } });
+    expect(auth.verifyOtp).not.toHaveBeenCalled();
+    expect(auth.verifyBearer).not.toHaveBeenCalled();
+  });
+
+  it("imports only a bearer access token without creating a persistent refresh session", async () => {
+    const { app, auth } = fixture();
+    const imported = await app.inject({ method: "POST", url: "/v1/auth/session", headers: { origin, authorization: "Bearer verified-token" } });
+    expect(imported.statusCode).toBe(200);
+    expect(imported.cookies.find(({ name }) => name === "capykit_session")).toMatchObject({ value: session.accessToken, httpOnly: true, secure: true, sameSite: "Strict", path: "/" });
+    expect(imported.cookies.find(({ name }) => name === "capykit_session")?.maxAge).toBe(3600);
+    expect(imported.cookies.some(({ name, value }) => name === "capykit_refresh" && value !== "")).toBe(false);
+    expect(imported.body).not.toContain(session.accessToken);
+    expect(auth.refresh).not.toHaveBeenCalled();
+    expect((await app.inject({ method: "POST", url: "/v1/auth/session", headers: { origin, cookie: "capykit_session=verified-token; capykit_csrf=csrf-proof", "x-csrf-token": "csrf-proof" } })).statusCode).toBe(401);
+  });
+
+  it("renews expired or missing access cookies using the private refresh cookie and preserves CSRF", async () => {
+    const { app, auth, database } = fixture();
+    for (const cookie of [renewalHeaders.cookie, "capykit_refresh=refresh-token; capykit_csrf=csrf-proof"]) {
+      const renewed = await app.inject({ method: "POST", url: "/v1/auth/refresh", headers: { ...renewalHeaders, cookie }, payload: {} });
+      expect(renewed.statusCode, renewed.body).toBe(200);
+      expect(renewed.cookies).toHaveLength(3);
+      expect(renewed.cookies.find(({ name }) => name === "capykit_session")).toMatchObject({ value: renewedSession.accessToken, httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: rememberedAge });
+      expect(renewed.cookies.find(({ name }) => name === "capykit_refresh")).toMatchObject({ value: renewedSession.refreshToken, httpOnly: true, secure: true, sameSite: "Strict", path: "/v1/auth", maxAge: rememberedAge });
+      expect(renewed.cookies.find(({ name }) => name === "capykit_csrf")).toMatchObject({ value: "csrf-proof", secure: true, sameSite: "Strict", path: "/", maxAge: rememberedAge });
+      expect(renewed.body).not.toMatch(/renewed-token|refresh-token/u);
+      expect(renewed.headers["cache-control"]).toBe("no-store");
+      const me = await app.inject({ url: "/v1/me", headers: { cookie: "capykit_session=renewed-token" } });
+      expect(me.statusCode).toBe(200);
+    }
+    expect(auth.refresh).toHaveBeenCalledTimes(2);
+    expect(auth.refresh).toHaveBeenCalledWith(session.refreshToken);
+    expect(auth.verifyBearer).toHaveBeenCalledWith(renewedSession.accessToken);
+    expect(database.resolveContext).toHaveBeenCalledWith(identity);
+  });
+
+  it("protects refresh-only sessions with Origin and CSRF and rejects bearer or body credentials", async () => {
+    const { app, auth } = fixture();
+    const cookie = "capykit_refresh=refresh-token; capykit_csrf=csrf-proof";
+    for (const headers of [{ cookie }, { cookie, origin }, { cookie, origin, "x-csrf-token": "wrong" },
+      { cookie, origin: "null", "x-csrf-token": "csrf-proof" }, { cookie, origin: "https://other.example.test", "x-csrf-token": "csrf-proof" }]) {
+      for (const url of ["/v1/auth/refresh", "/v1/auth/logout"]) {
+        const denied = await app.inject({ method: "POST", url, headers, payload: {} });
+        expect(denied.statusCode).toBe(403);
+        expect(denied.cookies).toHaveLength(0);
+      }
+    }
+    for (const authorization of ["Bearer verified-token", "Basic anything"]) {
+      const denied = await app.inject({ method: "POST", url: "/v1/auth/refresh", headers: { ...renewalHeaders, authorization }, payload: {} });
+      expect(denied.statusCode).toBeGreaterThanOrEqual(400);
+      expect(denied.statusCode).toBeLessThan(500);
+      expect(denied.cookies).toHaveLength(0);
+    }
+    const supplied = await app.inject({ method: "POST", url: "/v1/auth/refresh", headers: renewalHeaders, payload: { refreshToken: "SENTINEL_BODY_TOKEN" } });
+    expect(supplied.statusCode).toBe(400);
+    expect(supplied.cookies).toHaveLength(0);
+    expect(supplied.body).not.toContain("SENTINEL");
+    expect(auth.refresh).not.toHaveBeenCalled();
+    expect(auth.signOut).not.toHaveBeenCalled();
+  });
+
+  it("clears terminally invalid refresh sessions and rejects revoked membership before issuing credentials", async () => {
+    for (const failure of ["missing-refresh", "refresh", "identity", "missing-member", "inactive-member"] as const) {
+      const { app, auth, database } = fixture();
+      if (failure === "refresh") auth.refresh.mockResolvedValueOnce(undefined);
+      if (failure === "identity") auth.verifyBearer.mockResolvedValueOnce(undefined);
+      if (failure === "missing-member") database.resolveContext.mockResolvedValueOnce(undefined);
+      if (failure === "inactive-member") database.resolveContext.mockResolvedValueOnce({ ...context, membership: { ...context.membership, active: false } });
+      const headers = failure === "missing-refresh" ? { ...renewalHeaders, cookie: "capykit_csrf=csrf-proof" } : renewalHeaders;
+      const denied = await app.inject({ method: "POST", url: "/v1/auth/refresh", headers, payload: {} });
+      expect(denied.statusCode, `${failure}: ${denied.body}`).toBe(401);
+      expect(denied.cookies).toHaveLength(3);
+      expect(denied.cookies.every(({ value }) => value === "")).toBe(true);
+      expect(denied.cookies.find(({ name }) => name === "capykit_refresh")?.path).toBe("/v1/auth");
+      expect(denied.body).not.toMatch(/verified-token|renewed-token|refresh-token/u);
+      if (failure === "missing-refresh") expect(auth.refresh).not.toHaveBeenCalled();
+    }
+  });
+
+  it("preserves browser credentials on transient refresh, identity and membership failures", async () => {
+    for (const failure of ["refresh", "identity", "database"] as const) {
+      const { app, auth, database } = fixture();
+      if (failure === "refresh") auth.refresh.mockRejectedValueOnce(new AuthUnavailableError());
+      if (failure === "identity") auth.verifyBearer.mockRejectedValueOnce(new AuthUnavailableError());
+      if (failure === "database") database.resolveContext.mockRejectedValueOnce(new Error("SENTINEL_DATABASE_DETAIL"));
+      const unavailable = await app.inject({ method: "POST", url: "/v1/auth/refresh", headers: renewalHeaders, payload: {} });
+      expect(unavailable.statusCode, `${failure}: ${unavailable.body}`).toBe(failure === "database" ? 500 : 503);
+      expect(unavailable.cookies).toHaveLength(0);
+      expect(unavailable.body).not.toMatch(/SENTINEL|renewed-token|refresh-token/u);
+      if (failure !== "database") expect(unavailable.json<{ error: { code: string } }>().error.code).toBe("AUTHENTICATION_UNAVAILABLE");
+    }
+  });
+
+  it("renews for logout even after access expires, revokes the provider session and clears every cookie", async () => {
+    const { app, auth } = fixture();
+    const logout = await app.inject({ method: "POST", url: "/v1/auth/logout", headers: renewalHeaders, payload: {} });
     expect(logout.statusCode).toBe(200);
-    expect(logout.cookies).toHaveLength(2);
+    expect(auth.refresh).toHaveBeenCalledWith(session.refreshToken);
+    expect(auth.signOut).toHaveBeenCalledWith(renewedSession.accessToken);
+    expect(logout.cookies).toHaveLength(3);
     expect(logout.cookies.every(({ value }) => value === "")).toBe(true);
-    expect(auth.signOut).toHaveBeenCalledWith("verified-token");
-    expect((await app.inject({ method: "POST", url: "/v1/auth/verify", headers: { origin: "https://other.example.test" }, payload: { email: identity.email, token: "123456" } })).statusCode).toBe(403);
+    expect(logout.cookies.find(({ name }) => name === "capykit_refresh")?.path).toBe("/v1/auth");
+    expect(logout.body).not.toMatch(/renewed-token|refresh-token/u);
+  });
+
+  it("falls back to the presented access token on invalid refresh and preserves cookies on logout outages", async () => {
+    const { app, auth } = fixture();
+    auth.refresh.mockResolvedValueOnce(undefined);
+    const logout = await app.inject({ method: "POST", url: "/v1/auth/logout", headers: { ...renewalHeaders, cookie: "capykit_session=verified-token; capykit_refresh=invalid-refresh; capykit_csrf=csrf-proof" }, payload: {} });
+    expect(logout.statusCode).toBe(200);
+    expect(auth.signOut).toHaveBeenCalledWith(session.accessToken);
+    for (const failure of ["refresh", "signout"] as const) {
+      if (failure === "refresh") auth.refresh.mockRejectedValueOnce(new AuthUnavailableError());
+      else auth.signOut.mockRejectedValueOnce(new AuthUnavailableError());
+      const unavailable = await app.inject({ method: "POST", url: "/v1/auth/logout", headers: renewalHeaders, payload: {} });
+      expect(unavailable.statusCode).toBe(503);
+      expect(unavailable.cookies).toHaveLength(0);
+    }
+  });
+
+  it("rejects a delayed refresh when logout has revoked the provider session", async () => {
+    const { app, auth } = fixture();
+    let finishRotation: ((value: AuthSession) => void) | undefined;
+    const rotation = new Promise<AuthSession>((resolve) => { finishRotation = resolve; });
+    let finishRevocation: (() => void) | undefined;
+    const revoked = new Promise<void>((resolve) => { finishRevocation = resolve; });
+    auth.refresh.mockImplementation(() => rotation);
+    auth.signOut.mockImplementation(() => { finishRevocation?.(); return Promise.resolve(); });
+    auth.verifyBearer.mockImplementation(async () => { await revoked; return undefined; });
+    const refreshing = app.inject({ method: "POST", url: "/v1/auth/refresh", headers: renewalHeaders, payload: {} }).then((response) => response);
+    const loggingOut = app.inject({ method: "POST", url: "/v1/auth/logout", headers: renewalHeaders, payload: {} }).then((response) => response);
+    await vi.waitFor(() => { expect(auth.refresh).toHaveBeenCalledTimes(2); });
+    finishRotation?.(renewedSession);
+    const [refreshResponse, logoutResponse] = await Promise.all([refreshing, loggingOut]);
+    expect(logoutResponse.statusCode).toBe(200);
+    expect(auth.signOut).toHaveBeenCalledWith(renewedSession.accessToken);
+    expect(refreshResponse.statusCode).toBe(401);
+    expect(refreshResponse.cookies.every(({ value }) => value === "")).toBe(true);
+    expect(logoutResponse.cookies.every(({ value }) => value === "")).toBe(true);
+  });
+
+  it("keeps GitHub setup bound to the verified provider session across access-token rotation", async () => {
+    const { app, auth } = fixture();
+    const starting = vi.spyOn(ConnectionStore.prototype, "start").mockResolvedValue({ connectionId: "connection", setupId: "setup", authorizationUrl: "https://github.com/login/oauth/authorize", installationUrl: "https://github.com/apps/capykit/installations/new" });
+    try {
+      for (const accessToken of [session.accessToken, renewedSession.accessToken]) {
+        if (accessToken === renewedSession.accessToken) expect((await app.inject({ method: "POST", url: "/v1/auth/refresh", headers: renewalHeaders, payload: {} })).statusCode).toBe(200);
+        const started = await app.inject({ method: "POST", url: "/v1/connections/github/start", headers: { origin, cookie: `capykit_session=${accessToken}; capykit_csrf=csrf-proof`, "x-csrf-token": "csrf-proof" }, payload: {} });
+        expect(started.statusCode).toBe(200);
+      }
+      expect(starting.mock.calls[0]?.[1]).toBe(`gotrue:${identity.subject}:${identity.sessionId}`);
+      expect(starting.mock.calls[1]?.[1]).toBe(starting.mock.calls[0]?.[1]);
+      auth.verifyBearer.mockResolvedValueOnce({ ...identity, sessionId: "87654321-4321-4321-8123-123456789012" });
+      const differentSession = await app.inject({ method: "POST", url: "/v1/connections/github/start", headers: { origin, authorization: "Bearer another-login" }, payload: {} });
+      expect(differentSession.statusCode).toBe(200);
+      expect(starting.mock.calls[2]?.[1]).not.toBe(starting.mock.calls[0]?.[1]);
+    } finally { starting.mockRestore(); }
   });
 
   it("validates OTP inputs and callback origins without leaking submitted data", async () => {

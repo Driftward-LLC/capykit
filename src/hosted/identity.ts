@@ -5,6 +5,7 @@ export interface VerifiedIdentity {
   readonly provider: "gotrue";
   readonly subject: string;
   readonly email: string;
+  readonly sessionId?: string;
 }
 
 export interface WorkspaceMembership {
@@ -23,6 +24,7 @@ export interface AuthenticatedContext {
 export type StableErrorCode =
   | "AUTHENTICATION_REQUIRED"
   | "AUTHENTICATION_INVALID"
+  | "AUTHENTICATION_UNAVAILABLE"
   | "CSRF_REQUIRED"
   | "MEMBERSHIP_INACTIVE"
   | "FORBIDDEN"

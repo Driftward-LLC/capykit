@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { sessionFetch, writeRequest } from "./session.js";
 
 const h = React.createElement;
 const MiB = 1024 * 1024;
@@ -13,15 +14,6 @@ interface Capability { id: string; slug: string; name: string; kind: CapabilityK
 interface CapabilityDetail extends Capability {
   draft: (ArtifactSummary & { version: string; updatedAt: string }) | null;
   versions: (ArtifactSummary & { version: string; publishedAt: string })[];
-}
-
-export function writeRequest(path: string, method: "POST" | "PUT" | "DELETE", body?: unknown): Promise<Response> {
-  const csrf = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith("capykit_csrf="))?.slice("capykit_csrf=".length);
-  return fetch(path, {
-    method, credentials: "same-origin",
-    headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...(csrf === undefined ? {} : { "x-csrf-token": csrf }) },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
 }
 
 function bytesLabel(bytes: number): string {
@@ -145,14 +137,14 @@ export function CapabilityLibrary({ onSessionExpired }: { onSessionExpired: () =
   }
 
   async function refresh(): Promise<void> {
-    const response = await checked(await fetch("/v1/capabilities", { credentials: "same-origin", cache: "no-store" }));
+    const response = await checked(await sessionFetch("/v1/capabilities", { credentials: "same-origin", cache: "no-store" }));
     const result = await response.json() as { capabilities: Capability[] };
     setCapabilities(result.capabilities);
   }
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch("/v1/capabilities", { credentials: "same-origin", cache: "no-store", signal: controller.signal }).then(async (response) => {
+    void sessionFetch("/v1/capabilities", { credentials: "same-origin", cache: "no-store", signal: controller.signal }).then(async (response) => {
       if (response.status === 401) { onSessionExpired(); return; }
       if (!response.ok) throw new Error("Could not load your capabilities. Retry when your connection is available.");
       const result = await response.json() as { capabilities: Capability[] };
@@ -167,7 +159,7 @@ export function CapabilityLibrary({ onSessionExpired }: { onSessionExpired: () =
 
   async function open(id: string): Promise<void> {
     await run(async () => {
-      const response = await checked(await fetch(`/v1/capabilities/${encodeURIComponent(id)}`, { credentials: "same-origin", cache: "no-store" }));
+      const response = await checked(await sessionFetch(`/v1/capabilities/${encodeURIComponent(id)}`, { credentials: "same-origin", cache: "no-store" }));
       show(await response.json() as CapabilityDetail);
     });
   }
@@ -217,7 +209,7 @@ export function CapabilityLibrary({ onSessionExpired }: { onSessionExpired: () =
   async function download(publishedVersion: string): Promise<void> {
     if (selected === null) return;
     await run(async () => {
-      const response = await checked(await fetch(`/v1/capabilities/${encodeURIComponent(selected.id)}/versions/${encodeURIComponent(publishedVersion)}/download`, { credentials: "same-origin", cache: "no-store" }));
+      const response = await checked(await sessionFetch(`/v1/capabilities/${encodeURIComponent(selected.id)}/versions/${encodeURIComponent(publishedVersion)}/download`, { credentials: "same-origin", cache: "no-store" }));
       const url = URL.createObjectURL(await response.blob());
       const anchor = document.createElement("a");
       anchor.href = url; anchor.download = `${selected.slug}-${publishedVersion}.capykit.json`;

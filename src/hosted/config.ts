@@ -5,6 +5,7 @@ export interface HostedConfig {
   readonly databaseUrl: string | undefined;
   readonly authUrl: string | undefined;
   readonly sessionCookieName: string;
+  readonly refreshCookieName: string;
   readonly csrfCookieName: string;
   readonly secureCookies: boolean;
 }
@@ -51,6 +52,7 @@ export function loadHostedConfig(env: NodeJS.ProcessEnv = process.env): HostedCo
     databaseUrl: optionalEnv("DATABASE_URL", env),
     authUrl: authUrl === undefined ? undefined : internalAuthOrigin(authUrl),
     sessionCookieName: "capykit_session",
+    refreshCookieName: "capykit_refresh",
     csrfCookieName: "capykit_csrf",
     secureCookies: publicBaseUrl.startsWith("https://"),
   };
