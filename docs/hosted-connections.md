@@ -28,7 +28,8 @@ Compose sets the last value to `/var/lib/capykit/providers/github.json` and
 mounts the app-only `provider-config` named volume. The image creates its
 directory as the runtime user with mode `0700`; the complete configuration file
 uses mode `0600`. This storage requires Unix ownership and permissions; use the
-Linux container on Windows hosts. Treat this volume as secret storage: it includes the App key,
+Linux container on Windows hosts. Treat this volume as secret storage: it includes
+the App key,
 client/webhook secrets and the temporary-state encryption key. Back it up to
 protected storage with the database, and preserve it during image upgrades.
 Manual environment credentials and a stored configuration cannot coexist;
