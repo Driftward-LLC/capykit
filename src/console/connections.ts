@@ -23,7 +23,8 @@ interface Candidate {
   repositories: (Repository & { admin: boolean })[];
 }
 interface Setup { setupId: string; connectionId: string; candidates: Candidate[]; expiresAt: string; }
-type GitHubReturn = { code: string; state: string } | { notice: string };
+interface ProviderSetup { available: boolean; organization: string; }
+type GitHubReturn = { callback: "/v1/connections/github/callback" | "/v1/provider-setup/github/callback"; code: string; state: string } | { notice: string };
 
 // Strip OAuth material before any identity request, render, or later navigation.
 let githubReturn: GitHubReturn | null = (() => {
@@ -32,13 +33,14 @@ let githubReturn: GitHubReturn | null = (() => {
     window.history.replaceState(null, "", "/?tab=connections");
     return { notice: "Continue by authorizing your GitHub account. Capykit will verify the installation and let you choose repositories." };
   }
-  if (url.pathname !== "/v1/connections/github/callback") return null;
+  if (url.pathname !== "/v1/connections/github/callback" && url.pathname !== "/v1/provider-setup/github/callback") return null;
+  const providerSetup = url.pathname === "/v1/provider-setup/github/callback";
   window.history.replaceState(null, "", "/?tab=connections");
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  if (url.searchParams.has("error")) return { notice: "GitHub authorization was not completed. You can start again when you are ready." };
-  if (code === null || state === null || code.length === 0 || state.length === 0 || code.length > 4096 || state.length > 4096 || url.searchParams.getAll("code").length !== 1 || url.searchParams.getAll("state").length !== 1) return { notice: "That GitHub setup could not be verified. Start a new authorization." };
-  return { code, state };
+  if (url.searchParams.has("error")) return { notice: providerSetup ? "GitHub App setup was not completed. You can start again when you are ready." : "GitHub authorization was not completed. You can start again when you are ready." };
+  if (code === null || state === null || code.length === 0 || state.length === 0 || code.length > 4096 || state.length > 4096 || url.searchParams.getAll("code").length !== 1 || url.searchParams.getAll("state").length !== 1) return { notice: providerSetup ? "That GitHub App setup could not be verified. Start a new setup." : "That GitHub setup could not be verified. Start a new authorization." };
+  return { callback: url.pathname, code, state };
 })();
 
 export function discardGitHubReturn(): boolean {
@@ -58,6 +60,10 @@ const errorMessages: Record<string, string> = {
   CONNECT_SETUP_EXPIRED: "This setup expired. Start a new GitHub authorization.",
   CONNECT_STATE_INVALID: "This setup could not be verified. Start a new GitHub authorization.",
   GITHUB_NOT_CONFIGURED: "Your operator needs to configure a dedicated Capykit GitHub App before you can connect repositories.",
+  GITHUB_SETUP_STATE_INVALID: "This GitHub App setup expired or could not be verified. Start a new setup from Connections.",
+  GITHUB_SETUP_BUSY: "Another GitHub App setup is in progress. Complete it or wait for it to expire, then refresh and try again.",
+  GITHUB_SETUP_FAILED: "GitHub App setup could not be completed. The app may already exist on GitHub. Ask your organization administrator to check for and remove an incomplete Capykit app before trying again.",
+  GITHUB_ALREADY_CONFIGURED: "GitHub is already configured. Refresh connections to install and authorize the app.",
   CONFIGURATION_UNAVAILABLE: "GitHub configuration is unavailable. Contact your workspace operator.",
   GITHUB_AUTHORIZATION_FAILED: "GitHub authorization could not be verified. Start a new authorization.",
   GITHUB_ACCESS_REVOKED: "GitHub access was revoked or is no longer available. Check the app installation and your repository permissions, then reconnect.",
@@ -90,7 +96,8 @@ function githubLink(url: string | null): string | undefined {
 
 export function Connections({ onSessionExpired }: { onSessionExpired: () => void }): React.ReactElement {
   const [connections, setConnections] = useState<Connection[]>([]);
-  const [configured, setConfigured] = useState(false);
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [providerSetup, setProviderSetup] = useState<ProviderSetup | null>(null);
   const [installationUrl, setInstallationUrl] = useState<string | null>(null);
   const [selected, setSelected] = useState<Connection | null>(null);
   const [setup, setSetup] = useState<Setup | null>(null);
@@ -120,8 +127,8 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
 
   async function refresh(): Promise<void> {
     const response = await checked(await fetch("/v1/connections", { credentials: "same-origin", cache: "no-store" }));
-    const result = await response.json() as { configured: boolean; installationUrl: string | null; connections: Connection[] };
-    setConnections(result.connections); setConfigured(result.configured); setInstallationUrl(result.installationUrl);
+    const result = await response.json() as { configured: boolean; setup: ProviderSetup | null; installationUrl: string | null; connections: Connection[] };
+    setConnections(result.connections); setConfigured(result.configured); setProviderSetup(result.setup ?? null); setInstallationUrl(result.installationUrl);
     setSelected((previous) => previous === null ? null : result.connections.find((entry) => entry.id === previous.id) ?? null);
   }
 
@@ -145,11 +152,17 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
       try {
         if (returned !== null && "code" in returned) {
           // The one-use code stays in this request only; it is never persisted.
-          const request = writeRequest("/v1/connections/github/callback", "POST", returned);
+          const request = writeRequest(returned.callback, "POST", { code: returned.code, state: returned.state });
           returned.code = ""; returned.state = "";
           const response = await checked(await request);
-          const value = await response.json() as Setup;
-          if (!controller.signal.aborted) showSetup(value);
+          if (returned.callback === "/v1/provider-setup/github/callback") {
+            const value = await response.json() as { configured: unknown };
+            if (value.configured !== true) throw new Error(errorMessages.GITHUB_SETUP_FAILED);
+            if (!controller.signal.aborted) setNotice("The Capykit GitHub App is ready. Install it on selected repositories, then authorize GitHub to review and approve access.");
+          } else {
+            const value = await response.json() as Setup;
+            if (!controller.signal.aborted) showSetup(value);
+          }
         } else if (returned !== null) {
           if (!controller.signal.aborted) setNotice(returned.notice);
         } else if (setupId !== null) {
@@ -167,6 +180,28 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
     })();
     return () => { controller.abort(); };
   }, [onSessionExpired]);
+
+  async function startProviderSetup(): Promise<void> {
+    if (configured !== false || providerSetup?.available !== true) return;
+    await run(async () => {
+      const response = await checked(await writeRequest("/v1/provider-setup/github/start", "POST", {}));
+      const value = await response.json() as { registrationUrl: string; manifest: unknown };
+      let url: URL;
+      try { url = new URL(value.registrationUrl); }
+      catch { throw new Error(errorMessages.GITHUB_SETUP_FAILED); }
+      if (url.origin !== "https://github.com" || url.username !== "" || url.password !== "" || url.pathname !== `/organizations/${encodeURIComponent(providerSetup.organization)}/settings/apps/new` || url.hash !== "" || url.searchParams.getAll("state").length !== 1 || !url.searchParams.get("state") || [...url.searchParams.keys()].some((key) => key !== "state") || value.manifest === null || typeof value.manifest !== "object" || Array.isArray(value.manifest)) {
+        throw new Error(errorMessages.GITHUB_SETUP_FAILED);
+      }
+      // GitHub accepts the manifest through a browser form; credentials return only to the server.
+      const form = document.createElement("form");
+      form.method = "POST"; form.action = url.href; form.hidden = true;
+      const manifest = document.createElement("input");
+      manifest.type = "hidden"; manifest.name = "manifest"; manifest.value = JSON.stringify(value.manifest);
+      form.append(manifest); document.body.append(form);
+      try { form.submit(); }
+      catch { form.remove(); throw new Error("GitHub App registration could not open. Refresh and try again."); }
+    });
+  }
 
   async function start(connectionId?: string): Promise<void> {
     await run(async () => {
@@ -223,11 +258,21 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
     ),
     error === "" ? null : h("p", { className: "message error", role: "alert" }, error),
     notice === "" ? null : h("p", { className: "message success", role: "status" }, notice),
-    loading ? h("p", { className: "muted", role: "status" }, "Loading connections…") : configured ? h("section", { className: "panel connection-intro", "aria-label": "Connect GitHub" },
+    loading ? h("p", { className: "muted", role: "status" }, "Loading connections…") : configured === null ? h("section", { className: "panel connection-intro", "aria-label": "Connection status unavailable" },
+      h("h2", null, "Could not load connection status"), h("p", { className: "muted" }, "Refresh to check whether GitHub is ready to connect."),
+      h("button", { type: "button", disabled, onClick: () => { void run(refresh); } }, "Retry connection status"),
+    ) : configured ? h("section", { className: "panel connection-intro", "aria-label": "Connect GitHub" },
       h("h2", null, "GitHub App"), h("p", { className: "muted" }, "Install the Capykit GitHub App on selected repositories, then authorize your GitHub account to verify administrator access. You will review the repositories before connecting."),
       h("p", { className: "small muted" }, "Permissions: read issues and repository metadata. Publishing a function does not grant access to GitHub."),
       h("div", { className: "actions" }, installLink === undefined ? null : h("a", { className: "button-link secondary", href: installLink, target: "_blank", rel: "noopener noreferrer" }, "Install on GitHub"), h("button", { type: "button", disabled: disabled || setup !== null, onClick: () => { void start(); } }, "Authorize GitHub")),
-    ) : h("section", { className: "panel connection-intro", "aria-label": "GitHub setup required" }, h("h2", null, "GitHub setup is not configured yet"), h("p", { className: "muted" }, "Your operator needs to register and configure a dedicated Capykit GitHub App. Once it is configured, you can install it, choose repositories, and connect them here.")),
+    ) : h("section", { className: "panel connection-intro", "aria-label": "GitHub setup required" },
+      h("h2", null, "Set up GitHub"),
+      providerSetup?.available === true ? h(React.Fragment, null,
+        h("p", { className: "muted" }, `Create the dedicated Capykit GitHub App for ${providerSetup.organization}. GitHub will ask an authorized organization administrator to approve its creation. Capykit saves the app credentials securely when you return.`),
+        h("p", { className: "small muted" }, "After setup, install the app on selected repositories and approve their access here. Permissions: read issues and repository metadata."),
+        h("button", { type: "button", disabled, onClick: () => { void startProviderSetup(); } }, "Set up GitHub"),
+      ) : h("p", { className: "muted" }, providerSetup === null ? "Your operator needs to enable GitHub App setup for this Capykit deployment. Once enabled, they can create the app here and you can connect selected repositories." : "Only this deployment’s designated operator can set up the GitHub App. Ask them to open Connections and complete setup, then refresh to connect your repositories."),
+    ),
     setup === null ? null : h("section", { className: "panel connection-setup", "aria-label": "Review GitHub connection" },
       h("h2", null, "Review repository access"),
       h("p", { className: "muted small" }, `This setup expires ${new Date(setup.expiresAt).toLocaleString()}. Capykit checks your administrator access again when you confirm.`),
@@ -241,7 +286,7 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
         h("div", { className: "actions" }, h("button", { type: "submit", disabled: disabled || !consent || repositoryIds.length === 0 }, pending ? "Working…" : "Confirm connection"), h("button", { type: "button", className: "secondary", disabled, onClick: () => { void cancel(); } }, "Cancel setup")),
       ),
     ),
-    loading ? null : h("div", { className: "library-layout" },
+    loading || configured === null ? null : h("div", { className: "library-layout" },
       h("nav", { className: "panel library-nav", "aria-label": "Connections" }, h("h2", null, "Your connections"), connections.length === 0 ? h("p", { className: "muted small" }, "No GitHub connections yet.") : h("ul", { className: "capability-list" }, ...connections.map((connection) => h("li", { key: connection.id }, h("button", { type: "button", className: `capability-item${selected?.id === connection.id ? " active" : ""}`, "aria-pressed": selected?.id === connection.id, disabled, onClick: () => { void open(connection.id); } }, h("strong", null, connection.account?.login ?? "GitHub setup"), h("span", { className: "small muted" }, statusLabels[connection.status])))))),
       selected === null ? h("section", { className: "panel empty-state" }, h("h2", null, "Repository access stays explicit"), h("p", { className: "muted" }, "Select a connection to review its repositories and status. Grants and function execution are the next steps after connecting GitHub.")) : h("section", { className: "panel connection-detail", "aria-label": "Connection details" },
         h("div", { className: "section-heading compact" }, h("h2", null, selected.account?.login ?? "GitHub setup"), h("span", { className: `status-badge${selected.status === "active" ? " connected" : ""}` }, statusLabels[selected.status])),

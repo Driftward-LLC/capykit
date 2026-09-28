@@ -12,13 +12,23 @@ import { createAuthGateway, type AuthGateway } from "./auth.js";
 import { ArtifactError } from "./artifacts.js";
 import { CapabilityError, CapabilityStore } from "./capabilities.js";
 import { Readable } from "node:stream";
-import { HostedAccessError } from "./workspace-access.js";
+import { authorizeWorkspace, HostedAccessError, requireWorkspaceOwner } from "./workspace-access.js";
 import { ConnectionError, ConnectionStore } from "./connections.js";
-import { GithubError, GithubProvider, loadGithubConfig, verifyGithubWebhook, type GithubConfig } from "./github.js";
+import { GithubError, GithubProvider, loadGithubConfig as loadEnvironmentGithubConfig, verifyGithubWebhook, type GithubConfig } from "./github.js";
+import { GithubSetup, loadGithubSetupOptions, readStoredGithubConfig } from "./github-setup.js";
 import { createWebhookIngress } from "./webhook-ingress.js";
 export { verifyArtifact } from "./artifacts.js";
 export { ConnectionStore } from "./connections.js";
-export { GithubProvider, loadGithubConfig } from "./github.js";
+export { GithubProvider } from "./github.js";
+
+/** Shared by API startup and the operator-only cleanup command. */
+export function loadGithubConfig(env: NodeJS.ProcessEnv = process.env, publicBaseUrl?: string): GithubConfig | undefined {
+  const base = publicBaseUrl ?? loadHostedConfig(env).publicBaseUrl;
+  const manual = loadEnvironmentGithubConfig(env, base);
+  const stored = env.CAPYKIT_GITHUB_CONFIG_FILE ? readStoredGithubConfig(env.CAPYKIT_GITHUB_CONFIG_FILE, base) : undefined;
+  if (manual && stored) throw new GithubError("CONFIGURATION_UNAVAILABLE", 503);
+  return manual ?? stored;
+}
 
 interface ServerDeps {
   readonly config?: HostedConfig;
@@ -27,6 +37,7 @@ interface ServerDeps {
   readonly consoleDirectory?: string;
   readonly githubConfig?: GithubConfig | undefined;
   readonly githubProvider?: GithubProvider | undefined;
+  readonly githubSetup?: GithubSetup | undefined;
 }
 
 function bearerToken(request: FastifyRequest, config: HostedConfig): string | undefined {
@@ -90,9 +101,11 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   const auth = deps.auth ?? createAuthGateway(config);
   const consoleDirectory = deps.consoleDirectory ?? fileURLToPath(new URL("./console/", import.meta.url));
   const publicOrigin = new URL(config.publicBaseUrl).origin;
-  const githubConfig = deps.githubConfig ?? loadGithubConfig({ ...process.env, CAPYKIT_PUBLIC_BASE_URL: config.publicBaseUrl });
-  const github = deps.githubProvider ?? (githubConfig === undefined ? undefined : new GithubProvider(githubConfig));
-  const connections = database === undefined ? undefined : new ConnectionStore(database.pool, github, githubConfig);
+  let githubConfig = deps.githubConfig ?? loadGithubConfig(process.env, config.publicBaseUrl);
+  let github = deps.githubProvider ?? (githubConfig === undefined ? undefined : new GithubProvider(githubConfig));
+  let connections = database === undefined ? undefined : new ConnectionStore(database.pool, github, githubConfig);
+  const setupOptions = deps.githubSetup === undefined ? loadGithubSetupOptions() : undefined;
+  const githubSetup = deps.githubSetup ?? (setupOptions === undefined ? undefined : new GithubSetup(setupOptions, config.publicBaseUrl));
   const app = Fastify({ logger: false, genReqId: () => randomUUID(), bodyLimit: 16 * 1024,
     requestTimeout: 120_000, connectionTimeout: 30_000, ajv: { customOptions: { removeAdditional: false } } });
   const capabilities = database === undefined ? undefined : new CapabilityStore(database.pool);
@@ -134,7 +147,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     return reply.code(ready ? 200 : 503).send({ status: ready ? "ready" : "unavailable", database: db.reason, missing });
   });
   async function serveConsole(_request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> {
-    reply.header("content-security-policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    reply.header("content-security-policy", `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'${githubSetup ? " https://github.com" : ""}`);
     reply.header("referrer-policy", "no-referrer");
     return reply.type("text/html").send(await readFile(join(consoleDirectory, "index.html")));
   }
@@ -144,6 +157,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   // initial cross-site GET. The console immediately removes code/state from its URL.
   app.get("/v1/connections/github/callback", serveConsole);
   app.get("/v1/connections/github/setup", serveConsole);
+  app.get("/v1/provider-setup/github/callback", serveConsole);
   app.get<{ Params: { file: string } }>("/assets/:file", async (request, reply) => {
     const { file } = request.params;
     if (!/^[a-zA-Z0-9_-]+\.(?:js|css)$/u.test(file)) return reply.code(404).send(stableError("NOT_FOUND", request.id));
@@ -257,11 +271,48 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     if (token === undefined) throw new Error("Missing authenticated session");
     return token;
   }
-  app.get("/v1/connections", authenticated, async (request) => ({
-    configured: github !== undefined,
-    installationUrl: github?.installationUrl() ?? null,
-    connections: await connectionStore().list(contextFor(request)),
-  }));
+  app.get("/v1/connections", authenticated, async (request) => {
+    const context = contextFor(request);
+    const records = await connectionStore().list(context);
+    return { configured: github !== undefined, installationUrl: github?.installationUrl() ?? null, connections: records,
+      setup: github === undefined && githubSetup ? { available: githubSetup.eligible(context), organization: githubSetup.options.organization } : null };
+  });
+  async function requireSetupOperator(context: AuthenticatedContext): Promise<void> {
+    if (!githubSetup || !database) throw new GithubError("CONFIGURATION_UNAVAILABLE", 503);
+    if (!githubSetup.eligible(context)) throw new HostedAccessError("FORBIDDEN", 403);
+    const client = await database.pool.connect();
+    try {
+      await client.query("begin");
+      requireWorkspaceOwner(await authorizeWorkspace(client, context));
+      await client.query("commit");
+    } catch (error) { await client.query("rollback"); throw error; }
+    finally { client.release(); }
+    if (github !== undefined) throw new GithubError("GITHUB_ALREADY_CONFIGURED", 409);
+  }
+  app.post("/v1/provider-setup/github/start", { ...authenticated,
+    schema: { body: { type: "object", additionalProperties: false, properties: {} } },
+  }, async (request) => {
+    const context = contextFor(request);
+    await requireSetupOperator(context);
+    if (!githubSetup) throw new Error("Missing GitHub setup");
+    return githubSetup.start(context, sessionFor(request));
+  });
+  app.post("/v1/provider-setup/github/callback", { ...authenticated,
+    schema: { body: { type: "object", additionalProperties: false, required: ["code", "state"], properties: {
+      code: { type: "string", minLength: 1, maxLength: 1024, pattern: "^[A-Za-z0-9_-]+$" },
+      state: { type: "string", pattern: "^[A-Za-z0-9_-]{43}$" },
+    } } },
+  }, async (request) => {
+    const context = contextFor(request);
+    await requireSetupOperator(context);
+    if (!githubSetup || !database) throw new Error("Missing GitHub setup");
+    const activated = await githubSetup.complete(context, sessionFor(request), request.body, () => requireSetupOperator(context));
+    // Publish all consumers together after validated credentials are durable.
+    githubConfig = activated;
+    github = new GithubProvider(activated);
+    connections = new ConnectionStore(database.pool, github, activated);
+    return { configured: true };
+  });
   app.get<{ Params: { id: string } }>("/v1/connections/:id", authenticated, async (request) => connectionStore().detail(contextFor(request), request.params.id));
   app.post("/v1/connections/github/start", authenticated, async (request) => connectionStore().start(contextFor(request), sessionFor(request), request.id, request.body));
   app.post("/v1/connections/github/callback", authenticated, async (request) => connectionStore().callback(contextFor(request), sessionFor(request), request.id, request.body));

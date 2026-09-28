@@ -23,6 +23,7 @@ COPY scripts/bootstrap-hosted-owner.mjs ./scripts/bootstrap-hosted-owner.mjs
 COPY scripts/provision-hosted-owner.mjs ./scripts/provision-hosted-owner.mjs
 COPY scripts/cleanup-hosted-connections.mjs ./scripts/cleanup-hosted-connections.mjs
 COPY scripts/migrations ./scripts/migrations
+RUN install -d -m 0700 -o node -g node /var/lib/capykit/providers
 USER node
 EXPOSE 3000 3001
 CMD ["node", "dist/hosted-api.js"]

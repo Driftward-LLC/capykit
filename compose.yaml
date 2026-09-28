@@ -29,6 +29,13 @@ services:
       DATABASE_URL: postgresql://capykit_api:${CAPYKIT_DB_PASSWORD:?Set a generated hex database password}@postgres:5432/capykit
       CAPYKIT_AUTH_URL: http://auth:9999
       CAPYKIT_PUBLIC_BASE_URL: ${CAPYKIT_PUBLIC_BASE_URL:?Set the exact HTTPS origin}
+      CAPYKIT_GITHUB_CONFIG_FILE: /var/lib/capykit/providers/github.json
+      CAPYKIT_GITHUB_SETUP_WORKSPACE_ID: ${CAPYKIT_GITHUB_SETUP_WORKSPACE_ID:-}
+      CAPYKIT_GITHUB_SETUP_PRINCIPAL_ID: ${CAPYKIT_GITHUB_SETUP_PRINCIPAL_ID:-}
+      CAPYKIT_GITHUB_SETUP_ORGANIZATION: ${CAPYKIT_GITHUB_SETUP_ORGANIZATION:-}
+      CAPYKIT_GITHUB_WEBHOOK_URL: ${CAPYKIT_GITHUB_WEBHOOK_URL:-}
+    volumes:
+      - provider-config:/var/lib/capykit/providers
     ports:
       - "127.0.0.1:${CAPYKIT_HTTP_PORT:-19121}:3000"
       - "127.0.0.1:${CAPYKIT_WEBHOOK_HTTP_PORT:-19123}:3001"
@@ -157,5 +164,6 @@ services:
     logging: *logging
 
 volumes:
+  provider-config:
   postgres-data:
   mailpit-data:

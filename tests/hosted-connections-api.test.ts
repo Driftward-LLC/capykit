@@ -9,6 +9,7 @@ import { createHostedServer } from "../src/hosted/server.js";
 import { createHostedDatabase } from "../src/hosted/db.js";
 import { loadHostedConfig } from "../src/hosted/config.js";
 import { GithubError, GithubProvider, type GithubConfig, type InstallationCandidate } from "../src/hosted/github.js";
+import { GithubSetup } from "../src/hosted/github-setup.js";
 import type { ConnectionRecord, PendingConnectionSetup } from "../src/hosted/connections.js";
 
 const databaseUrl = process.env.CAPYKIT_TEST_POSTGRES_URL;
@@ -29,7 +30,7 @@ describe.skipIf(databaseUrl === undefined)("GitHub connection HTTP and PostgreSQ
   const scoped = new URL(databaseUrl ?? "postgres://localhost/capykit_test");
   scoped.searchParams.set("options", `-c search_path=${schema},public -c role=${runtimeRole}`);
   const identities = new Map<string, { provider: "gotrue"; subject: string; email: string }>();
-  const workspaces = [randomUUID(), randomUUID()];
+  const workspaces = [randomUUID(), randomUUID()] as const;
   const apps: FastifyInstance[] = [];
   const github = new GithubProvider(githubConfig, vi.fn<typeof fetch>().mockRejectedValue(new Error("Live GitHub calls forbidden in HTTP tests")));
   const exchange = vi.spyOn(github, "exchange").mockResolvedValue({ accessToken: "USER_TOKEN_SENTINEL", refreshToken: "REFRESH_TOKEN_SENTINEL", expiresAt: new Date(Date.now() + 3600000).toISOString() });
@@ -42,16 +43,21 @@ describe.skipIf(databaseUrl === undefined)("GitHub connection HTTP and PostgreSQ
   let ownerPrincipal: string;
   let nextInstallation = 100;
 
-  function server(configured = true): FastifyInstance {
-    const database = createHostedDatabase(scoped.toString());
+  function server(configured = true, githubSetup?: GithubSetup, database = createHostedDatabase(scoped.toString())): FastifyInstance {
     if (!database) throw new Error("Missing disposable test database");
     const result = createHostedServer({ database, consoleDirectory: directory,
       config: loadHostedConfig({ DATABASE_URL: scoped.toString(), CAPYKIT_PUBLIC_BASE_URL: origin, CAPYKIT_AUTH_URL: "http://auth:9999" }),
       ...(configured ? { githubConfig, githubProvider: github } : {}),
+      ...(githubSetup ? { githubSetup } : {}),
       auth: { verifyBearer: (token) => Promise.resolve(identities.get(token)), verifyOtp: () => Promise.resolve(undefined), requestOtp: async () => {}, signOut: async () => {} },
     });
     apps.push(result);
     return result;
+  }
+  function setupService(): GithubSetup {
+    return new GithubSetup({ workspaceId: workspaces[0], principalId: ownerPrincipal, organization: "test-team",
+      webhookUrl: `${origin}/v1/webhooks/github`, configFile: join(directory, "github-setup.json") }, origin,
+    vi.fn<typeof fetch>().mockRejectedValue(new Error("Live GitHub calls forbidden in HTTP tests")));
   }
   beforeAll(async () => {
     directory = await mkdtemp(join(tmpdir(), "capykit-connections-api-"));
@@ -67,6 +73,7 @@ describe.skipIf(databaseUrl === undefined)("GitHub connection HTTP and PostgreSQ
       for (const [token, workspace, kind, role] of [
         ["owner", workspaces[0], "human", "owner"], ["member", workspaces[0], "human", "member"],
         ["agent", workspaces[0], "agent", "owner"], ["other-owner", workspaces[1], "human", "owner"],
+        ["same-workspace-owner", workspaces[0], "human", "owner"],
       ]) {
         if (!token) throw new Error("Invalid identity fixture");
         const id = randomUUID();
@@ -88,7 +95,7 @@ describe.skipIf(databaseUrl === undefined)("GitHub connection HTTP and PostgreSQ
     if (directory) await rm(directory, { recursive: true, force: true });
   });
   function noCredentials(body: string): void {
-    for (const secret of ["USER_TOKEN_SENTINEL", "REFRESH_TOKEN_SENTINEL", "CLIENT_SENTINEL", "PRIVATE_KEY_SENTINEL", "PROVIDER_DETAIL_SENTINEL"]) expect(body).not.toContain(secret);
+    for (const secret of ["USER_TOKEN_SENTINEL", "REFRESH_TOKEN_SENTINEL", "CLIENT_SENTINEL", "PRIVATE_KEY_SENTINEL", "PROVIDER_DETAIL_SENTINEL", githubConfig.webhookSecret, githubConfig.encryptionKey.toString("base64")]) expect(body).not.toContain(secret);
   }
   async function start(): Promise<Started> {
     const response = await app.inject({ method: "POST", url: "/v1/connections/github/start", headers: browserHeaders, payload: {} });
@@ -177,11 +184,178 @@ describe.skipIf(databaseUrl === undefined)("GitHub connection HTTP and PostgreSQ
     const unavailable = server(false);
     const listed = await unavailable.inject({ url: "/v1/connections", headers: ownerHeaders });
     expect(listed.statusCode).toBe(200);
-    expect(listed.json<{ configured: boolean; installationUrl: null }>()).toMatchObject({ configured: false, installationUrl: null });
+    expect(listed.json<{ configured: boolean; installationUrl: null; setup: null }>()).toMatchObject({ configured: false, installationUrl: null, setup: null });
     const start = await unavailable.inject({ method: "POST", url: "/v1/connections/github/start", headers: ownerHeaders, payload: {} });
     expect(start.statusCode).toBe(503);
     expect(start.json<{ error: { code: string } }>().error.code).toBe("CONFIGURATION_UNAVAILABLE");
+    for (const action of ["start", "callback"]) {
+      expect((await unavailable.inject({ method: "POST", url: `/v1/provider-setup/github/${action}`, headers: browserHeaders,
+        payload: action === "start" ? {} : { code: "MANIFEST_CODE_SENTINEL", state: "A".repeat(43) } })).statusCode).toBe(503);
+    }
     expect((await unavailable.inject({ method: "POST", url: "/v1/webhooks/github", payload: {} })).statusCode).toBe(503);
+  });
+
+  it("exposes only safe setup metadata for the designated owner and serves a static manifest callback", async () => {
+    const setup = setupService();
+    const completing = vi.spyOn(setup, "complete");
+    const unconfigured = server(false, setup);
+    const listed = await unconfigured.inject({ url: "/v1/connections", headers: browserHeaders });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json<{ configured: boolean; setup: unknown }>()).toMatchObject({ configured: false, setup: { available: true, organization: "test-team" } });
+    expect(listed.json<{ setup: unknown }>().setup).toEqual({ available: true, organization: "test-team" });
+    noCredentials(listed.body);
+    for (const token of ["other-owner", "same-workspace-owner"]) {
+      const ineligible = await unconfigured.inject({ url: "/v1/connections", headers: { authorization: `Bearer ${token}` } });
+      expect(ineligible.statusCode).toBe(200);
+      expect(ineligible.json<{ setup: unknown }>().setup).toEqual({ available: false, organization: "test-team" });
+      noCredentials(ineligible.body);
+    }
+    const configured = server(true, setup);
+    expect((await configured.inject({ url: "/v1/connections", headers: browserHeaders })).json<{ setup: unknown }>().setup).toBeNull();
+    const registration = await unconfigured.inject({ method: "POST", url: "/v1/provider-setup/github/start", headers: browserHeaders, payload: {} });
+    expect(registration.statusCode, registration.body).toBe(200);
+    expect(registration.json<{ manifest: { redirect_url: string } }>().manifest.redirect_url).toBe(`${origin}/v1/provider-setup/github/callback`);
+    noCredentials(registration.body);
+    const callback = await unconfigured.inject({ url: "/v1/provider-setup/github/callback?code=MANIFEST_CODE_SENTINEL&state=MANIFEST_STATE_SENTINEL", headers: { referer: "https://github.com/", "sec-fetch-site": "cross-site" } });
+    expect(callback.statusCode).toBe(200);
+    expect(callback.headers["content-type"]).toContain("text/html");
+    expect(callback.headers["cache-control"]).toBe("no-store");
+    expect(callback.headers["referrer-policy"]).toBe("no-referrer");
+    expect(callback.headers["content-security-policy"]).toContain("form-action 'self' https://github.com");
+    expect(callback.body).toBe((await unconfigured.inject({ url: "/" })).body);
+    expect(callback.body).not.toMatch(/MANIFEST_CODE_SENTINEL|MANIFEST_STATE_SENTINEL/u);
+    expect(completing).not.toHaveBeenCalled();
+  });
+
+  it("denies anonymous, member, agent and other owners before starting or completing provider setup", async () => {
+    const setup = setupService();
+    const starting = vi.spyOn(setup, "start");
+    const completing = vi.spyOn(setup, "complete");
+    const unconfigured = server(false, setup);
+    for (const token of [undefined, "member", "agent", "other-owner", "same-workspace-owner"]) {
+      for (const action of ["start", "callback"]) {
+        const denied = await unconfigured.inject({ method: "POST", url: `/v1/provider-setup/github/${action}`,
+          headers: token ? { authorization: `Bearer ${token}` } : {},
+          payload: action === "start" ? {} : { code: "MANIFEST_CODE_SENTINEL", state: "A".repeat(43) } });
+        expect(denied.statusCode, `${token ?? "anonymous"} ${action}: ${denied.body}`).toBe(token === undefined ? 401 : 403);
+        noCredentials(denied.body);
+      }
+    }
+    expect(starting).not.toHaveBeenCalled();
+    expect(completing).not.toHaveBeenCalled();
+  });
+
+  it("requires same-origin CSRF protection and strict bodies on both provider setup mutations", async () => {
+    const setup = setupService();
+    const starting = vi.spyOn(setup, "start");
+    const completing = vi.spyOn(setup, "complete");
+    const unconfigured = server(false, setup);
+    const callbackBody = { code: "MANIFEST_CODE_SENTINEL", state: "A".repeat(43) };
+    for (const action of ["start", "callback"]) {
+      for (const headers of [{ cookie, origin }, { cookie, origin: "https://evil.example", "x-csrf-token": "csrf-test" },
+        { cookie, "x-csrf-token": "csrf-test" }, { cookie, origin, "x-csrf-token": "wrong" }]) {
+        const denied = await unconfigured.inject({ method: "POST", url: `/v1/provider-setup/github/${action}`, headers, payload: action === "start" ? {} : callbackBody });
+        expect(denied.statusCode).toBe(403);
+        expect(denied.json<{ error: { code: string } }>().error.code).toBe("CSRF_REQUIRED");
+      }
+    }
+    for (const payload of [{ organization: "attacker" }, { configFile: "/tmp/attacker.json" }]) {
+      expect((await unconfigured.inject({ method: "POST", url: "/v1/provider-setup/github/start", headers: browserHeaders, payload })).statusCode).toBe(400);
+    }
+    for (const payload of [{}, { ...callbackBody, code: "" }, { ...callbackBody, code: "A".repeat(1025) },
+      { ...callbackBody, state: "A".repeat(42) }, { ...callbackBody, state: "A".repeat(44) },
+      { ...callbackBody, state: "+".repeat(43) }, { ...callbackBody, clientSecret: "CLIENT_SENTINEL" }]) {
+      const denied = await unconfigured.inject({ method: "POST", url: "/v1/provider-setup/github/callback", headers: browserHeaders, payload });
+      expect(denied.statusCode, denied.body).toBe(400);
+      noCredentials(denied.body);
+    }
+    expect(starting).not.toHaveBeenCalled();
+    expect(completing).not.toHaveBeenCalled();
+  });
+
+  it("rereads setup authority from PostgreSQL after identity resolution for both mutations", async () => {
+    const database = createHostedDatabase(scoped.toString());
+    const identity = identities.get("owner");
+    if (!database || !identity) throw new Error("Missing database or owner fixture");
+    const context = await database.resolveContext(identity);
+    if (!context) throw new Error("Missing owner context");
+    vi.spyOn(database, "resolveContext").mockResolvedValue(context);
+    const setup = setupService();
+    const starting = vi.spyOn(setup, "start");
+    const completing = vi.spyOn(setup, "complete");
+    const unconfigured = server(false, setup, database);
+    for (const [role, active, expected] of [["member", true, 403], ["owner", false, 401]] as const) {
+      await admin.query(`update ${schema}.workspace_memberships set role=$2, active=$3 where principal_id=$1`, [ownerPrincipal, role, active]);
+      try {
+        for (const action of ["start", "callback"]) {
+          const denied = await unconfigured.inject({ method: "POST", url: `/v1/provider-setup/github/${action}`, headers: browserHeaders,
+            payload: action === "start" ? {} : { code: "MANIFEST_CODE_SENTINEL", state: "A".repeat(43) } });
+          expect(denied.statusCode, denied.body).toBe(expected);
+        }
+      } finally { await admin.query(`update ${schema}.workspace_memberships set role='owner', active=true where principal_id=$1`, [ownerPrincipal]); }
+    }
+    expect(starting).not.toHaveBeenCalled();
+    expect(completing).not.toHaveBeenCalled();
+  });
+
+  it("reauthorizes setup after provider conversion before activating the returned credentials", async () => {
+    const setup = setupService();
+    vi.spyOn(setup, "complete").mockImplementation(async (_context, _session, _body, authorize) => {
+      await admin.query(`update ${schema}.workspace_memberships set active=false where principal_id=$1`, [ownerPrincipal]);
+      await authorize();
+      return githubConfig;
+    });
+    const unconfigured = server(false, setup);
+    try {
+      const denied = await unconfigured.inject({ method: "POST", url: "/v1/provider-setup/github/callback", headers: browserHeaders,
+        payload: { code: "MANIFEST_CODE_SENTINEL", state: "A".repeat(43) } });
+      expect(denied.statusCode, denied.body).toBe(401);
+      noCredentials(denied.body);
+    } finally { await admin.query(`update ${schema}.workspace_memberships set active=true where principal_id=$1`, [ownerPrincipal]); }
+    expect((await unconfigured.inject({ url: "/v1/connections", headers: browserHeaders })).json<{ configured: boolean }>().configured).toBe(false);
+  });
+
+  it("activates connection operations and webhook verification after setup without exposing credentials", async () => {
+    const connected = await activeConnection();
+    const setup = setupService();
+    const registration = { registrationUrl: "https://github.com/organizations/test-team/settings/apps/new?state=TEST_STATE", manifest: { name: "Capykit", public: false } };
+    const starting = vi.spyOn(setup, "start").mockReturnValue(registration);
+    const completing = vi.spyOn(setup, "complete").mockImplementation(async (_context, _session, _body, authorize) => { await authorize(); return githubConfig; });
+    const unconfigured = server(false, setup);
+    const started = await unconfigured.inject({ method: "POST", url: "/v1/provider-setup/github/start", headers: browserHeaders, payload: {} });
+    expect(started.statusCode, started.body).toBe(200);
+    expect(started.json()).toEqual(registration);
+    expect(starting).toHaveBeenCalledTimes(1);
+    expect(starting.mock.calls[0]?.[0].membership).toMatchObject({ principalId: ownerPrincipal, workspaceId: workspaces[0] });
+    expect(starting.mock.calls[0]?.[1]).toBe("owner");
+    noCredentials(started.body);
+    const body = { code: "MANIFEST_CODE_SENTINEL", state: "A".repeat(43) };
+    const completed = await unconfigured.inject({ method: "POST", url: "/v1/provider-setup/github/callback", headers: browserHeaders, payload: body });
+    expect(completed.statusCode, completed.body).toBe(200);
+    expect(completing).toHaveBeenCalledTimes(1);
+    expect(completing.mock.calls[0]?.[0].membership.principalId).toBe(ownerPrincipal);
+    expect(completing.mock.calls[0]?.slice(1, 3)).toEqual(["owner", body]);
+    expect(typeof completing.mock.calls[0]?.[3]).toBe("function");
+    noCredentials(completed.body);
+    expect(completed.body).not.toContain("MANIFEST_CODE_SENTINEL");
+    const listed = await unconfigured.inject({ url: "/v1/connections", headers: browserHeaders });
+    expect(listed.json<{ configured: boolean; installationUrl: string; setup: null }>()).toMatchObject({ configured: true, installationUrl: github.installationUrl(), setup: null });
+    noCredentials(listed.body);
+    for (const action of ["start", "callback"]) {
+      expect((await unconfigured.inject({ method: "POST", url: `/v1/provider-setup/github/${action}`, headers: browserHeaders,
+        payload: action === "start" ? {} : body })).statusCode).toBe(409);
+    }
+    expect(starting).toHaveBeenCalledTimes(1);
+    expect(completing).toHaveBeenCalledTimes(1);
+    const connect = await unconfigured.inject({ method: "POST", url: "/v1/connections/github/start", headers: browserHeaders, payload: {} });
+    expect(connect.statusCode, connect.body).toBe(200);
+    noCredentials(connect.body);
+    const raw = JSON.stringify({ action: "suspend", installation: { id: Number(connected.installationId) } });
+    const webhook = await unconfigured.inject({ method: "POST", url: "/v1/webhooks/github", payload: raw,
+      headers: { "content-type": "application/json", "x-github-event": "installation", "x-github-delivery": randomUUID(),
+        "x-hub-signature-256": `sha256=${createHmac("sha256", githubConfig.webhookSecret).update(raw).digest("hex")}` } });
+    expect(webhook.statusCode, webhook.body).toBe(202);
+    expect((await unconfigured.inject({ url: `/v1/connections/${connected.id}`, headers: browserHeaders })).json<ConnectionRecord>().status).toBe("suspended");
   });
 
   it("authenticates exact raw webhook bytes, validates headers/JSON and preserves normal API JSON parsing", async () => {

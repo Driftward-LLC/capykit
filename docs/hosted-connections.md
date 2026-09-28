@@ -5,7 +5,59 @@ GitHub App, select repositories, and explicitly consent to future delegated use.
 Publishing a capability or connecting a repository creates no execution grant.
 Recipient grants and execution remain ENG-124 and ENG-125.
 
-## Register the pilot App
+## Set up GitHub inside Capykit
+
+For a new deployment, the configured platform operator can choose **Connections
+→ Set up GitHub**. GitHub asks that organization's App administrator to approve
+the registration. The browser returns to Capykit, which exchanges the temporary
+code on the server, checks the App identity, permissions and webhook settings,
+and saves the credentials without exposing them to the browser. Then install
+the App on selected repositories and complete the existing authorization flow.
+
+Enable this bootstrap with these nonsecret deployment settings:
+
+| Variable | Value |
+| --- | --- |
+| `CAPYKIT_GITHUB_SETUP_WORKSPACE_ID` | Existing operator workspace UUID |
+| `CAPYKIT_GITHUB_SETUP_PRINCIPAL_ID` | Existing operator human principal UUID |
+| `CAPYKIT_GITHUB_SETUP_ORGANIZATION` | GitHub organization login |
+| `CAPYKIT_GITHUB_WEBHOOK_URL` | Public HTTPS webhook URL described below |
+| `CAPYKIT_GITHUB_CONFIG_FILE` | Absolute private configuration file path |
+
+Compose sets the last value to `/var/lib/capykit/providers/github.json` and
+mounts the app-only `provider-config` named volume. The image creates its
+directory as the runtime user with mode `0700`; the complete configuration file
+uses mode `0600`. This storage requires Unix ownership and permissions; use the
+Linux container on Windows hosts. Treat this volume as secret storage: it includes the App key,
+client/webhook secrets and the temporary-state encryption key. Back it up to
+protected storage with the database, and preserve it during image upgrades.
+Manual environment credentials and a stored configuration cannot coexist;
+startup rejects conflicts or corrupt stored credentials instead of enabling
+fresh registration over them. The API and cleanup command use the same loader.
+
+Only the exact configured operator, with current active human owner membership,
+can initiate or complete registration. Ordinary workspace ownership is not
+platform authority. Registration state is bound to that authenticated session,
+single-use and valid for ten minutes. This single-process pilot keeps at most
+one pending registration in memory; another start or an app restart invalidates
+the previous attempt. Once configuration is saved, bootstrap is disabled.
+
+The registration callback is `/v1/provider-setup/github/callback`, distinct
+from the repository authorization callback. Its static page strips code/state
+before identity requests and completes through a CSRF-protected same-origin
+POST. Only a public manifest leaves the browser. The
+[GitHub manifest flow](https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest)
+creates the private App with Issues-read and Metadata-read access.
+
+If GitHub creates the App but completion fails, Capykit does not activate it.
+Restart setup from Connections. An organization App administrator may need to
+remove the incomplete registration in GitHub's developer settings. An expired
+Capykit session also requires signing in and starting setup again. Successful
+registration does not itself connect repositories or grant execution access.
+If a storage error happened after the configuration file was published, preserve
+that file and restart the app first; startup can recover the saved configuration.
+
+## Manual registration alternative
 
 Use a dedicated private App owned by the account containing the pilot repository.
 For `Driftward-LLC/capykit`, register under the Driftward-LLC organization. Its
@@ -39,8 +91,8 @@ issue-content event subscriptions. See GitHub's
 [registration instructions](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app)
 and [webhook event reference](https://docs.github.com/en/webhooks/webhook-events-and-payloads).
 
-Manual registration needs no manifest-conversion callback. Capykit's callback is
-the workspace OAuth flow, not a GitHub App registration handshake.
+Manual registration needs no manifest-conversion callback; its callback URL
+remains the workspace OAuth flow.
 
 ## Protected backend configuration
 
@@ -98,7 +150,8 @@ does not add external alerting. Request logging is disabled on both listeners.
 
 ## Owner flow and authority
 
-1. Open **Connections**, install the App if needed, then authorize GitHub.
+1. Open **Connections**, set up GitHub if offered, install the App on selected
+   repositories, then authorize GitHub.
 2. Return to Capykit and review the verified installation and repositories where
    the current GitHub user has administrator permission.
 3. Select exact repositories and accept the delegation explanation. Capykit
@@ -152,6 +205,10 @@ For an existing installation, take and restore-test a protected backup, apply
 only migration 004 as the schema owner in a transaction with `ON_ERROR_STOP=1`,
 then deploy the application. Fresh volumes apply migrations 001–004 atomically.
 Keep the previous image and preserve added tables for application rollback.
+The in-app registration upgrade needs no further schema migration. Preserve the
+new provider configuration volume even when rolling back; images predating its
+loader cannot use registered credentials until the new image is restored or an
+operator securely configures the manual environment alternative.
 
 Run bounded maintenance using the same restricted database login and optional
 GitHub configuration as the app:
