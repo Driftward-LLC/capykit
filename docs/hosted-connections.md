@@ -58,6 +58,36 @@ registration does not itself connect repositories or grant execution access.
 If a storage error happened after the configuration file was published, preserve
 that file and restart the app first; startup can recover the saved configuration.
 
+## Connect repositories and recover setup
+
+The console separates three steps: choose repositories on GitHub, check GitHub
+access, and confirm the repositories for this workspace. App registration alone
+does not complete those steps. In GitHub installation settings, use **Only select
+repositories** and choose repositories where you have administrator access.
+
+An installation covering **All repositories** is not eligible for this preview.
+If this is why discovery has no candidates, authorization returns the safe
+`GITHUB_SELECTED_REPOSITORIES_REQUIRED` error instead of an unexplained empty
+picker. Temporary authorization credentials are revoked and discarded on that
+failure. Eligible selected-repository installations still work when another
+installation is ineligible; no access is broadened to resolve the error.
+
+Empty discovery shows recovery actions instead of a disabled account picker and
+confirmation form. Use **Manage GitHub access** to correct the installation, then
+**Check again** to run a fresh authorization on the same pending connection.
+Opening an unfinished connection offers **Resume setup**; the normal start action
+also reuses a sole unfinished connection. A refresh only reloads saved connection
+status and does not rediscover GitHub repositories. A single eligible GitHub
+account is selected automatically, but repositories and delegation consent still
+require explicit selection before confirmation.
+
+When several unfinished connections exist, choose one before resuming instead
+of creating another pending record. Repository review also offers **Check again**
+if its authorization has expired or failed. Canceling an already removed or
+expired setup clears the stale form without treating a missing setup as a new
+authorization. Reconnecting an approved connection still requires the warning
+that its existing access will pause until confirmation.
+
 ## Manual registration alternative
 
 Use a dedicated private App owned by the account containing the pilot repository.
