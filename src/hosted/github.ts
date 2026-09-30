@@ -215,11 +215,11 @@ export class GithubProvider {
   private async installation(installationId: string, discovery = false): Promise<Omit<InstallationCandidate, "repositories"> | undefined> {
     const entry = object((await this.request(`/app/installations/${id(installationId)}`, `Bearer ${this.appToken()}`)).value);
     if (id(entry.app_id) !== this.config.appId || id(entry.id) !== installationId) fail("GITHUB_INSTALLATION_INVALID", 403);
-    if (entry.suspended_at != null || entry.repository_selection === "all") {
+    if (entry.suspended_at != null || (!discovery && entry.repository_selection === "all")) {
       if (discovery) return undefined;
       fail("GITHUB_INSTALLATION_INVALID", 403);
     }
-    if (entry.repository_selection !== "selected") fail("GITHUB_INSTALLATION_INVALID", 403);
+    if (entry.repository_selection !== "selected" && entry.repository_selection !== "all") fail("GITHUB_INSTALLATION_INVALID", 403);
     const account = object(entry.account);
     if (!["User", "Organization"].includes(String(account.type))) fail("GITHUB_INSTALLATION_INVALID", 403);
     let approvedPermissions: InstallationCandidate["permissions"];
@@ -228,23 +228,33 @@ export class GithubProvider {
       if (discovery && error instanceof GithubError && error.code === "GITHUB_PERMISSION_MISMATCH") return undefined;
       throw error;
     }
-    return { installationId, account: { id: id(account.id), login: string(account.login), type: String(account.type) }, permissions: approvedPermissions };
+    const candidate = { installationId, account: { id: id(account.id), login: string(account.login), type: String(account.type) }, permissions: approvedPermissions };
+    if (entry.repository_selection === "all") fail("GITHUB_SELECTED_REPOSITORIES_REQUIRED", 409);
+    return candidate;
   }
   async candidates(accessToken: string): Promise<InstallationCandidate[]> {
     await this.user(accessToken);
     const installations = await this.pages("/user/installations", accessToken, "installations", MAX_DISCOVERY_INSTALLATIONS);
     const result: InstallationCandidate[] = [];
+    let selectedRepositoriesRequired = false;
     let remainingRepositories = MAX_DISCOVERY_REPOSITORIES;
     for (const value of installations) {
       const entry = object(value);
       if (id(entry.app_id) !== this.config.appId) fail("GITHUB_INSTALLATION_INVALID", 403);
-      const installation = await this.installation(id(entry.id), true);
+      let installation: Omit<InstallationCandidate, "repositories"> | undefined;
+      try { installation = await this.installation(id(entry.id), true); }
+      catch (error) {
+        if (!(error instanceof GithubError) || error.code !== "GITHUB_SELECTED_REPOSITORIES_REQUIRED") throw error;
+        selectedRepositoriesRequired = true;
+        continue;
+      }
       if (installation === undefined) continue;
       const repos = await this.pages(`/user/installations/${installation.installationId}/repositories`, accessToken, "repositories", remainingRepositories);
       remainingRepositories -= repos.length;
       const repositories = repos.map(repository).filter((repo) => repo.admin);
       if (repositories.length > 0) result.push({ ...installation, repositories });
     }
+    if (result.length === 0 && selectedRepositoriesRequired) fail("GITHUB_SELECTED_REPOSITORIES_REQUIRED", 409);
     return result;
   }
   async recheck(accessToken: string, installationId: string, expectedAccountId: string, selectedIds: string[]): Promise<InstallationCandidate> {

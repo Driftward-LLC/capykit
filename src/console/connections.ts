@@ -68,6 +68,7 @@ const errorMessages: Record<string, string> = {
   GITHUB_AUTHORIZATION_FAILED: "GitHub authorization could not be verified. Start a new authorization.",
   GITHUB_ACCESS_REVOKED: "GitHub access was revoked or is no longer available. Check the app installation and your repository permissions, then reconnect.",
   GITHUB_INSTALLATION_INVALID: "This installation is unavailable or does not meet the connection requirements. Use the Capykit GitHub App with selected repositories, then reconnect.",
+  GITHUB_SELECTED_REPOSITORIES_REQUIRED: "The Capykit GitHub App is installed for All repositories. In GitHub, change Repository access to Only select repositories, choose at least one repository, and save. Then return here and check GitHub access again.",
   GITHUB_PERMISSION_MISMATCH: "The GitHub App permissions do not match the required read access. Contact your workspace operator.",
   GITHUB_REPOSITORY_FORBIDDEN: "You no longer have administrator access to every selected repository. Start a new authorization and review the repositories.",
   GITHUB_RESULT_LIMIT: "This GitHub account has too many installations or repositories for this preview. Contact your workspace operator.",
@@ -111,6 +112,8 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const candidate = setup?.candidates.find((entry) => entry.installationId === installationId);
+  const unfinished = connections.filter((connection) => connection.consentAt === null && (connection.status === "pending" || connection.status === "reconnect_required"));
+  const resumable = unfinished.length === 1 ? unfinished[0] : undefined;
 
   async function checked(response: Response): Promise<Response> {
     if (response.status === 401) {
@@ -139,7 +142,7 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
   }
 
   function showSetup(value: Setup): void {
-    setSetup(value); setSelected(null); setInstallationId(""); setRepositoryIds([]); setConsent(false);
+    setSetup(value); setSelected(null); setInstallationId(value.candidates.length === 1 ? value.candidates[0]?.installationId ?? "" : ""); setRepositoryIds([]); setConsent(false);
     setupInUrl(value.setupId);
   }
 
@@ -205,7 +208,9 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
 
   async function start(connectionId?: string): Promise<void> {
     await run(async () => {
-      const response = await checked(await writeRequest("/v1/connections/github/start", "POST", connectionId === undefined ? {} : { connectionId }));
+      const existingId = connectionId ?? setup?.connectionId ?? resumable?.id;
+      if (existingId === undefined && unfinished.length > 1) throw new Error("Select an unfinished setup under Your connections, then choose Resume setup.");
+      const response = await checked(await writeRequest("/v1/connections/github/start", "POST", existingId === undefined ? {} : { connectionId: existingId }));
       const value = await response.json() as { authorizationUrl: string };
       const url = githubLink(value.authorizationUrl);
       if (url === undefined) throw new Error("GitHub authorization is unavailable. Contact your workspace operator.");
@@ -234,7 +239,9 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
   async function cancel(): Promise<void> {
     if (setup === null) return;
     await run(async () => {
-      await checked(await writeRequest(`/v1/connections/github/pending/${encodeURIComponent(setup.setupId)}`, "DELETE"));
+      const response = await writeRequest(`/v1/connections/github/pending/${encodeURIComponent(setup.setupId)}`, "DELETE");
+      // An expired or already-removed setup needs no further server cleanup.
+      if (response.status !== 404 && response.status !== 410) await checked(response);
       setSetup(null); setupInUrl(); setConsent(false); setRepositoryIds([]); setNotice("Setup canceled. No new repository access was approved.");
       await refresh();
     });
@@ -251,20 +258,26 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
 
   const disabled = pending || loading;
   const installLink = configured ? githubLink(installationUrl) : undefined;
+  const selectedUnfinished = selected !== null && selected.consentAt === null && (selected.status === "pending" || selected.status === "reconnect_required");
+  const manageAccess = installLink === undefined ? null : h("a", { className: "button-link secondary", href: installLink, target: "_blank", rel: "noopener noreferrer" }, "Manage GitHub access", h("span", { className: "small" }, " ↗"));
   return h("section", { className: "connections", "aria-label": "GitHub connections", "aria-busy": disabled },
     h("div", { className: "section-heading" },
       h("div", null, h("p", { className: "eyebrow" }, "Workspace connections"), h("h1", null, "Connect your repositories"), h("p", { className: "muted" }, "Choose where Capykit can read GitHub issues. Only workspace owners can manage these connections.")),
-      h("button", { type: "button", className: "secondary", disabled, onClick: () => { void run(refresh); } }, "Refresh"),
+      h("button", { type: "button", className: "secondary", disabled, onClick: () => { void run(refresh); } }, "Refresh connections"),
     ),
     error === "" ? null : h("p", { className: "message error", role: "alert" }, error),
     notice === "" ? null : h("p", { className: "message success", role: "status" }, notice),
     loading ? h("p", { className: "muted", role: "status" }, "Loading connections…") : configured === null ? h("section", { className: "panel connection-intro", "aria-label": "Connection status unavailable" },
       h("h2", null, "Could not load connection status"), h("p", { className: "muted" }, "Refresh to check whether GitHub is ready to connect."),
       h("button", { type: "button", disabled, onClick: () => { void run(refresh); } }, "Retry connection status"),
-    ) : configured ? h("section", { className: "panel connection-intro", "aria-label": "Connect GitHub" },
-      h("h2", null, "GitHub App"), h("p", { className: "muted" }, "Install the Capykit GitHub App on selected repositories, then authorize your GitHub account to verify administrator access. You will review the repositories before connecting."),
+    ) : configured ? setup !== null || selectedUnfinished ? null : h("section", { className: "panel connection-intro", "aria-label": "Connect GitHub" },
+      h("h2", null, resumable === undefined ? "Connect GitHub" : "Finish connecting GitHub"),
+      h("ol", { className: "connection-steps" },
+        h("li", null, h("h3", null, "Choose repositories on GitHub"), h("p", { className: "muted" }, "Install or configure the Capykit GitHub App. Choose Only select repositories, select repositories you administer, and save. All repositories is not supported in this preview."), manageAccess),
+        h("li", null, h("h3", null, "Check GitHub access"), h("p", { className: "muted" }, unfinished.length > 1 ? "Several setups are unfinished. Select one under Your connections below, then choose Resume setup. GitHub will verify your account before you review access in Capykit." : "Once you have saved your choices on GitHub, return here. GitHub will verify your account before you review access in Capykit."), unfinished.length > 1 ? null : h("button", { type: "button", disabled, onClick: () => { void start(); } }, pending ? "Opening GitHub…" : "Check GitHub access")),
+        h("li", null, h("h3", null, "Review and confirm in Capykit"), h("p", { className: "muted" }, "Choose which repositories this workspace may use. Nothing is connected until you confirm.")),
+      ),
       h("p", { className: "small muted" }, "Permissions: read issues and repository metadata. Publishing a function does not grant access to GitHub."),
-      h("div", { className: "actions" }, installLink === undefined ? null : h("a", { className: "button-link secondary", href: installLink, target: "_blank", rel: "noopener noreferrer" }, "Install on GitHub"), h("button", { type: "button", disabled: disabled || setup !== null, onClick: () => { void start(); } }, "Authorize GitHub")),
     ) : h("section", { className: "panel connection-intro", "aria-label": "GitHub setup required" },
       h("h2", null, "Set up GitHub"),
       providerSetup?.available === true ? h(React.Fragment, null,
@@ -274,26 +287,34 @@ export function Connections({ onSessionExpired }: { onSessionExpired: () => void
       ) : h("p", { className: "muted" }, providerSetup === null ? "Your operator needs to enable GitHub App setup for this Capykit deployment. Once enabled, they can create the app here and you can connect selected repositories." : "Only this deployment’s designated operator can set up the GitHub App. Ask them to open Connections and complete setup, then refresh to connect your repositories."),
     ),
     setup === null ? null : h("section", { className: "panel connection-setup", "aria-label": "Review GitHub connection" },
-      h("h2", null, "Review repository access"),
-      h("p", { className: "muted small" }, `This setup expires ${new Date(setup.expiresAt).toLocaleString()}. Capykit checks your administrator access again when you confirm.`),
-      setup.candidates.length === 0 ? h("p", null, "No eligible installations were found. Install the Capykit GitHub App on repositories you administer, then start a new authorization.") : null,
-      h("form", { onSubmit: (event) => { void confirm(event); } },
-        h("label", { htmlFor: "github-installation" }, "GitHub account", h("select", { id: "github-installation", value: installationId, disabled, required: true, onChange: (event: React.ChangeEvent<HTMLSelectElement>) => { setInstallationId(event.currentTarget.value); setRepositoryIds([]); setConsent(false); } }, h("option", { value: "" }, "Choose an installation"), ...setup.candidates.map((entry) => h("option", { key: entry.installationId, value: entry.installationId }, `${entry.account.login} (${entry.account.type})`)))),
+      h("p", { className: "eyebrow" }, setup.candidates.length === 0 ? "Step 2 of 3 · Check GitHub access" : "Step 3 of 3 · Confirm access"),
+      h("h2", null, setup.candidates.length === 0 ? "No repositories are ready to connect" : "Review repository access"),
+      setup.candidates.length === 0 ? h(React.Fragment, null,
+        h("p", null, "GitHub authorization succeeded, but no repositories you administer are available to Capykit. No connection has been approved."),
+        h("p", { className: "muted" }, "Open the GitHub App installation, choose Only select repositories, select at least one repository you administer, and save. If it already uses selected repositories, check that you authorized the GitHub account with administrator access."),
+        h("p", { className: "small muted" }, "Then return here and choose Check again. You will reauthorize GitHub so Capykit can fetch the updated repository list."),
+        h("div", { className: "actions" }, manageAccess, h("button", { type: "button", disabled, onClick: () => { void start(setup.connectionId); } }, pending ? "Opening GitHub…" : "Check again"), h("button", { type: "button", className: "text-button", disabled, onClick: () => { void cancel(); } }, "Cancel setup")),
+      ) : h("form", { onSubmit: (event) => { void confirm(event); } },
+        h("p", { className: "muted small" }, `This setup expires ${new Date(setup.expiresAt).toLocaleString()}. Capykit checks your administrator access again when you confirm.`),
+        setup.candidates.length === 1 ? h("p", null, h("strong", null, "GitHub account: "), candidate?.account.login) : h("label", { htmlFor: "github-installation" }, "GitHub account", h("select", { id: "github-installation", value: installationId, disabled, required: true, onChange: (event: React.ChangeEvent<HTMLSelectElement>) => { setInstallationId(event.currentTarget.value); setRepositoryIds([]); setConsent(false); } }, h("option", { value: "" }, "Choose a GitHub account"), ...setup.candidates.map((entry) => h("option", { key: entry.installationId, value: entry.installationId }, `${entry.account.login} (${entry.account.type})`)))),
         candidate === undefined ? null : h("fieldset", { className: "repository-picker", disabled }, h("legend", null, "Repositories"), candidate.repositories.length === 0 ? h("p", { className: "muted" }, "No repositories are available for this installation.") : null,
           ...candidate.repositories.map((repo) => h("label", { key: repo.id, className: "checkbox-label" }, h("input", { type: "checkbox", disabled: disabled || !repo.admin, checked: repositoryIds.includes(repo.id), onChange: (event) => { const checked = event.currentTarget.checked; setRepositoryIds((current) => checked ? [...current, repo.id] : current.filter((id) => id !== repo.id)); setConsent(false); } }), h("span", null, repo.fullName, !repo.admin ? h("span", { className: "muted small" }, " — administrator access required") : null))),
         ),
         h("label", { className: "checkbox-label connection-consent" }, h("input", { type: "checkbox", checked: consent, disabled: disabled || repositoryIds.length === 0, onChange: (event) => { setConsent(event.currentTarget.checked); } }), h("span", null, "I authorize the Capykit GitHub App to read issues and metadata from these repositories for this workspace. Humans and agents explicitly granted access may use this connection without their own GitHub repository access. Publishing a function does not grant provider access.")),
+        h("p", { className: "small muted", role: "status" }, repositoryIds.length === 0 ? "Select at least one repository to continue." : !consent ? "Review the access statement and check the box to confirm." : `${String(repositoryIds.length)} ${repositoryIds.length === 1 ? "repository" : "repositories"} selected. Ready to connect.`),
         h("div", { className: "actions" }, h("button", { type: "submit", disabled: disabled || !consent || repositoryIds.length === 0 }, pending ? "Working…" : "Confirm connection"), h("button", { type: "button", className: "secondary", disabled, onClick: () => { void cancel(); } }, "Cancel setup")),
+        h("p", { className: "small muted github-manage" }, "Missing repositories or setup expired? ", installLink === undefined ? null : h("a", { href: installLink, target: "_blank", rel: "noopener noreferrer" }, "Manage GitHub access"), " and check again to start a fresh review."),
+        h("button", { type: "button", className: "secondary", disabled, onClick: () => { void start(setup.connectionId); } }, "Check again"),
       ),
     ),
     loading || configured === null ? null : h("div", { className: "library-layout" },
       h("nav", { className: "panel library-nav", "aria-label": "Connections" }, h("h2", null, "Your connections"), connections.length === 0 ? h("p", { className: "muted small" }, "No GitHub connections yet.") : h("ul", { className: "capability-list" }, ...connections.map((connection) => h("li", { key: connection.id }, h("button", { type: "button", className: `capability-item${selected?.id === connection.id ? " active" : ""}`, "aria-pressed": selected?.id === connection.id, disabled, onClick: () => { void open(connection.id); } }, h("strong", null, connection.account?.login ?? "GitHub setup"), h("span", { className: "small muted" }, statusLabels[connection.status])))))),
       selected === null ? h("section", { className: "panel empty-state" }, h("h2", null, "Repository access stays explicit"), h("p", { className: "muted" }, "Select a connection to review its repositories and status. Grants and function execution are the next steps after connecting GitHub.")) : h("section", { className: "panel connection-detail", "aria-label": "Connection details" },
         h("div", { className: "section-heading compact" }, h("h2", null, selected.account?.login ?? "GitHub setup"), h("span", { className: `status-badge${selected.status === "active" ? " connected" : ""}` }, statusLabels[selected.status])),
-        h("p", { className: "muted" }, selected.status === "active" ? "This connection is ready for explicit access grants. Grants and execution are not available yet." : selected.status === "suspended" ? "This installation is suspended on GitHub. Resume it on GitHub and reconnect to verify access." : selected.status === "reconnect_required" ? "Repository access changed. Reconnect to verify the current repositories before this connection can be used." : selected.status === "revoked" ? "Capykit access is disabled for this connection." : "GitHub setup has not been confirmed."),
+        h("p", { className: "muted" }, selectedUnfinished ? "This setup is unfinished. On GitHub, choose Only select repositories and save your repository choices. Then resume setup to check access and confirm in Capykit." : selected.status === "active" ? "This connection is ready for explicit access grants. Grants and execution are not available yet." : selected.status === "suspended" ? "This installation is suspended on GitHub. Resume it on GitHub and reconnect to verify access." : selected.status === "reconnect_required" ? "Repository access changed. Reconnect to verify the current repositories before this connection can be used." : "Capykit access is disabled for this connection."),
         h("h3", null, "Selected repositories"), selected.repositories.length === 0 ? h("p", { className: "muted" }, "No repositories are approved.") : h("ul", { className: "repository-list" }, ...selected.repositories.map((repo) => h("li", { key: repo.id }, githubLink(repo.url) === undefined ? repo.fullName : h("a", { href: githubLink(repo.url), target: "_blank", rel: "noopener noreferrer" }, repo.fullName)))),
         h("dl", null, h("dt", null, "Permissions"), h("dd", null, "Issues: read · Metadata: read"), h("dt", null, "Approved"), h("dd", null, selected.consentAt === null ? "Not confirmed" : new Date(selected.consentAt).toLocaleString()), selected.consentByPrincipalId == null ? null : h(React.Fragment, null, h("dt", null, "Approved by"), h("dd", null, selected.consentByPrincipalId)), h("dt", null, "Updated"), h("dd", null, new Date(selected.updatedAt).toLocaleString())),
-        h("div", { className: "actions" }, configured ? h("button", { type: "button", className: "secondary", disabled: disabled || setup !== null, onClick: () => { setReconnecting(true); setDisconnecting(false); } }, selected.status === "active" ? "Review and reconnect" : "Reconnect") : null, selected.status === "revoked" ? null : h("button", { type: "button", className: "text-button danger-text", disabled, onClick: () => { setDisconnecting(true); setReconnecting(false); } }, "Disconnect")),
+        h("div", { className: "actions" }, selectedUnfinished ? manageAccess : null, configured ? h("button", { type: "button", className: "secondary", disabled: disabled || setup !== null, onClick: () => { if (selectedUnfinished) { void start(selected.id); } else { setReconnecting(true); setDisconnecting(false); } } }, selectedUnfinished ? "Resume setup" : selected.status === "active" ? "Review and reconnect" : "Reconnect") : null, selected.status === "revoked" ? null : h("button", { type: "button", className: "text-button danger-text", disabled, onClick: () => { setDisconnecting(true); setReconnecting(false); } }, "Disconnect")),
         reconnecting ? h("div", { className: "connection-confirm" }, h("p", null, "Starting a reconnect pauses use of this connection until you verify repository access and confirm again."), h("div", { className: "actions" }, h("button", { type: "button", disabled, onClick: () => { void start(selected.id); } }, "Continue to GitHub"), h("button", { type: "button", className: "secondary", disabled, onClick: () => { setReconnecting(false); } }, "Keep current connection"))) : null,
         disconnecting ? h("div", { className: "connection-confirm" }, h("p", null, "Disconnect this account from Capykit? Access stops immediately. The GitHub App stays installed until you uninstall it on GitHub."), h("div", { className: "actions" }, h("button", { type: "button", className: "danger", disabled, onClick: () => { void disconnect(); } }, "Confirm disconnect"), h("button", { type: "button", className: "secondary", disabled, onClick: () => { setDisconnecting(false); } }, "Cancel"))) : null,
         githubLink(selected.uninstallUrl) === undefined ? null : h("p", { className: "small github-manage" }, h("a", { href: githubLink(selected.uninstallUrl), target: "_blank", rel: "noopener noreferrer" }, "Manage or uninstall this app on GitHub")),

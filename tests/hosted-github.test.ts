@@ -116,6 +116,34 @@ describe("GitHub owner verification and narrow tokens", () => {
       await expect(new GithubProvider(config, mockFetch(wrong)).mint("10", ["123"])).rejects.toBeInstanceOf(GithubError);
     }
   });
+  it("explains an otherwise eligible all-repositories installation without discovering or granting its repositories", async () => {
+    const all = { ...installation, repository_selection: "all" };
+    const fetcher = mockFetch(user, { installations: [all] }, all);
+    await expect(new GithubProvider(config, fetcher).candidates("user-token")).rejects.toMatchObject({ code: "GITHUB_SELECTED_REPOSITORIES_REQUIRED", statusCode: 409 });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    await expect(new GithubProvider(config, mockFetch(user, { installations: [all] }, all)).recheck("user-token", "10", "20", ["123"])).rejects.toMatchObject({ code: "GITHUB_INSTALLATION_INVALID" });
+    const mint = mockFetch(all);
+    await expect(new GithubProvider(config, mint).mint("10", ["123"])).rejects.toMatchObject({ code: "GITHUB_INSTALLATION_INVALID" });
+    expect(mint).toHaveBeenCalledTimes(1);
+  });
+  it("keeps empty discovery generic when installation selection is not the blocker", async () => {
+    await expect(new GithubProvider(config, mockFetch(user, { installations: [] })).candidates("user-token")).resolves.toEqual([]);
+    for (const wrong of [
+      { ...installation, repository_selection: "all", suspended_at: "2026-01-01T00:00:00Z" },
+      { ...installation, repository_selection: "all", permissions: { issues: "write", metadata: "read" } },
+    ]) {
+      await expect(new GithubProvider(config, mockFetch(user, { installations: [wrong] }, wrong)).candidates("user-token")).resolves.toEqual([]);
+    }
+    await expect(new GithubProvider(config, mockFetch(user, { installations: [installation] }, installation, { repositories: [{ ...repo, permissions: { admin: false } }] })).candidates("user-token")).resolves.toEqual([]);
+  });
+  it("does not replace later provider failures with the all-repositories recovery hint", async () => {
+    const all = { ...installation, repository_selection: "all" };
+    const next = { ...installation, id: 11 };
+    for (const status of [403, 429, 500]) {
+      const fetcher = mockFetch(user, { installations: [all, next] }, all, new Response(null, { status }));
+      await expect(new GithubProvider(config, fetcher).candidates("user-token")).rejects.toMatchObject({ code: status === 429 ? "GITHUB_RATE_LIMITED" : status === 500 ? "GITHUB_UNAVAILABLE" : "GITHUB_ACCESS_REVOKED" });
+    }
+  });
   it("does not hide wrong-app, malformed, authentication or network discovery failures", async () => {
     for (const wrong of [{ ...installation, app_id: 43 }, { ...installation, repository_selection: "unexpected" }, { ...installation, permissions: null }]) {
       await expect(new GithubProvider(config, mockFetch(user, { installations: [installation] }, wrong)).candidates("user-token")).rejects.toBeInstanceOf(GithubError);

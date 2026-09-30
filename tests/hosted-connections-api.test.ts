@@ -391,4 +391,29 @@ describe.skipIf(databaseUrl === undefined)("GitHub connection HTTP and PostgreSQ
     expect(replay.statusCode).toBe(400);
     expect(replay.json<{ error: { code: string } }>().error.code).toBe("CONNECT_STATE_INVALID");
   });
+
+  it.each([false, true])("returns the selected-repositories recovery code and removes temporary authority even if remote cleanup fails: %s", async (cleanupFails) => {
+    const started = await start();
+    const state = new URL(started.authorizationUrl).searchParams.get("state");
+    const error = new GithubError("GITHUB_SELECTED_REPOSITORIES_REQUIRED", 409);
+    error.message = "PROVIDER_DETAIL_SENTINEL USER_TOKEN_SENTINEL";
+    candidates.mockRejectedValueOnce(error);
+    const previousRevocations = revoke.mock.calls.length;
+    if (cleanupFails) revoke.mockRejectedValueOnce(new Error("PROVIDER_DETAIL_SENTINEL"));
+    const payload = { code: "TEST_AUTHORIZATION_CODE", state };
+    const failed = await app.inject({ method: "POST", url: "/v1/connections/github/callback", headers: browserHeaders, payload });
+    expect(failed.statusCode, failed.body).toBe(409);
+    expect(failed.json<{ error: { code: string; requestId: string } }>().error).toEqual({ code: "GITHUB_SELECTED_REPOSITORIES_REQUIRED", requestId: failed.headers["x-request-id"] });
+    noCredentials(failed.body);
+    expect(revoke.mock.calls.length).toBe(previousRevocations + 1);
+    expect(revoke).toHaveBeenLastCalledWith("USER_TOKEN_SENTINEL");
+    expect((await admin.query(`select id from ${schema}.connection_setups where id=$1`, [started.setupId])).rows).toEqual([]);
+    const detail = await app.inject({ url: `/v1/connections/${started.connectionId}`, headers: browserHeaders });
+    expect(detail.json<ConnectionRecord>()).toMatchObject({ status: "reconnect_required", repositories: [] });
+    noCredentials(detail.body);
+    expect((await app.inject({ url: `/v1/connections/github/pending/${started.setupId}`, headers: browserHeaders })).statusCode).toBe(404);
+    const replay = await app.inject({ method: "POST", url: "/v1/connections/github/callback", headers: browserHeaders, payload });
+    expect(replay.statusCode).toBe(400);
+    expect(replay.json<{ error: { code: string } }>().error.code).toBe("CONNECT_STATE_INVALID");
+  });
 });
