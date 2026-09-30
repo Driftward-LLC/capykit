@@ -151,6 +151,17 @@ npm run check
 node dist/cli.js --help
 ```
 
+### Focused checks
+
+Use the focused scripts when you only need one validation slice: `npm run lint`
+for ESLint, `npm run typecheck` for strict TypeScript checking, `npm test` for
+Vitest, `npm run build` for distributable artifacts, `npm run test:package` to
+verify the built package contents, `npm run check:schema` for registry and
+security policy schema contracts, and `npm run check:secrets` for public
+repository safety checks. Run `npm run build` before `npm run test:package`
+because the package test reads build artifacts. `npm run check` remains the
+complete local validation gate.
+
 CI runs lint, strict type checking, tests, builds, schema validation, and public
 repository safety checks. Tagged releases rerun the suite before publishing the
 npm package with provenance. npm installation, standalone executable artifacts,
