@@ -99,10 +99,14 @@ a { color: #225c43; text-underline-offset: 3px; }
 .workspace-nav button.active { background: #e5eee0; color: #234c35; }
 .connection-intro, .connection-setup { margin-bottom: 24px; }
 .connection-intro p { max-width: 800px; }
-.connection-steps { padding-left: 24px; }
-.connection-steps li { padding-left: 8px; margin: 24px 0; }
-.connection-steps li::marker { color: #52735f; font-weight: 700; }
-.connection-steps h3 { margin-bottom: 6px; }
+.connection-progress { display: flex; flex-wrap: wrap; gap: 8px 24px; list-style: none; padding: 0; margin: 0 0 24px; color: #59685f; font-size: .8rem; }
+.connection-progress .current { color: #192d29; font-weight: 700; border-bottom: 2px solid #185740; padding-bottom: 4px; }
+.connection-progress .complete { color: #2e6236; }
+.connection-help { margin-top: 24px; }
+.connection-help p { margin-top: 12px; }
+.connection-permissions { margin-top: 16px; }
+.connection-back { margin-bottom: 20px; }
+.connection-list-only { grid-template-columns: minmax(0, 1fr); }
 .button-link { display: inline-block; border: 1px solid #cbd5cd; border-radius: 8px; padding: 10px 16px; font-weight: 600; text-decoration: none; color: #29463b; background: #fff; }
 .button-link:hover { background: #eff4ef; }
 .connection-setup form { max-width: 800px; }
@@ -112,6 +116,7 @@ a { color: #225c43; text-underline-offset: 3px; }
 .checkbox-label { display: flex; align-items: flex-start; gap: 12px; font-weight: 400; margin: 12px 0; overflow-wrap: anywhere; }
 .checkbox-label input { flex: 0 0 auto; margin: 2px 0 0; }
 .connection-consent { padding: 16px; background: #f3f6ef; border-radius: 8px; }
+.connection-consent .checkbox-label { margin-top: 0; }
 .repository-list { padding-left: 20px; font-size: .875rem; overflow-wrap: anywhere; }
 .repository-list li { margin: 8px 0; }
 .status-badge.connected { background: #e8f4e4; color: #2e6236; }
