@@ -60,10 +60,17 @@ that file and restart the app first; startup can recover the saved configuration
 
 ## Connect repositories and recover setup
 
-The console separates three steps: choose repositories on GitHub, check GitHub
-access, and confirm the repositories for this workspace. App registration alone
-does not complete those steps. In GitHub installation settings, use **Only select
-repositories** and choose repositories where you have administrator access.
+The console guides the owner through GitHub verification and workspace approval.
+Choose **Continue with GitHub**, authorize the account, then return to choose
+repositories and approve access for this workspace. App installation help is
+available when needed; registration alone does not complete a connection. In
+GitHub installation settings, use **Only select repositories** and choose
+repositories where you have administrator access.
+
+During the return from GitHub, the console checks the existing session without
+showing sign-in inputs. An unavailable session check offers a retry; a confirmed
+missing session requires sign-in and a new authorization. The verification step
+keeps progress visible until the repository review is ready.
 
 An installation covering **All repositories** is not eligible for this preview.
 If this is why discovery has no candidates, authorization returns the safe
@@ -74,16 +81,19 @@ installation is ineligible; no access is broadened to resolve the error.
 
 Empty discovery shows recovery actions instead of a disabled account picker and
 confirmation form. Use **Manage GitHub access** to correct the installation, then
-**Check again** to run a fresh authorization on the same pending connection.
-Opening an unfinished connection offers **Resume setup**; the normal start action
-also reuses a sole unfinished connection. A refresh only reloads saved connection
+**Continue with GitHub** to run a fresh authorization on the same pending connection.
+An unfinished connection is labeled **Setup unfinished**; **Finish setup** uses
+the same primary GitHub action. The normal start action also reuses a sole unfinished
+connection. A refresh only reloads saved connection
 status and does not rediscover GitHub repositories. A single eligible GitHub
 account is selected automatically, but repositories and delegation consent still
-require explicit selection before confirmation.
+require explicit selection before confirmation. Selection instructions precede
+the repository list, with a selected count and permission summary. Recovery
+controls remain available under **Missing a repository?** during review.
 
 When several unfinished connections exist, choose one before resuming instead
-of creating another pending record. Repository review also offers **Check again**
-if its authorization has expired or failed. Canceling an already removed or
+of creating another pending record. Expired repository review offers **Continue
+with GitHub** for a fresh authorization. Canceling an already removed or
 expired setup clears the stale form without treating a missing setup as a new
 authorization. Reconnecting an approved connection still requires the warning
 that its existing access will pause until confirmation.
@@ -259,6 +269,21 @@ so remove those orphaned authorizations on GitHub. Backups retain historical
 encrypted data until separately expired; reconcile revocations before a restore.
 
 Set `CAPYKIT_TEST_POSTGRES_URL` to a disposable database and run `npm run check`.
+To run the console regression checks after building, use an existing Playwright
+installation with Chromium installed:
+
+```sh
+CAPYKIT_PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs \
+  node scripts/test-console-flow.mjs
+```
+
+This standalone harness intercepts every browser request with test fixtures. It
+checks session loading and retry, callback ownership, connection recovery,
+explicit repository selection and consent, keyboard focus, and mobile layout.
+It reads `dist/console` by default and writes screenshots and a JSON report under
+the system temporary directory. `CAPYKIT_CONSOLE_DIR` and
+`CAPYKIT_BROWSER_ARTIFACT_PREFIX` override those paths.
+
 Provider mocks prove request scoping and error behavior; real PostgreSQL/HTTP
 tests prove transaction, identity, RLS, replay, and lifecycle behavior. Browser
 tests with mocked APIs prove the UI, not GitHub acceptance. ENG-123's real-provider
