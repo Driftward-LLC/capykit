@@ -139,6 +139,10 @@ and the complete setup flow. Profile commands are currently unreleased.
 
 ## Development
 
+The web console is mobile first. Apply the
+[phone acceptance criteria](docs/mobile-first.md) to every UI change before
+expanding the layout for desktop use.
+
 The TypeScript application has explicit boundaries under `src/`: `core` owns
 catalog behavior, `cli` owns the `capykit` command, `mcp` owns the read-only
 `capykit-mcp` server, and `schemas` exposes the versioned registry contract.
