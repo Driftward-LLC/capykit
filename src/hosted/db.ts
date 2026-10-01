@@ -45,6 +45,7 @@ export function createHostedDatabase(databaseUrl: string | undefined): HostedDat
                             left join connection_webhook_deliveries d on false
                             left join connection_installation_events e on e.installation_id = c.installation_id
                            limit 0`);
+        await pool.query("select g.id, a.action from capability_grants g left join grant_audit a on a.workspace_id = g.workspace_id and a.grant_id = g.id limit 0");
         return { status: "ready", reason: "ok" };
       } catch {
         return { status: "unavailable", reason: "connection_failed" };

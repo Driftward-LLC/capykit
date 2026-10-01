@@ -17,6 +17,7 @@ import { ConnectionError, ConnectionStore } from "./connections.js";
 import { GithubError, GithubProvider, loadGithubConfig as loadEnvironmentGithubConfig, verifyGithubWebhook, type GithubConfig } from "./github.js";
 import { GithubSetup, loadGithubSetupOptions, readStoredGithubConfig } from "./github-setup.js";
 import { createWebhookIngress } from "./webhook-ingress.js";
+import { GrantError, GrantStore } from "./grants.js";
 export { verifyArtifact } from "./artifacts.js";
 export { ConnectionStore } from "./connections.js";
 export { GithubProvider } from "./github.js";
@@ -112,6 +113,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   const githubSetup = deps.githubSetup ?? (setupOptions === undefined ? undefined : new GithubSetup(setupOptions, config.publicBaseUrl));
   const app = Fastify({ logger: false, genReqId: () => randomUUID(), bodyLimit: 16 * 1024,
     requestTimeout: 120_000, connectionTimeout: 30_000, ajv: { customOptions: { removeAdditional: false } } });
+  const grants = database === undefined ? undefined : new GrantStore(database.pool);
   const capabilities = database === undefined ? undefined : new CapabilityStore(database.pool);
   const contexts = new WeakMap<FastifyRequest, AuthenticatedContext>();
   // ponytail: one artifact transfer per API process bounds memory for 32 MiB bundles;
@@ -123,7 +125,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     reply.header("x-request-id", request.id).header("cache-control", "no-store").header("x-content-type-options", "nosniff");
   });
   app.setErrorHandler((error, request, reply) => {
-    if (error instanceof ArtifactError || error instanceof CapabilityError || error instanceof HostedAccessError || error instanceof ConnectionError || error instanceof GithubError || error instanceof AuthUnavailableError) {
+    if (error instanceof ArtifactError || error instanceof CapabilityError || error instanceof GrantError || error instanceof HostedAccessError || error instanceof ConnectionError || error instanceof GithubError || error instanceof AuthUnavailableError) {
       return reply.code(error.statusCode).send(stableError(error.code as StableErrorCode, request.id));
     }
     const status = error instanceof Error && "statusCode" in error && typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
@@ -256,6 +258,19 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     return capabilities;
   }
   const authenticated = { onRequest: requireIdentity };
+  function grantStore(): GrantStore {
+    if (!grants) throw new Error("Missing grant database");
+    return grants;
+  }
+  app.get("/v1/access/options", authenticated, async request => grantStore().options(contextFor(request)));
+  app.get<{ Querystring: { cursor?: string } }>("/v1/grants", { ...authenticated,
+    schema: { querystring: { type: "object", additionalProperties: false, properties: { cursor: { type: "string", maxLength: 36 } } } },
+  }, async request => grantStore().list(contextFor(request), request.query.cursor));
+  app.post("/v1/grants", authenticated, async (request, reply) => reply.code(201).send(await grantStore().create(contextFor(request), request.body)));
+  app.delete<{ Params: { id: string } }>("/v1/grants/:id", authenticated, async (request, reply) => {
+    await grantStore().revoke(contextFor(request), request.params.id);
+    return reply.code(204).send();
+  });
   app.get("/v1/capabilities", authenticated, async (request) => ({ capabilities: await capabilityStore().list(contextFor(request)) }));
   app.post("/v1/capabilities", authenticated, async (request, reply) => reply.code(201).send(await capabilityStore().create(contextFor(request), request.body)));
   app.get<{ Params: { id: string } }>("/v1/capabilities/:id", authenticated, async (request) => capabilityStore().detail(contextFor(request), request.params.id));

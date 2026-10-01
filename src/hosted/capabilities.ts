@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { artifactSummary, validateArtifact, verifyArtifact, type CapabilityKind, type ValidatedArtifact } from "./artifacts.js";
-import type { AuthenticatedContext } from "./identity.js";
+import { canManageWorkspace, type AuthenticatedContext } from "./identity.js";
 import { authorizeWorkspace, requireWorkspaceOwner } from "./workspace-access.js";
 
 export class CapabilityError extends Error {
@@ -47,12 +47,11 @@ function versionIdentifier(value: unknown): asserts value is string {
   if (typeof value !== "string" || !versionPattern.test(value)) throw new CapabilityError("INVALID_REQUEST", 400);
 }
 
-/** The single hosted artifact authorization seam. ENG-124 may add exact-version
- * recipient grants here; until then every content operation requires an owner. */
+/** Owners manage content; recipients read only currently granted published versions. */
 export class CapabilityStore {
   constructor(private readonly pool: Pool) {}
 
-  private async transaction<T>(context: AuthenticatedContext, id: string | undefined, run: (client: PoolClient, record?: CapabilityRecord) => Promise<T>): Promise<T> {
+  private async transaction<T>(context: AuthenticatedContext, id: string | undefined, run: (client: PoolClient, record?: CapabilityRecord) => Promise<T>, ownerOnly = true): Promise<T> {
     if (!context.membership.active) throw new CapabilityError("MEMBERSHIP_INACTIVE", 401);
     if (id !== undefined && !idPattern.test(id)) throw new CapabilityError("INVALID_REQUEST", 400);
     const client = await this.pool.connect();
@@ -68,8 +67,8 @@ export class CapabilityStore {
         )).rows[0];
         if (record === undefined) throw new CapabilityError("NOT_FOUND", 404);
       }
-      requireWorkspaceOwner(actor);
-      if (id !== undefined) {
+      if (ownerOnly || (canManageWorkspace(context.membership) && !canManageWorkspace(actor))) requireWorkspaceOwner(actor);
+      if (id !== undefined && canManageWorkspace(actor)) {
         // Serialize publication, replacement, deletion and downloads of one
         // capability. A delete committed first can never hand out its bytes.
         const locked = await client.query("select id from capabilities where workspace_id = $1 and id = $2 and deleted_at is null for update", [workspaceId, id]);
@@ -128,8 +127,8 @@ export class CapabilityStore {
   async list(context: AuthenticatedContext): Promise<CapabilityRecord[]> {
     return this.transaction(context, undefined, async (client) => (await client.query<CapabilityRecord>(
       `select id, slug, name, kind, created_at::text as "createdAt" from capabilities
-       where workspace_id = $1 and deleted_at is null order by created_at desc, id`, [context.membership.workspaceId],
-    )).rows);
+       where workspace_id = $1 and deleted_at is null and ($2::boolean or exists (select 1 from capability_versions v where v.workspace_id = capabilities.workspace_id and v.capability_id = capabilities.id and capability_granted_version(v.workspace_id,v.capability_id,v.version))) order by created_at desc, id limit 200`, [context.membership.workspaceId, canManageWorkspace(context.membership)],
+    )).rows, false);
   }
 
   async create(context: AuthenticatedContext, input: unknown): Promise<CapabilityDetail> {
@@ -149,7 +148,11 @@ export class CapabilityStore {
   }
 
   async detail(context: AuthenticatedContext, id: string): Promise<CapabilityDetail> {
-    return this.transaction(context, id, (client, record) => this.describe(client, context.membership.workspaceId, requireRecord(record)));
+    return this.transaction(context, id, async (client, record) => {
+      const detail = await this.describe(client, context.membership.workspaceId, requireRecord(record));
+      if (!canManageWorkspace(context.membership) && detail.versions.length === 0) throw new CapabilityError("FORBIDDEN", 403);
+      return detail;
+    }, false);
   }
 
   async saveDraft(context: AuthenticatedContext, id: string, input: unknown): Promise<CapabilityDetail> {
@@ -220,26 +223,28 @@ export class CapabilityStore {
   async download(context: AuthenticatedContext, id: string, version: string): Promise<CapabilityDownload> {
     versionIdentifier(version);
     return this.transaction(context, id, async (client, record) => {
+      if (!canManageWorkspace(context.membership) && requireRecord(record).kind !== "skill") throw new CapabilityError("FORBIDDEN", 403);
       const published = (await client.query<{ artifact_id: string }>(
         "select artifact_id from capability_versions where workspace_id = $1 and capability_id = $2 and version = $3", [context.membership.workspaceId, id, version],
       )).rows[0];
-      if (published === undefined) throw new CapabilityError("NOT_FOUND", 404);
+      if (published === undefined) throw new CapabilityError(canManageWorkspace(context.membership) ? "NOT_FOUND" : "FORBIDDEN", canManageWorkspace(context.membership) ? 404 : 403);
       const artifact = await this.readArtifact(client, context.membership.workspaceId, id, published.artifact_id);
       if (artifact.kind !== requireRecord(record).kind) throw new CapabilityError("ARTIFACT_CORRUPT", 500);
       return {
         format: "capykit.artifact.v1", capability: { id, slug: requireRecord(record).slug, name: requireRecord(record).name, kind: requireRecord(record).kind }, version, artifact,
         guidance: requireRecord(record).kind === "skill"
-          ? ["Decode every contentBase64 file to its relative path in a new directory; preserve executable flags where supported.", "Read SKILL.md before using supporting scripts. Retrieval does not execute any file.", "This exact version is an owner download. Publishing creates no execution or recipient grant."]
+          ? ["Decode every contentBase64 file to its relative path in a new directory; preserve executable flags where supported.", "Read SKILL.md before using supporting scripts. Retrieval does not execute any file.", "This exact-version download was authorized by current workspace access. Retrieval does not grant function invocation."]
           : ["index.mjs is stored with the reviewed github.issues.list.v1 contract.", "Execution requires the hosted runner and an explicit exact-version grant; publication does not execute code or grant provider access."],
       };
-    });
+    }, false);
   }
 
   async delete(context: AuthenticatedContext, id: string): Promise<void> {
     return this.transaction(context, id, async (client) => {
       const workspaceId = context.membership.workspaceId;
-      // All authorization paths reject this marker. ENG-124 must revoke any
-      // future grants in this same transaction before removing content.
+      // The deletion marker immediately denies all reads. Revoke recipient
+      // authority in the same transaction before removing content.
+      await client.query("update capability_grants set revoked_at = now() where workspace_id = $1 and capability_id = $2 and revoked_at is null", [workspaceId, id]);
       await client.query("update capabilities set deleted_at = now() where workspace_id = $1 and id = $2", [workspaceId, id]);
       const deletedArtifacts = await client.query<{ version: string; digest: string }>(
         `select v.version, a.digest from capability_versions v join capability_artifacts a

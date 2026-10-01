@@ -9,8 +9,9 @@ inside this deployment, rather than depending on their hosted platform.
 This foundation provides invited-user sign-in and durable workspace identity.
 The [capability library](hosted-capabilities.md) adds complete skill/function
 artifacts and immutable versions. [GitHub connections](hosted-connections.md)
-provide the ENG-123 lifecycle; grants, execution, and run history remain
-ENG-124 through ENG-126. The worker executable is a
+provide the ENG-123 lifecycle; [user grants](hosted-access.md) add scoped access.
+Agent credentials, remote MCP, execution, and run history remain ENG-124 through
+ENG-126. The worker executable is a
 one-shot readiness check, not an execution queue consumer.
 
 ## Portable deployment
