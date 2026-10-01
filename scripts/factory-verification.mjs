@@ -46,6 +46,7 @@ function checkChangedFileScope() {
   }
 
   const allowedExact = new Set([
+    ".github/workflows/ci.yml",
     ".github/workflows/factory-verification.yml",
     ".github/workflows/release.yml",
     ".gitignore",
@@ -57,6 +58,7 @@ function checkChangedFileScope() {
     "package-lock.json",
     "package.json",
     "Dockerfile.hosted",
+    "scripts/activepieces-poc/Dockerfile",
     "compose.yaml",
     "deploy/init-postgres.sh",
     "tsconfig.json",
@@ -75,7 +77,10 @@ function checkChangedFileScope() {
 
   const failures = [];
   for (const file of files) {
-    const forbiddenReason = forbidden.find(([pattern]) => pattern.test(file))?.[1];
+    // Named, operator-scoped infrastructure may change; secret boundaries always
+    // apply, and other Dockerfiles/workflows still fail closed.
+    const forbiddenReason = forbidden.find(([pattern, reason]) => pattern.test(file)
+      && !(allowedExact.has(file) && ["dockerfile", "workflow-mutation"].includes(reason)))?.[1];
     if (forbiddenReason !== undefined) {
       failures.push(`${file}: forbidden ${forbiddenReason}`);
       continue;

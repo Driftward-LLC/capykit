@@ -6,6 +6,18 @@ on:
 permissions:
   contents: read
 jobs:
+  activepieces-poc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: scripts/activepieces-poc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: scripts/activepieces-poc/package-lock.json }
+      - run: npm ci --ignore-scripts
+      - run: npm test
   quality:
     strategy:
       matrix:
