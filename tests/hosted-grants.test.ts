@@ -142,6 +142,10 @@ describe.skipIf(!databaseUrl)("current exact-version user grants", () => {
     const options = await app.inject({url:"/v1/access/options",headers:{authorization:"Bearer owner"}}); expect(options.statusCode,options.body).toBe(200);
     const csrf = await app.inject({method:"POST",url:"/v1/grants",headers:{cookie:"capykit_session=owner",origin},payload:skillInput()}); expect(csrf.statusCode).toBe(403);
     expect((await app.inject({method:"POST",url:"/v1/grants",headers:{authorization:"Bearer member"},payload:skillInput()})).statusCode).toBe(403);
+    for (const invalidExpiry of ["2027-02-30T12:00:00Z", "0000-01-01T00:00:00Z"]) {
+      const invalidDate = await app.inject({method:"POST",url:"/v1/grants",headers:{authorization:"Bearer owner"},payload:{...skillInput(),expiresAt:invalidExpiry}});
+      expect(invalidDate.statusCode).toBe(400); expect(invalidDate.json<{error:{code:string}}>().error.code).toBe("INVALID_REQUEST");
+    }
     const created = await app.inject({method:"POST",url:"/v1/grants",headers:{authorization:"Bearer owner"},payload:skillInput()}); expect(created.statusCode,created.body).toBe(201);
     const g = created.json<{id:string}>();
     const url = `/v1/capabilities/${skill}/versions/1/download`;

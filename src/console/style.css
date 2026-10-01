@@ -93,7 +93,7 @@ dd { margin: 0; overflow-wrap: anywhere; }
 
 [hidden] { display: none !important; }
 a { color: #225c43; text-underline-offset: 3px; }
-.workspace-nav { display: flex; gap: 8px; margin: -16px 0 32px; border-bottom: 1px solid #dce3da; padding-bottom: 14px; }
+.workspace-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: -16px 0 32px; border-bottom: 1px solid #dce3da; padding-bottom: 14px; }
 .workspace-nav button { color: #52665a; background: transparent; border-color: transparent; }
 .workspace-nav button:hover { background: #eaf0e7; }
 .workspace-nav button.active { background: #e5eee0; color: #234c35; }

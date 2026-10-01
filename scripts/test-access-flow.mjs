@@ -70,6 +70,8 @@ try {
     assert.equal(posted.csrf, 'csrf-test'); const body = JSON.parse(posted.body);
     assert.deepEqual(body.repositoryIds, ['101']); assert.equal(body.version, '2.0.0'); assert.equal(body.connectionId, 'connection'); assert.match(body.expiresAt, /Z$/);
     assert.ok(await submit(page).isDisabled());
+    await page.getByText('GitHub account: example', { exact: true }).waitFor();
+    await page.getByRole('listitem').filter({ hasText: 'example/first' }).waitFor();
   });
   await check('skill grant excludes provider scope and revoke requires confirmation', {}, async ({ page, requests }) => {
     await select(page, 'skill'); assert.equal(await page.getByLabel('GitHub connection', { exact: true }).count(), 0);

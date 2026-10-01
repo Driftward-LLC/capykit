@@ -60,6 +60,10 @@ export class GrantStore {
     const body = input as Record<string, unknown>;
     id(body.recipientId); id(body.capabilityId);
     if (typeof body.version !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u.test(body.version) || typeof body.expiresAt !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/u.test(body.expiresAt) || !Number.isFinite(Date.parse(body.expiresAt))) throw new GrantError("INVALID_REQUEST", 400);
+    const canonicalExpiry = body.expiresAt.includes(".")
+      ? body.expiresAt.replace(/\.(\d{1,3})Z$/u, (_, fraction: string) => `.${fraction.padEnd(3, "0")}Z`)
+      : body.expiresAt.replace(/Z$/u, ".000Z");
+    if (Date.parse(body.expiresAt) <= Date.now() || new Date(body.expiresAt).toISOString() !== canonicalExpiry) throw new GrantError("INVALID_REQUEST", 400);
     return this.transaction(context, true, async client => {
       const workspace = context.membership.workspaceId;
       const recipient = await client.query(`select p.id from principals p join workspace_memberships m on m.workspace_id = p.workspace_id and m.principal_id = p.id join identity_bindings b on b.principal_id = p.id and b.verified_at is not null where p.workspace_id = $1 and p.id = $2 and p.kind = 'human' and p.active and m.active`, [workspace, body.recipientId]);
