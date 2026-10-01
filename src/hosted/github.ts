@@ -87,7 +87,7 @@ export function loadGithubConfig(env: NodeJS.ProcessEnv = process.env, publicBas
 }
 
 export interface SealedGithubState { version: string; nonce: string; tag: string; ciphertext: string }
-export function seal(config: GithubConfig, payload: unknown, aad: string): SealedGithubState {
+export function seal(config: Pick<GithubConfig, "encryptionKey" | "keyVersion">, payload: unknown, aad: string): SealedGithubState {
   const nonce = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", config.encryptionKey, nonce);
   cipher.setAAD(Buffer.from(JSON.stringify([config.keyVersion, aad])));
@@ -96,7 +96,7 @@ export function seal(config: GithubConfig, payload: unknown, aad: string): Seale
 }
 // The authenticated JSON envelope has its domain shape validated by the connection store.
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-export function unseal<T>(config: GithubConfig, encrypted: unknown, aad: string): T {
+export function unseal<T>(config: Pick<GithubConfig, "encryptionKey" | "keyVersion">, encrypted: unknown, aad: string): T {
   try {
     const entry = object(encrypted);
     if (Object.keys(entry).sort().join() !== "ciphertext,nonce,tag,version" || entry.version !== config.keyVersion) fail();

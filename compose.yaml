@@ -22,6 +22,8 @@ services:
     env_file:
       - path: ${CAPYKIT_GITHUB_ENV_FILE:-/etc/driftward/capykit-github.env}
         required: false
+      - path: ${CAPYKIT_GOOGLE_ENV_FILE:-/etc/driftward/capykit-google.env}
+        required: false
     environment:
       NODE_ENV: production
       PORT: "3000"

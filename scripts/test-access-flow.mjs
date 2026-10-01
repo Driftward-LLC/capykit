@@ -8,7 +8,7 @@ const origin = 'https://capykit.example.test';
 const options = { users: [{ id: 'user', name: 'Alex', email: 'alex@example.test', role: 'member' }], versions: [{ capabilityId: 'skill', name: 'Review guide', kind: 'skill', version: '1.0.0', operation: null }, { capabilityId: 'function', name: 'Read issues', kind: 'function', version: '2.0.0', operation: 'github.issues.list.v1' }], connections: [{ id: 'connection', name: 'example', repositories: [{ id: '101', name: 'example/first' }, { id: '102', name: 'example/second' }] }], truncated: false };
 const capability = { id: 'skill', name: 'Review guide', slug: 'review-guide', kind: 'skill', createdAt: '2026-01-01T00:00:00Z' };
 const detail = { ...capability, draft: null, versions: [{ version: '1.0.0', publishedAt: '2026-01-01T00:00:00Z', digest: 'sha256:fixture', fileCount: 1, byteCount: 100, contract: null, files: [{ path: 'SKILL.md', executable: false, byteLength: 100, sha256: 'fixture' }] }] };
-const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+const browser = await chromium.launch({ ...(process.env.CAPYKIT_CHROMIUM_PATH ? { executablePath: process.env.CAPYKIT_CHROMIUM_PATH } : {}), headless: true, args: ['--no-sandbox'] });
 const results = [];
 async function check(name, settings, run) {
   const context = await browser.newContext({ viewport: { width: settings.mobile ? 390 : 1440, height: 900 } });
@@ -28,6 +28,7 @@ async function check(name, settings, run) {
       if (url.pathname === '/v1/me') return json({ identity: { email: 'alex@example.test', principalKind: 'human' }, workspace: { id: 'workspace', role: state.member ? 'member' : 'owner' } });
       if (url.pathname === '/v1/capabilities') return json({ capabilities: state.member ? [capability] : [] });
       if (url.pathname === '/v1/capabilities/skill') return json(detail);
+   if(url.pathname==='/v1/apps')return json({apps:[{id:'github',name:'GitHub',configured:true,connected:false,description:'Read issues'}],github:[],google:{configured:false,connection:null}});
       if (url.pathname === '/v1/connections') return json({ configured: true, setup: null, installationUrl: 'https://github.com/apps/example/installations/new', connections: [] });
       if (url.pathname === '/v1/access/options') return json(state.empty ? { ...options, versions: [] } : options);
       if (url.pathname === '/v1/grants' && req.method() === 'GET') return json({ grants: state.grants, nextCursor: null });
@@ -93,7 +94,7 @@ try {
   });
   await check('empty library explains the prerequisite', { empty: true }, async ({ page }) => { await page.getByText('Publish a function or skill in Capabilities first.', { exact: false }).waitFor(); assert.equal(await submit(page).count(), 0); });
   await check('member gets read-only granted library without management routes', { member: true }, async ({ page, requests }) => {
-    await page.getByRole('heading', { name: 'Capabilities', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Functions & skills', exact: true }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'Access', exact: true }).count(), 0); assert.equal(await page.getByRole('button', { name: 'New capability' }).count(), 0);
     await page.getByRole('button').filter({ hasText: 'Review guide' }).click(); await page.getByRole('button', { name: 'Download 1.0.0' }).waitFor();
     assert.equal(await page.getByRole('button', { name: /Delete|Publish|Save draft/ }).count(), 0);

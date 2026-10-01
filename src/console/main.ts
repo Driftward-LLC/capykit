@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { CapabilityLibrary } from "./library.js";
 import { sessionFetch, writeRequest } from "./session.js";
-import { Connections, discardGitHubReturn, hasGitHubReturn } from "./connections.js";
+import { discardGitHubReturn, hasGitHubReturn } from "./connections.js";
+import { Apps, discardGoogleReturn } from "./apps.js";
 import { Access } from "./access.js";
 import "./style.css";
 
@@ -23,7 +24,8 @@ function callbackError(): string {
 }
 
 function App(): React.ReactElement {
-  const [tab, setTab] = useState(["connections", "access"].includes(new URL(window.location.href).searchParams.get("tab") ?? "") ? new URL(window.location.href).searchParams.get("tab") ?? "capabilities" : "capabilities");
+  const [tab, setTab] = useState(["capabilities", "connections", "access"].includes(new URL(window.location.href).searchParams.get("tab") ?? "") ? new URL(window.location.href).searchParams.get("tab") ?? "capabilities" : "connections");
+  const [createFunctionRequest, setCreateFunctionRequest] = useState(0);
   const [githubNotice, setGitHubNotice] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -42,6 +44,7 @@ function App(): React.ReactElement {
     try {
       const response = await sessionFetch("/v1/me");
       if (response.status === 401) {
+        discardGoogleReturn();
         if (discardGitHubReturn()) setGitHubNotice("GitHub setup needs an existing signed-in session. Sign in below, then start a new GitHub authorization from Connections.");
         const url = new URL(window.location.href);
         url.searchParams.delete("setup");
@@ -54,6 +57,7 @@ function App(): React.ReactElement {
       } else {
         const user = await response.json() as CurrentUser;
         if ((user.identity.principalKind !== "human" || user.workspace.role !== "owner") && discardGitHubReturn()) setGitHubNotice("Only a workspace owner can manage GitHub connections. This authorization was discarded.");
+        if (user.identity.principalKind !== "human" || user.workspace.role !== "owner") discardGoogleReturn();
         setCurrentUser(user);
         setIdentityResolved(true);
         setStatus("You are signed in.");
@@ -68,7 +72,7 @@ function App(): React.ReactElement {
   }, []);
 
   const sessionExpired = useCallback((): void => {
-    discardGitHubReturn();
+    discardGitHubReturn(); discardGoogleReturn();
     const url = new URL(window.location.href);
     url.searchParams.delete("setup");
     window.history.replaceState(null, "", `${url.pathname}${url.search}`);
@@ -141,7 +145,7 @@ function App(): React.ReactElement {
     try {
       const response = await post("/v1/auth/logout");
       if (!response.ok) throw new Error("logout failed");
-      discardGitHubReturn();
+      discardGitHubReturn(); discardGoogleReturn();
       const url = new URL(window.location.href);
       url.searchParams.delete("setup");
       window.history.replaceState(null, "", `${url.pathname}${url.search}`);
@@ -199,10 +203,10 @@ function App(): React.ReactElement {
       currentUser.identity.principalKind === "human"
         ? h(React.Fragment, { key: currentUser.workspace.id },
           h("nav", { className: "workspace-nav", "aria-label": "Workspace" },
-            ...(currentUser.workspace.role === "owner" ? ["capabilities", "connections", "access"] : ["capabilities"]).map((name) => h("button", { key: name, type: "button", className: tab === name ? "active" : "", "aria-current": tab === name ? "page" : undefined, onClick: () => { setTab(name); setGitHubNotice(""); const url = new URL(window.location.href); url.searchParams.set("tab", name); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } }, name === "capabilities" ? "Capabilities" : name === "connections" ? "Connections" : "Access")),
+            ...(currentUser.workspace.role === "owner" ? ["connections", "capabilities", "access"] : ["capabilities"]).map((name) => h("button", { key: name, type: "button", className: tab === name ? "active" : "", "aria-current": tab === name ? "page" : undefined, onClick: () => { setTab(name); setGitHubNotice(""); const url = new URL(window.location.href); url.searchParams.set("tab", name); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } }, name === "capabilities" ? "Functions" : name === "connections" ? "Apps" : "Access")),
           ),
-          h("div", { hidden: currentUser.workspace.role === "owner" && tab !== "capabilities" }, h(CapabilityLibrary, { onSessionExpired: sessionExpired, manage: currentUser.workspace.role === "owner" })),
-          currentUser.workspace.role !== "owner" ? null : h("div", { hidden: tab !== "connections" }, h(Connections, { onSessionExpired: sessionExpired, active: tab === "connections" })),
+          h("div", { hidden: currentUser.workspace.role === "owner" && tab !== "capabilities" }, h(CapabilityLibrary, { createFunctionRequest, onSessionExpired: sessionExpired, manage: currentUser.workspace.role === "owner" })),
+          currentUser.workspace.role !== "owner" ? null : h("div", { hidden: tab !== "connections" }, h(Apps, { onSessionExpired: sessionExpired, active: tab === "connections", onCreateFunction: () => { setCreateFunctionRequest(value => value + 1); setTab("capabilities"); const url = new URL(window.location.href); url.searchParams.set("tab","capabilities"); window.history.replaceState(null,"",`${url.pathname}${url.search}`); } })),
           currentUser.workspace.role !== "owner" ? null : h("div", { hidden: tab !== "access" }, h(Access, { onSessionExpired: sessionExpired, active: tab === "access" })),
         )
         : h("section", { className: "panel", "aria-label": "Capability access" }, h("h1", null, "Your workspace"), h("p", null, "Your account is active. Capability access is currently available to workspace owners. Member and agent access will become available through grants.")),

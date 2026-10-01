@@ -14,3 +14,6 @@
 !scripts/migrations/**
 !schemas/
 !schemas/**
+
+!docs/
+!docs/LICENSE.activepieces

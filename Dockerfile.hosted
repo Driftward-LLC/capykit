@@ -19,6 +19,7 @@ WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
+COPY docs/LICENSE.activepieces ./docs/LICENSE.activepieces
 COPY scripts/bootstrap-hosted-owner.mjs ./scripts/bootstrap-hosted-owner.mjs
 COPY scripts/provision-hosted-owner.mjs ./scripts/provision-hosted-owner.mjs
 COPY scripts/cleanup-hosted-connections.mjs ./scripts/cleanup-hosted-connections.mjs

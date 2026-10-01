@@ -16,7 +16,7 @@ const candidate = { installationId: 'installation-1', account: { id: 'account-1'
 const pendingConnection = { id: 'existing-connection', status: 'pending', account: null, installationId: null, repositories: [], permissions: { issues: 'read', metadata: 'read' }, consentAt: null, consentByPrincipalId: null, uninstallUrl: null, createdAt: '2026-09-29T00:00:00Z', updatedAt: '2026-09-29T00:00:00Z' };
 const activeConnection = { ...pendingConnection, status: 'active', account: candidate.account, installationId: candidate.installationId, repositories: [repository], consentAt: '2026-09-29T00:00:00Z' };
 const owner = { identity: { email: 'owner@example.test', principalKind: 'human' }, workspace: { id: 'workspace', role: 'owner' } };
-const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+const browser = await chromium.launch({ ...(process.env.CAPYKIT_CHROMIUM_PATH ? { executablePath: process.env.CAPYKIT_CHROMIUM_PATH } : {}), headless: true, args: ['--no-sandbox'] });
 const results = [];
 
 function deferred() {
@@ -61,6 +61,7 @@ async function check(name, options, run, path = '/?tab=connections') {
       if (url.pathname === '/v1/auth/otp') return json({});
       if (url.pathname === '/v1/auth/verify') { state.identityStatus = 200; return json({}); }
       if (url.pathname === '/v1/capabilities') return json({ capabilities: [] });
+      if (url.pathname === '/v1/apps') return json({ apps: [{ id:'github', name:'GitHub', configured:true, connected:state.connections.some(c=>c.status==='active'), description:'Read issues' }], github:state.connections, google:{configured:false,connection:null} });
       if (url.pathname === '/v1/connections') return json({ configured: true, setup: null, installationUrl: 'https://github.com/apps/capykit-test/installations/new', connections: state.connections });
       if (url.pathname === '/v1/connections/github/callback' || url.pathname === `/v1/connections/github/pending/${setupId}`) {
         if (req.method() === 'DELETE') return json({ error: { code: 'NOT_FOUND' } }, state.cancelStatus ?? 404);
@@ -104,6 +105,7 @@ async function check(name, options, run, path = '/?tab=connections') {
 
 async function connectionsReady(page) {
   await page.waitForFunction(() => document.querySelector('section.connections')?.getAttribute('aria-busy') === 'false');
+  if (await page.getByRole('heading',{name:'Apps',exact:true}).isVisible()) await page.locator('.app-row').filter({hasText:'GitHub'}).click();
 }
 
 async function noSignIn(page) {
@@ -351,13 +353,13 @@ try {
   }, setupPath);
 
   await check('hidden Connections callback completion never steals focus from Capabilities', { candidates: [candidate], manualWait: true, callbackGate: deferred() }, async ({ page, state }) => {
-    await page.getByRole('button', { name: 'Capabilities', exact: true }).waitFor();
-    await page.getByRole('button', { name: 'Capabilities', exact: true }).click();
+    await page.getByRole('button', { name: 'Functions', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Functions', exact: true }).click();
     state.callbackGate.resolve(); state.callbackGate = null;
     await connectionsReady(page);
-    assert.equal(await page.getByRole('button', { name: 'Capabilities', exact: true }).evaluate(element => element === document.activeElement), true);
+    assert.equal(await page.getByRole('button', { name: 'Functions', exact: true }).evaluate(element => element === document.activeElement), true);
     assert.equal(await page.getByRole('heading', { name: 'Choose repositories for this workspace' }).count(), 0);
-    await page.getByRole('button', { name: 'Connections', exact: true }).click();
+    await page.getByRole('button', { name: 'Apps', exact: true }).click();
     await page.getByRole('heading', { name: 'Choose repositories for this workspace' }).waitFor();
   }, callbackPath);
 

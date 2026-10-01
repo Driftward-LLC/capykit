@@ -107,7 +107,7 @@ function githubLink(url: string | null): string | undefined {
   } catch { return undefined; }
 }
 
-export function Connections({ onSessionExpired, active }: { onSessionExpired: () => void; active: boolean }): React.ReactElement {
+export function Connections({ onSessionExpired, active, onConnectionsChanged }: { onSessionExpired: () => void; active: boolean; onConnectionsChanged?: () => void }): React.ReactElement {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [providerSetup, setProviderSetup] = useState<ProviderSetup | null>(null);
@@ -154,6 +154,7 @@ export function Connections({ onSessionExpired, active }: { onSessionExpired: ()
   async function refresh(): Promise<void> {
     const response = await checked(await sessionFetch("/v1/connections", { credentials: "same-origin", cache: "no-store" }));
     const result = await response.json() as { configured: boolean; setup: ProviderSetup | null; installationUrl: string | null; connections: Connection[] };
+    onConnectionsChanged?.();
     setConnections(result.connections); setConfigured(result.configured); setProviderSetup(result.setup ?? null); setInstallationUrl(result.installationUrl);
     setSelected((previous) => previous === null ? null : result.connections.find((entry) => entry.id === previous.id) ?? null);
   }

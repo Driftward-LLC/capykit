@@ -102,7 +102,7 @@ const errorMessages: Record<string, string> = {
   CSRF_REQUIRED: "Your session needs refreshing. Reload the page and try again.",
 };
 
-export function CapabilityLibrary({ onSessionExpired, manage = true }: { onSessionExpired: () => void; manage?: boolean }): React.ReactElement {
+export function CapabilityLibrary({ onSessionExpired, manage = true, createFunctionRequest = 0 }: { onSessionExpired: () => void; manage?: boolean; createFunctionRequest?: number }): React.ReactElement {
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [selected, setSelected] = useState<CapabilityDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -116,6 +116,7 @@ export function CapabilityLibrary({ onSessionExpired, manage = true }: { onSessi
   const [version, setVersion] = useState("1.0.0");
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [deleting, setDeleting] = useState(false);
+  useEffect(() => { if (createFunctionRequest > 0 && manage) { setCreating(true); setKind("function"); } }, [createFunctionRequest, manage]);
 
   async function checked(response: Response): Promise<Response> {
     if (response.status === 401) {
@@ -229,7 +230,7 @@ export function CapabilityLibrary({ onSessionExpired, manage = true }: { onSessi
 
   const dirty = files.length > 0;
   return h("section", { className: "library", "aria-label": "Capability library", "aria-busy": loading || pending },
-    h("div", { className: "section-heading" }, h("div", null, h("p", { className: "eyebrow" }, "Workspace library"), h("h1", null, "Capabilities"), h("p", { className: "muted" }, manage ? "Store complete skills and reviewed functions. Publish versions you can reuse anywhere." : "Browse versions granted to you by a workspace owner.")),
+    h("div", { className: "section-heading" }, h("div", null, h("p", { className: "eyebrow" }, "Workspace library"), h("h1", null, "Functions & skills"), h("p", { className: "muted" }, manage ? "Store complete skills and reviewed functions. Publish versions you can reuse anywhere." : "Browse versions granted to you by a workspace owner.")),
       !manage ? null : h("button", { type: "button", disabled: pending, onClick: () => { setCreating(true); setError(""); setNotice(""); } }, "New capability")),
     error === "" ? null : h("p", { className: "message error", role: "alert" }, error),
     notice === "" ? null : h("p", { className: "message success", role: "status" }, notice),
