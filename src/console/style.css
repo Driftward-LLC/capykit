@@ -56,6 +56,7 @@ button.capability-item.active { background: #edf4ec; border-color: #c5d7c2; }
 .empty-state { padding: 46px 32px; }
 .empty-state p { max-width: 550px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr 160px; gap: 16px; margin-bottom: 12px; }
+.access-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 270px; }
 .uploads { grid-template-columns: 1fr 1fr; margin-bottom: 20px; }
 .version-field { max-width: 230px; margin-bottom: 20px; }
 .actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 20px; }

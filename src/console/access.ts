@@ -84,7 +84,7 @@ export function Access({ onSessionExpired, active }: { onSessionExpired: () => v
     !options ? null : h("section", { className: "panel connection-intro" }, h("h2", null, "Grant access"),
       options.truncated ? h("p", { role: "status" }, "Only the first 200 choices are shown. Contact your operator if a choice is missing.") : null,
       options.versions.length === 0 ? h("p", null, "Publish a function or skill in Capabilities first. Only published versions can be granted.") : h("form", { onSubmit: event => { void grant(event); } },
-        h("div", { className: "form-grid" },
+        h("div", { className: "form-grid access-grid" },
           h("label", null, "User", h("select", { "aria-label": "User", required: true, value: recipientId, disabled, onChange: (e: React.ChangeEvent<HTMLSelectElement>) => { setRecipientId(e.currentTarget.value); setApproved(false); } }, h("option", { value: "" }, "Choose a user"), ...options.users.map(u => h("option", { key: u.id, value: u.id }, `${u.name} (${u.email})`)))),
           h("label", null, "Published capability version", h("select", { "aria-label": "Published capability version", required: true, value: versionKey, disabled, onChange: (e: React.ChangeEvent<HTMLSelectElement>) => { setVersionKey(e.currentTarget.value); setConnectionId(""); setRepositoryIds([]); setApproved(false); } }, h("option", { value: "" }, "Choose a version"), ...options.versions.map(v => h("option", { key: `${v.capabilityId}:${v.version}`, value: `${v.capabilityId}:${v.version}` }, `${v.name} · ${v.version} · ${v.kind}`)))),
           h("label", null, "Expires", h("input", { type: "datetime-local", required: true, disabled, value: expiry, onChange: e => { setExpiry(e.currentTarget.value); setApproved(false); } })),
