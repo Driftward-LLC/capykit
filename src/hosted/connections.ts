@@ -24,7 +24,7 @@ export interface PendingConnectionSetup { setupId: string; connectionId: string;
 export type ConnectionProvider = Pick<GithubProvider, "authorizationUrl" | "installationUrl" | "exchange" | "revokeUserToken" | "user" | "candidates" | "recheck" | "mint" | "revokeInstallationToken">;
 /** Trusted backend input, never a browser request. ENG-124/125 must authorize
  * the caller/grant first and invoke assertAccess before each provider operation. */
-export interface AuthorizedConnectionAccess { workspaceId: string; connectionId: string; repositoryIds: string[]; permission: "github.issues.list.v1" }
+export interface AuthorizedConnectionAccess { workspaceId: string; connectionId: string; repositoryIds: string[]; permission: "github.issues.list.v1" | "github.issue.read.v1" }
 interface Header extends Omit<ConnectionRecord, "repositories" | "uninstallUrl"> { generation: number }
 interface Setup {
   id: string; workspace_id: string; connection_id: string; principal_id: string; generation: number;
@@ -358,7 +358,7 @@ export class ConnectionStore {
     identifier(access.workspaceId); identifier(access.connectionId);
     const repositoryIds = ids(access.repositoryIds);
     const permission: unknown = access.permission;
-    if (permission !== "github.issues.list.v1") return fail("FORBIDDEN", 403);
+    if (permission !== "github.issues.list.v1" && permission !== "github.issue.read.v1") return fail("FORBIDDEN", 403);
     return this.transaction(async (client) => {
       const connection = (await client.query<{ installation_id: string | null; status: string; generation: number }>("select c.installation_id, c.status, c.generation from provider_connections c join workspaces w on w.id = c.workspace_id and w.active where c.workspace_id = $1 and c.id = $2 for share of c", [access.workspaceId, access.connectionId])).rows[0];
       if (!connection) return fail("NOT_FOUND", 404);
