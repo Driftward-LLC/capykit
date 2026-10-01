@@ -8,7 +8,7 @@ const origin = 'https://capykit.example.test';
 const options = { users: [{ id: 'user', name: 'Alex', email: 'alex@example.test', role: 'member' }], versions: [{ capabilityId: 'skill', name: 'Review guide', kind: 'skill', version: '1.0.0', operation: null }, { capabilityId: 'function', name: 'Read issues', kind: 'function', version: '2.0.0', operation: 'github.issues.list.v1' }], connections: [{ id: 'connection', name: 'example', repositories: [{ id: '101', name: 'example/a-long-repository-name-for-phone-layout-verification' }, { id: '102', name: 'example/second' }] }], truncated: false };
 const capability = { id: 'skill', name: 'Review guide with a long name for phone layout verification', slug: 'review-guide', kind: 'skill', createdAt: '2026-01-01T00:00:00Z' };
 const detail = { ...capability, draft: null, versions: [{ version: '1.0.0', publishedAt: '2026-01-01T00:00:00Z', digest: 'sha256:fixture', fileCount: 1, byteCount: 100, contract: null, files: [{ path: 'SKILL.md', executable: false, byteLength: 100, sha256: 'fixture' }] }] };
-const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+const browser = await chromium.launch({ ...(process.env.CAPYKIT_CHROMIUM_PATH ? { executablePath: process.env.CAPYKIT_CHROMIUM_PATH } : {}), headless: true, args: ['--no-sandbox'] });
 const results = [];
 async function check(width) {
  const context = await browser.newContext({viewport:{width,height:844},isMobile:width<641,hasTouch:width<641});
@@ -27,6 +27,7 @@ async function check(width) {
    if(url.pathname==='/v1/auth/verify'){signedIn=true;return json({});}
    if(url.pathname==='/v1/capabilities')return json({capabilities:[capability]});
    if(url.pathname==='/v1/capabilities/skill')return json(detail);
+   if(url.pathname==='/v1/apps')return json({apps:[{id:'github',name:'GitHub',configured:true,connected:false,description:'Read issues'}],github:[],google:{configured:false,connection:null}});
    if(url.pathname==='/v1/connections')return json({configured:true,setup:null,installationUrl:'https://github.com/apps/example/installations/new',connections:[]});
    if(url.pathname.startsWith('/v1/connections/github/pending/'))return json({setupId:'12345678-1234-1234-1234-123456789abc',connectionId:'pending',expiresAt:'2030-01-01T00:00:00Z',candidates:[{installationId:'10',account:{id:'20',login:'example',type:'Organization'},repositories:options.connections[0].repositories.map(r=>({id:r.id,fullName:r.name,url:'https://github.com/'+r.name,admin:true}))}]});
    if(url.pathname==='/v1/access/options')return json(options);
@@ -47,11 +48,11 @@ async function check(width) {
   await page.goto(origin);await page.getByLabel('Invited email address').waitFor();await layout('sign-in');
   await page.getByLabel('Invited email address').fill('owner@example.test');await page.getByRole('button',{name:'Send sign-in code',exact:true}).click();
   const otp=page.getByLabel('Six-digit sign-in code');await otp.waitFor();assert.equal(await otp.getAttribute('inputmode'),'numeric');assert.equal(await otp.getAttribute('autocomplete'),'one-time-code');await layout('otp');
-  await otp.fill('123456');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByRole('heading',{name:'Capabilities',exact:true}).waitFor();
+  await otp.fill('123456');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByRole('button',{name:'Functions',exact:true}).click();await page.getByRole('heading',{name:'Functions & skills',exact:true}).waitFor();
   await page.getByRole('button',{name:'New capability'}).click();await page.getByRole('heading',{name:'Create a capability'}).waitFor();await layout('create');
   const identifier=page.getByLabel('Identifier',{exact:true});assert.equal(await identifier.getAttribute('autocapitalize'),'none');
   await page.getByRole('button',{name:'Cancel',exact:true}).click();await page.getByRole('button').filter({hasText:capability.name}).click();await page.getByRole('button',{name:'Download 1.0.0'}).waitFor();await layout('detail');
-  await page.getByRole('button',{name:'Connections',exact:true}).click();await page.getByRole('button',{name:'Continue with GitHub',exact:true}).waitFor();await layout('connections');
+  await page.getByRole('button',{name:'Apps',exact:true}).click();await page.locator('.app-row').filter({hasText:'GitHub'}).click();await page.getByRole('button',{name:'Continue with GitHub',exact:true}).waitFor();await layout('connections');
   await page.goto(origin+'/?tab=connections&setup=12345678-1234-1234-1234-123456789abc');
   await page.getByRole('checkbox',{name:options.connections[0].repositories[0].name,exact:true}).waitFor();await layout('repository-review');
   await page.getByRole('button',{name:'Access',exact:true}).click();await page.getByLabel('User',{exact:true}).selectOption('user');await page.getByLabel('Published capability version').selectOption('function:2.0.0');await page.getByLabel('GitHub connection',{exact:true}).selectOption('connection');
@@ -59,8 +60,8 @@ async function check(width) {
   const consent=page.getByRole('checkbox',{name:/^I grant/});await consent.focus();await page.keyboard.press('Space');assert.ok(await page.getByRole('button',{name:'Grant access',exact:true}).isEnabled());await layout('access');
   await page.getByRole('button',{name:'Revoke access for Alex'}).click();await page.getByRole('button',{name:'Confirm revoke'}).waitFor();await layout('revoke');
   if(width<641){
-   await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));const nav=await page.getByRole('navigation',{name:'Workspace',exact:true}).boundingBox();assert.ok(nav.y>=-1&&nav.y<2,'navigation remains reachable while scrolling');
-   await page.getByRole('button',{name:'Capabilities',exact:true}).click();await page.getByRole('button',{name:'New capability'}).click();await page.getByLabel('Name',{exact:true}).focus();
+   await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));const nav=await page.getByRole('navigation',{name:'Workspace',exact:true}).boundingBox();assert.ok(nav.y+nav.height>=899&&nav.y>=0,'navigation remains reachable while scrolling');
+   await page.getByRole('button',{name:'Functions',exact:true}).click();await page.getByRole('button',{name:'New capability'}).click();await page.getByLabel('Name',{exact:true}).focus();
    await page.setViewportSize({width,height:420});await page.getByLabel('Name',{exact:true}).scrollIntoViewIfNeeded();await layout('short-viewport');
   }
   assert.deepEqual(errors,[]);results.push({width,passed:true});console.log(`PASS ${width}px: sign-in, OTP, create, detail, connections, grants, revoke, touch/text dimensions`);

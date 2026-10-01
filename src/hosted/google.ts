@@ -31,24 +31,20 @@ export class GoogleProvider {
   async exchange(code: string, verifier: string): Promise<{ refreshToken: string; subject: string; email: string }> {
     const data = await this.token({ code, code_verifier: verifier, redirect_uri: this.config.callbackUrl, grant_type: "authorization_code" });
     const access = tokenString(data.access_token);
-    try {
+    {
       if (typeof data.scope !== "string" || !data.scope.split(" ").includes(driveScope) || data.token_type !== "Bearer") fail("PROVIDER_SCOPE_REQUIRED", 403);
       const refreshToken = tokenString(data.refresh_token);
       const user = await providerJson("https://openidconnect.googleapis.com/v1/userinfo", { headers: { authorization: `Bearer ${access}` } });
       if (typeof user.sub !== "string" || !/^[0-9]{1,255}$/.test(user.sub) || user.email_verified !== true || typeof user.email !== "string" || user.email.length > 254) fail("PROVIDER_RESPONSE_INVALID", 502);
       return { refreshToken, subject: user.sub as string, email: user.email as string };
-    } catch (error) { await this.revoke(access).catch(() => {}); throw error; }
+    }
   }
   async refresh(refreshToken: string): Promise<string> {
     const data = await this.token({ refresh_token: refreshToken, grant_type: "refresh_token" });
     if (data.token_type !== "Bearer" || (typeof data.scope === "string" && !data.scope.split(" ").includes(driveScope))) fail("PROVIDER_SCOPE_REQUIRED", 403);
     return tokenString(data.access_token);
   }
-  async revoke(token: string): Promise<void> {
-    const response = await fetch("https://oauth2.googleapis.com/revoke", { method: "POST", body: new URLSearchParams({ token }), redirect: "error", signal: AbortSignal.timeout(10_000) });
-    await response.body?.cancel();
-    if (!response.ok) fail("PROVIDER_REQUEST_FAILED", 502);
-  }
+
 }
 interface GoogleRow {
   workspace_id: string; status: "pending" | "active" | "revoked" | "reconnect_required"; generation: number;
@@ -56,7 +52,7 @@ interface GoogleRow {
   state_hash: string | null; verifier: unknown; refresh_token: unknown; expires_at: Date | null; updated_at: Date;
 }
 export class GoogleConnections {
-  constructor(private readonly pool: Pool, private readonly provider?: Pick<GoogleProvider, "authorizationUrl" | "exchange" | "refresh" | "revoke">, private readonly config?: GoogleConfig) {}
+  constructor(private readonly pool: Pool, private readonly provider?: Pick<GoogleProvider, "authorizationUrl" | "exchange" | "refresh">, private readonly config?: GoogleConfig) {}
   private configured() {
     if (!this.provider || !this.config) return fail("CONFIGURATION_UNAVAILABLE", 503);
     return { provider: this.provider, config: this.config };
@@ -103,17 +99,16 @@ export class GoogleConnections {
       await client.query("update google_connections set state_hash=null,verifier=null where workspace_id=$1", [row.workspace_id]);
       return { row, verifier };
     });
-    let tokens: Awaited<ReturnType<GoogleProvider["exchange"]>> | undefined;
     try {
-      tokens = await provider.exchange(body.code, setup.verifier);
-      const verified = tokens;
+      const verified = await provider.exchange(body.code, setup.verifier);
       await this.owner(context, async (client, row) => {
         if (!row || row.generation !== setup.row.generation || row.status !== "pending" || !row.expires_at || row.expires_at.getTime() <= Date.now()) return fail("CONNECT_STATE_INVALID");
         await client.query("update google_connections set status='active',email=$2,subject=$3,refresh_token=$4,session_hash=null,expires_at=null,updated_at=now() where workspace_id=$1", [row.workspace_id,verified.email,verified.subject,seal(config, verified.refreshToken, this.aad(row,"refresh"))]);
         await this.audit(client,context,"connected");
       });
     } catch (error) {
-      if (tokens) await provider.revoke(tokens.refreshToken).catch(() => {});
+      // Google revocation affects every token for this user/project. Never revoke
+      // a superseded token: a newer setup or another workspace may be using it.
       await this.owner(context, async (client, row) => {
         if (row?.generation === setup.row.generation && row.status === "pending") await client.query("update google_connections set status='reconnect_required',state_hash=null,verifier=null,session_hash=null,expires_at=null where workspace_id=$1", [row.workspace_id]);
       }).catch(() => {});
@@ -121,16 +116,15 @@ export class GoogleConnections {
     }
   }
   async disconnect(context: AuthenticatedContext): Promise<void> {
-    const row = await this.owner(context, async (client, row) => {
-      if (!row) return undefined;
+    await this.owner(context, async (client, row) => {
+      if (!row) return;
       await client.query("update google_connections set status='revoked',generation=generation+1,refresh_token=null,verifier=null,state_hash=null,session_hash=null,expires_at=null,email=null,subject=null,updated_at=now() where workspace_id=$1", [row.workspace_id]);
-      await this.audit(client,context,"disconnected"); return row;
+      await this.audit(client,context,"disconnected");
     });
-    if (row?.refresh_token) {
-      try { const { provider, config } = this.configured(); await provider.revoke(unseal<string>(config,row.refresh_token,this.aad(row,"refresh"))); }
-      catch { await this.owner(context, async client => this.audit(client,context,"cleanup_failed")); }
-    }
+    // Disconnect is local to this workspace. The console separately links to
+    // Google's account settings for explicit project-wide revocation.
   }
+
   async withToken<T>(context: AuthenticatedContext, run: (token: string, check: () => Promise<void>) => Promise<T>): Promise<T> {
     const { provider, config } = this.configured();
     const initial = await this.owner(context, (_client,row) => {
@@ -140,7 +134,16 @@ export class GoogleConnections {
     const check = async () => { await this.owner(context, (_client,row) => {
       if (row?.status !== "active" || row.generation !== initial.generation) fail("CONNECTION_INACTIVE",403);
     }); };
-    const token = await provider.refresh(unseal<string>(config,initial.refresh_token,this.aad(initial,"refresh")));
+    let token: string;
+    try { token = await provider.refresh(unseal<string>(config,initial.refresh_token,this.aad(initial,"refresh"))); }
+    catch(error) {
+      if (error instanceof ConnectionError && error.code === "PROVIDER_AUTHORIZATION_EXPIRED") {
+        await this.owner(context, async (client,row) => {
+          if (row?.generation === initial.generation && row.status === "active") await client.query("update google_connections set status='reconnect_required',generation=generation+1,refresh_token=null,updated_at=now() where workspace_id=$1", [row.workspace_id]);
+        });
+      }
+      throw error;
+    }
     await check();
     const result = await run(token,check); await check(); return result;
   }

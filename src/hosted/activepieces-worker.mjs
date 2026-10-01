@@ -3,6 +3,7 @@
 // Nock intercepts the connector's HTTP request and relays it to the authenticated
 // parent broker. Provider credentials and environment variables never enter here.
 import nock from 'nock';
+import { randomUUID } from 'node:crypto';
 nock.disableNetConnect();
 process.once('message', async ({ action, resource, issueNumber }) => {
   try {
@@ -18,7 +19,7 @@ process.once('message', async ({ action, resource, issueNumber }) => {
         process.send({ type: 'request' });
       });
     });
-    const auth = { type: 'OAUTH2', access_token: 'capykit-brokered-transport' };
+    const auth = { type: 'OAUTH2', access_token: randomUUID() };
     let result;
     if (github) {
       const module = await import('@activepieces/piece-github');

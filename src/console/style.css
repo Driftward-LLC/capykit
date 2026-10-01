@@ -68,7 +68,7 @@ button.capability-item.active { background: #22362c; border-color: #6da88c; }
 .digest { font-size: .8rem; overflow-wrap: anywhere; padding: 12px; background: #111b16; border-radius: 7px; }
 .artifact-summary { margin-bottom: 16px; }
 details { border-top: 1px solid #2b3631; padding: 12px 0; }
-summary { min-height: 44px; padding: 10px 0; cursor: pointer; font-size: .85rem; color: #3c5546; font-weight: 600; }
+summary { min-height: 44px; padding: 10px 0; cursor: pointer; font-size: .85rem; color: #b4bdc6; font-weight: 600; }
 details[open] summary { margin-bottom: 14px; }
 .table-scroll { overflow: auto; max-height: 320px; border: 1px solid #e1e6dd; border-radius: 6px; margin: 12px 0; }
 table { border-collapse: collapse; width: 100%; text-align: left; font-size: .8rem; }
@@ -188,3 +188,5 @@ button.app-row:hover:enabled { background: #18271f; }
  .workspace-nav button { flex: 0 1 auto; padding: 10px 24px; }
  .console { padding-bottom: 48px; }
 }
+
+.account > span { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

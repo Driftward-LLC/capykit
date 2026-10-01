@@ -24,7 +24,7 @@ function callbackError(): string {
 }
 
 function App(): React.ReactElement {
-  const [tab, setTab] = useState(["connections", "access"].includes(new URL(window.location.href).searchParams.get("tab") ?? "") ? new URL(window.location.href).searchParams.get("tab") ?? "capabilities" : "connections");
+  const [tab, setTab] = useState(["capabilities", "connections", "access"].includes(new URL(window.location.href).searchParams.get("tab") ?? "") ? new URL(window.location.href).searchParams.get("tab") ?? "capabilities" : "connections");
   const [createFunctionRequest, setCreateFunctionRequest] = useState(0);
   const [githubNotice, setGitHubNotice] = useState("");
   const [email, setEmail] = useState("");

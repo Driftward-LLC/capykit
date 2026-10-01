@@ -46,7 +46,8 @@
     "scripts/unpack-hosted-artifact.mjs",
     "scripts/cleanup-hosted-connections.mjs",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "docs/LICENSE.activepieces"
   ],
   "scripts": {
     "build": "tsup && node scripts/build-hosted.mjs && vite build src/console --outDir ../../dist/console --emptyOutDir false",

@@ -6,7 +6,7 @@ export async function providerJson(url: string, init: RequestInit = {}, signal?:
   let response: Response;
   try { response = await fetch(url, { ...init, redirect: "error", signal: signal ? AbortSignal.any([signal, deadline]) : deadline }); }
   catch { throw new ConnectionError("PROVIDER_UNAVAILABLE", 502); }
-  if (!response.ok) {
+  if (!response.ok && !(url === "https://oauth2.googleapis.com/token" && response.status === 400)) {
     await response.body?.cancel();
     throw new ConnectionError(response.status === 401 ? "PROVIDER_AUTHORIZATION_EXPIRED" : response.status === 404 ? "PROVIDER_RESOURCE_NOT_FOUND" : "PROVIDER_REQUEST_FAILED", 502);
   }
@@ -24,7 +24,8 @@ export async function providerJson(url: string, init: RequestInit = {}, signal?:
     }
     const data: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
     if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("shape");
+    if (!response.ok) throw new ConnectionError((data as Record<string, unknown>).error === "invalid_grant" ? "PROVIDER_AUTHORIZATION_EXPIRED" : "PROVIDER_REQUEST_FAILED", 502);
     return data as Record<string, unknown>;
-  } catch { throw new ConnectionError("PROVIDER_RESPONSE_INVALID", 502); }
+  } catch(error) { if (error instanceof ConnectionError) throw error; throw new ConnectionError("PROVIDER_RESPONSE_INVALID", 502); }
   finally { await reader.cancel().catch(() => {}); }
 }

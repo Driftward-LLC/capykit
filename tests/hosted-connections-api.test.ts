@@ -66,7 +66,7 @@ describe.skipIf(databaseUrl === undefined)("GitHub connection HTTP and PostgreSQ
     const client = await admin.connect();
     try {
       await client.query(`set search_path=${schema},public`);
-      for (const name of ["001_hosted_workspace_identity.sql", "002_hosted_database_access.sql", "003_hosted_capabilities.sql", "004_hosted_connections.sql", "005_hosted_grants.sql"]) {
+      for (const name of ["001_hosted_workspace_identity.sql", "002_hosted_database_access.sql", "003_hosted_capabilities.sql", "004_hosted_connections.sql", "005_hosted_grants.sql", "006_hosted_app_connections.sql"]) {
         await client.query((await readFile(new URL(`../scripts/migrations/${name}`, import.meta.url), "utf8")).replaceAll("capykit_runtime", runtimeRole));
       }
       for (const id of workspaces) await client.query("insert into workspaces(id,slug,name) values($1,$2,'Connection HTTP test')", [id, id]);
@@ -416,4 +416,40 @@ describe.skipIf(databaseUrl === undefined)("GitHub connection HTTP and PostgreSQ
     expect(replay.statusCode).toBe(400);
     expect(replay.json<{ error: { code: string } }>().error.code).toBe("CONNECT_STATE_INVALID");
   });
+  it("lists real app availability without leaking credentials and denies non-owner connector tests", async () => {
+    const catalog = await app.inject({url:"/v1/apps",headers:ownerHeaders});
+    expect(catalog.statusCode,catalog.body).toBe(200); noCredentials(catalog.body);
+    expect(catalog.json<{apps:{id:string;configured:boolean}[]}>().apps).toEqual(expect.arrayContaining([expect.objectContaining({id:"github",configured:true}),expect.objectContaining({id:"google-drive",configured:false})]));
+    for (const token of ["member","agent"]) {
+      expect((await app.inject({url:"/v1/apps",headers:{authorization:`Bearer ${token}`}})).statusCode).toBe(403);
+      expect((await app.inject({method:"POST",url:"/v1/apps/google-drive/test",headers:{authorization:`Bearer ${token}`},payload:{fileId:"file123"}})).statusCode).toBe(403);
+    }
+    expect((await app.inject({method:"POST",url:"/v1/connections/google/start",headers:browserHeaders,payload:{consent:false}})).statusCode).toBe(400);
+    expect((await app.inject({method:"POST",url:"/v1/connections/google/start",headers:browserHeaders,payload:{consent:true}})).statusCode).toBe(503);
+  });
+  it("mediates an owner GitHub read, refuses unapproved repositories/cross-workspace callers, and rechecks revocation", async () => {
+    const record=await activeConnection();
+    const mint=vi.spyOn(github,"mint").mockResolvedValue({token:"INSTALLATION_TEST_SENTINEL",expiresAt:new Date(Date.now()+60000).toISOString()});
+    const cleanup=vi.spyOn(github,"revokeInstallationToken").mockResolvedValue(undefined);
+    const payload={connectionId:record.id,repositoryId:"123",issueNumber:12};
+    const fetcher=vi.fn<typeof fetch>().mockImplementation(url=>Promise.resolve(new Response(JSON.stringify((typeof url === "string" ? url : url instanceof URL ? url.href : url.url).includes("/repositories/")?{id:123,full_name:"test-team/repo"}:{number:12,title:"Brokered read",state:"open",body:"private body"}))));
+    vi.stubGlobal("fetch",fetcher);
+    try {
+      const response=await app.inject({method:"POST",url:"/v1/apps/github/test",headers:browserHeaders,payload});
+      expect(response.statusCode,response.body).toBe(200);
+      expect(response.json()).toEqual({result:{number:12,title:"Brokered read",state:"open"}});
+      expect(response.body).not.toContain("SENTINEL");expect(response.body).not.toContain("private body");
+      expect(mint).toHaveBeenCalledWith(record.installationId,["123"]);expect(cleanup).toHaveBeenCalled();
+      expect((await app.inject({method:"POST",url:"/v1/apps/github/test",headers:browserHeaders,payload:{...payload,repositoryId:"999"}})).statusCode).toBe(403);
+      expect((await app.inject({method:"POST",url:"/v1/apps/github/test",headers:{authorization:"Bearer other-owner"},payload})).statusCode).toBe(404);
+      expect((await app.inject({method:"POST",url:"/v1/apps/github/test",headers:{cookie,origin},payload})).statusCode).toBe(403);
+      fetcher.mockImplementation(async url=>{
+        if((typeof url === "string" ? url : url instanceof URL ? url.href : url.url).includes("/issues/")) await app.inject({method:"DELETE",url:`/v1/connections/${record.id}`,headers:browserHeaders});
+        return new Response(JSON.stringify((typeof url === "string" ? url : url instanceof URL ? url.href : url.url).includes("/repositories/")?{id:123,full_name:"test-team/repo"}:{number:12,title:"must be discarded",state:"open"}));
+      });
+      const fenced=await app.inject({method:"POST",url:"/v1/apps/github/test",headers:browserHeaders,payload});
+      expect(fenced.statusCode).toBe(403);expect(fenced.body).not.toContain("must be discarded");
+    } finally {vi.unstubAllGlobals();mint.mockRestore();cleanup.mockRestore();}
+  });
+
 });
