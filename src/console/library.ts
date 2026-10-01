@@ -238,7 +238,7 @@ export function CapabilityLibrary({ onSessionExpired, manage = true }: { onSessi
       h("form", { onSubmit: (event) => { void create(event); } },
         h("div", { className: "form-grid" },
           h("label", null, "Name", h("input", { required: true, maxLength: 120, value: name, disabled: pending, onChange: (event) => { setName(event.currentTarget.value); }, placeholder: "Repository triage" })),
-          h("label", null, "Identifier", h("input", { required: true, maxLength: 80, pattern: "[a-z0-9]+(?:-[a-z0-9]+)*", value: slug, disabled: pending, onChange: (event) => { setSlug(event.currentTarget.value); }, placeholder: "repository-triage", "aria-describedby": "identifier-help" })),
+          h("label", null, "Identifier", h("input", { autoCapitalize: "none", autoCorrect: "off", spellCheck: false, required: true, maxLength: 80, pattern: "[a-z0-9]+(?:-[a-z0-9]+)*", value: slug, disabled: pending, onChange: (event) => { setSlug(event.currentTarget.value); }, placeholder: "repository-triage", "aria-describedby": "identifier-help" })),
           h("label", null, "Kind", h("select", { value: kind, disabled: pending, onChange: (event: React.ChangeEvent<HTMLSelectElement>) => { setKind(event.currentTarget.value as CapabilityKind); } }, h("option", { value: "skill" }, "Skill bundle"), h("option", { value: "function" }, "Function"))),
         ),
         h("p", { id: "identifier-help", className: "muted small" }, "Use a stable lowercase identifier with letters, numbers, or hyphens. It cannot be changed later."),
