@@ -32,12 +32,14 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
       .replaceAll("capykit_runtime", runtimeRole).replaceAll("'anon'", `'${browserRole}'`);
     const connections = (await readFile(new URL("../scripts/migrations/004_hosted_connections.sql", import.meta.url), "utf8"))
       .replaceAll("capykit_runtime", runtimeRole).replaceAll("'anon'", `'${browserRole}'`);
+    const grants = (await readFile(new URL("../scripts/migrations/005_hosted_grants.sql", import.meta.url), "utf8"))
+      .replaceAll("capykit_runtime", runtimeRole).replaceAll("'anon'", `'${browserRole}'`);
     await admin.query(`create role ${browserRole} nologin`);
     await database.pool.query(`begin; ${migration}\n${access}\ncommit;`);
     expect(await database.readiness()).toEqual({ status: "unavailable", reason: "connection_failed" });
     await database.pool.query(`begin; ${artifacts}\ncommit;`);
     expect(await database.readiness()).toEqual({ status: "unavailable", reason: "connection_failed" });
-    await database.pool.query(`begin; ${connections}\ncommit;`);
+    await database.pool.query(`begin; ${connections}\n${grants}\ncommit;`);
     await database.pool.query(`begin; ${migration}\n${access}\n${artifacts}\n${connections}\ncommit;`);
     expect(await database.readiness()).toEqual({ status: "ready", reason: "ok" });
   });
@@ -103,7 +105,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
          from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = $2 and c.relkind = 'r'`, [browserRole, schema],
     );
-    expect(protectedTables.rows).toHaveLength(16);
+    expect(protectedTables.rows).toHaveLength(18);
     expect(protectedTables.rows.every((table) => table.relrowsecurity && !table.can_select)).toBe(true);
     await admin.query(`grant usage on schema ${schema} to ${browserRole}; grant select on ${schema}.workspaces to ${browserRole}`);
     const client = await admin.connect();

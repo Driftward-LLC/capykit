@@ -3,7 +3,8 @@
 The Connections tab lets an active human workspace owner authorize a dedicated
 GitHub App, select repositories, and explicitly consent to future delegated use.
 Publishing a capability or connecting a repository creates no execution grant.
-Recipient grants and execution remain ENG-124 and ENG-125.
+[User grants](hosted-access.md) are managed in Access. Agent credentials and
+execution remain ENG-124 and ENG-125.
 
 ## Set up GitHub inside Capykit
 
