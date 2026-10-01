@@ -60,7 +60,7 @@ async function check(width) {
   const consent=page.getByRole('checkbox',{name:/^I grant/});await consent.focus();await page.keyboard.press('Space');assert.ok(await page.getByRole('button',{name:'Grant access',exact:true}).isEnabled());await layout('access');
   await page.getByRole('button',{name:'Revoke access for Alex'}).click();await page.getByRole('button',{name:'Confirm revoke'}).waitFor();await layout('revoke');
   if(width<641){
-   await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));const nav=await page.getByRole('navigation',{name:'Workspace',exact:true}).boundingBox();assert.ok(nav.y+nav.height>=899&&nav.y>=0,'navigation remains reachable while scrolling');
+   await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));const nav=await page.getByRole('navigation',{name:'Workspace',exact:true}).boundingBox();assert.ok(nav.y+nav.height>=page.viewportSize().height-1&&nav.y>=0,'navigation remains reachable while scrolling');
    await page.getByRole('button',{name:'Functions',exact:true}).click();await page.getByRole('button',{name:'New capability'}).click();await page.getByLabel('Name',{exact:true}).focus();
    await page.setViewportSize({width,height:420});await page.getByLabel('Name',{exact:true}).scrollIntoViewIfNeeded();await layout('short-viewport');
   }

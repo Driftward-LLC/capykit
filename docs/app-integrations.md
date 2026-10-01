@@ -57,7 +57,8 @@ OAuth requests `openid email` and `drive.metadata.readonly`. This is account-wid
 read-only metadata access, including shared files the account can access; it does
 not permit reading file contents or writing files. The UI explicitly discloses
 this breadth before consent. Review Google's scope verification requirements before
-making the application broadly available. See [Drive scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth)
+making the application broadly available.
+See [Drive scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth)
 and [Google web-server OAuth](https://developers.google.com/identity/protocols/oauth2/web-server).
 
 One Drive account is stored per workspace. State is random, single-use, PKCE-bound,
