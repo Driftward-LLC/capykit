@@ -32,6 +32,7 @@ for(const width of [320,390,430,1440]){
  assert.equal(await page.getByRole('button',{name:'Connect Google Drive',exact:true}).count(),0);
  await page.reload();await page.getByRole('heading',{name:'Google Drive isn’t available yet',exact:true}).waitFor();
  await page.getByRole('button',{name:'Check availability',exact:true}).click();await page.getByText('Google Drive is still unavailable. Your administrator needs to finish setup.',{exact:true}).waitFor();
+ assert.equal(await page.getByText('Google Drive is still unavailable. Your administrator needs to finish setup.',{exact:true}).evaluate(node=>node.classList.contains('success')),false);
  configured=true;await page.getByRole('button',{name:'Check availability',exact:true}).click();await page.getByText('Google Drive is ready. Connect your account below.',{exact:true}).waitFor();
  assert.equal(await page.getByRole('button',{name:'Connect Google Drive',exact:true}).isEnabled(),true);
  assert.equal(await page.getByRole('checkbox').count(),0);

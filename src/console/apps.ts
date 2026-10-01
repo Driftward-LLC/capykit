@@ -67,6 +67,7 @@ export function Apps({active,onSessionExpired,onCreateFunction}:{active:boolean;
     return googleReturn?"google-drive":hasGitHubReturn()||url.searchParams.has("setup")?"github":app==="github"||app==="google-drive"?app:null;
   });
   const [data,setData]=useState<Catalog|null>(null),[error,setError]=useState(""),[notice,setNotice]=useState("");
+  const [noticeSuccess,setNoticeSuccess]=useState(false);
   const [query,setQuery]=useState(""),[connectedOnly,setConnectedOnly]=useState(false),[busy,setBusy]=useState(false),[disconnecting,setDisconnecting]=useState(false);
   const heading=useRef<HTMLHeadingElement>(null);
   const load=useCallback(async()=>{try{const value=await json<Catalog>(await sessionFetch("/v1/apps"),onSessionExpired);setData(value);setError("");return value;}catch(error){setError(error instanceof Error?error.message:"Could not load apps.");return undefined;}},[onSessionExpired]);
@@ -74,21 +75,21 @@ export function Apps({active,onSessionExpired,onCreateFunction}:{active:boolean;
   useEffect(()=>{
     const callback=googleReturn;googleReturn=null;
     if (!callback)return;
-    if ("notice" in callback){setNotice(callback.notice);return;}
+    if ("notice" in callback){setNoticeSuccess(false);setNotice(callback.notice);return;}
     setBusy(true);
-    void writeRequest("/v1/connections/google/callback","POST",callback).then(response=>json(response,onSessionExpired)).then(async()=>{setNotice("Google Drive is connected.");await load();}).catch((error:unknown)=>{setError(error instanceof Error?error.message:"Google Drive setup failed.");}).finally(()=>{setBusy(false);});
+    void writeRequest("/v1/connections/google/callback","POST",callback).then(response=>json(response,onSessionExpired)).then(async()=>{setNoticeSuccess(true);setNotice("Google Drive is connected.");await load();}).catch((error:unknown)=>{setError(error instanceof Error?error.message:"Google Drive setup failed.");}).finally(()=>{setBusy(false);});
   },[load,onSessionExpired]);
   function testFailure(message:string){void load().then(()=>{setError(message);});}
-  function open(id:AppId|null){setSelected(id);setError("");setNotice("");setDisconnecting(false);const url=new URL(window.location.href);if(id)url.searchParams.set("app",id);else url.searchParams.delete("app");window.history.replaceState(null,"",url);void load();requestAnimationFrame(()=>heading.current?.focus());}
+  function open(id:AppId|null){setSelected(id);setError("");setNotice("");setDisconnecting(false);const url=new URL(window.location.href);if(id)url.searchParams.set("app",id);else url.searchParams.delete("app");if(id!=="github")url.searchParams.delete("setup");window.history.replaceState(null,"",url);void load();requestAnimationFrame(()=>heading.current?.focus());}
   async function connect(){if(busy)return;setBusy(true);setError("");setNotice("");try{const value=await json<{authorizationUrl:string}>(await writeRequest("/v1/connections/google/start","POST",{consent:true}),onSessionExpired);const url=new URL(value.authorizationUrl);if(url.origin!=="https://accounts.google.com")throw new Error("Unexpected authorization URL.");window.location.assign(url.href);}catch(error){setError(error instanceof Error?error.message:"Could not start Google setup.");setBusy(false);}}
-  async function checkAvailability(){setBusy(true);setNotice("");try{const value=await load();if(value)setNotice(value.google.configured?"Google Drive is ready. Connect your account below.":"Google Drive is still unavailable. Your administrator needs to finish setup.");}finally{setBusy(false);}}
-  async function disconnect(){setBusy(true);setError("");try{const response=await writeRequest("/v1/connections/google","DELETE");if(!response.ok)await json(response,onSessionExpired);setDisconnecting(false);setNotice("Google Drive is disconnected.");await load();}catch(error){setError(error instanceof Error?error.message:"Could not disconnect.");}finally{setBusy(false);}}
+  async function checkAvailability(){setBusy(true);setNotice("");try{const value=await load();if(value){setNoticeSuccess(value.google.configured);setNotice(value.google.configured?"Google Drive is ready. Connect your account below.":"Google Drive is still unavailable. Your administrator needs to finish setup.");}}finally{setBusy(false);}}
+  async function disconnect(){setBusy(true);setError("");try{const response=await writeRequest("/v1/connections/google","DELETE");if(!response.ok)await json(response,onSessionExpired);setDisconnecting(false);setNoticeSuccess(true);setNotice("Google Drive is disconnected.");await load();}catch(error){setError(error instanceof Error?error.message:"Could not disconnect.");}finally{setBusy(false);}}
   const google=data?.google.connection;
   const apps=(data?.apps??[]).filter(app=>(!connectedOnly||app.connected)&&app.name.toLowerCase().includes(query.toLowerCase().trim()));
   return h("section",{className:"apps"},
     selected?h("button",{type:"button",className:"text-button connection-back",onClick:()=>{ open(null); },disabled:busy},"← All apps"):null,
     h("div",{className:"section-heading"},h("div",null,h("h1",{ref:heading,tabIndex:-1},selected==="google-drive"?"Google Drive":selected==="github"?"GitHub":"Apps"),h("p",{className:"muted"},selected?"Manage your workspace connection.":"Your tools, connected.")),h("button",{type:"button",className:"text-button",disabled:busy,"aria-label":"Refresh apps",onClick:()=>{void load();}},"↻")),
-    error?h("p",{className:"message error",role:"alert"},error):null,notice?h("p",{className:"message success",role:"status"},notice):null,
+    error?h("p",{className:"message error",role:"alert"},error):null,notice?h("p",{className:noticeSuccess?"message success":"message",role:"status"},notice):null,
     h("div",{hidden:selected!==null},h("label",{className:"app-search"},"Search apps",h("input",{type:"search",placeholder:"Search apps",value:query,onChange:event=>{ setQuery(event.currentTarget.value); }})),
       h("div",{className:"app-filters","aria-label":"Filter apps"},h("button",{type:"button","aria-pressed":!connectedOnly,onClick:()=>{ setConnectedOnly(false); }},"All apps"),h("button",{type:"button","aria-pressed":connectedOnly,onClick:()=>{ setConnectedOnly(true); }},"Connected")),
       data===null?h("p",{role:"status"},error?"Use Refresh apps to try again.":"Loading apps…"):apps.length===0?h("p",{className:"empty-state"},query?"No apps match your search.":"No connected apps yet. Choose All apps to connect your first app."):h("ul",{className:"app-list"},...apps.map(app=>h("li",{key:app.id},h("button",{type:"button",className:"app-row",onClick:()=>{ open(app.id); }},h(AppIcon,{id:app.id}),h("span",{className:"app-row-copy"},h("strong",null,app.name),h("span",{className:app.connected?"app-connected":"muted"},app.connected?"● Connected":!app.configured?"Not available yet":app.id==="google-drive"&&google?.status==="reconnect_required"?"Reconnect required":"Ready to connect"),h("span",{className:"small muted"},app.connected&&app.id==="google-drive"?google?.email:app.description)),h("span",{"aria-hidden":true},"›"))))),

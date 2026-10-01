@@ -29,6 +29,9 @@ await page.route('**/v1/**',async route=>{
 try{
  await page.goto(`${origin}/?tab=connections&setup=${id}`);
  await page.getByRole('heading',{name:'Choose repositories for this workspace',exact:true}).waitFor();
+ await page.getByRole('button',{name:'← All apps',exact:true}).click();await page.getByRole('button',{name:/Google Drive.*Ready to connect/}).click();
+ assert.equal(new URL(page.url()).searchParams.has('setup'),false);await page.reload();await page.getByRole('heading',{name:'Connect Google Drive',exact:true}).waitFor();
+ await page.goto(`${origin}/?tab=connections&setup=${id}`);await page.getByRole('heading',{name:'Choose repositories for this workspace',exact:true}).waitFor();
  await page.getByRole('checkbox',{name:'example/repository',exact:true}).check();
  await page.getByRole('checkbox',{name:'I approve read access to these repositories for this workspace.',exact:true}).check();
  await page.getByRole('button',{name:'Confirm connection',exact:true}).click();await page.getByRole('heading',{name:'Try your connection',exact:true}).waitFor();
@@ -45,6 +48,7 @@ try{
  driveReconnect=true;await page.reload();await page.getByRole('heading',{name:'Reconnect Google Drive',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Reconnect Google Drive',exact:true}).isEnabled(),true);
  await page.getByRole('button',{name:'Reconnect Google Drive',exact:true}).click();await page.waitForURL('https://accounts.google.com/**');assert.equal(startCount,3);driveReconnect=false;
  await page.goto(`${origin}/v1/connections/google/callback?error=access_denied&state=${'x'.repeat(43)}`);await page.getByText('Google Drive connection was canceled. You can connect when you’re ready.',{exact:true}).waitFor();assert.equal(callbackCount,1);assert.equal(new URL(page.url()).searchParams.get('app'),'google-drive');assert.equal(new URL(page.url()).searchParams.has('state'),false);assert.equal(await page.getByRole('button',{name:'Connect Google Drive',exact:true}).isEnabled(),true);
+ assert.equal(await page.getByText('Google Drive connection was canceled. You can connect when you’re ready.',{exact:true}).evaluate(node=>node.classList.contains('success')),false);
  await page.goto(`${origin}/v1/connections/google/callback?code=invalid&state=bad`);await page.getByText('Google Drive setup expired or could not be verified. Connect again to continue.',{exact:true}).waitFor();assert.equal(callbackCount,1);
  role='member';await page.goto(callback);await page.getByRole('heading',{name:'Functions & skills',exact:true}).waitFor();assert.equal(callbackCount,1);
  assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,githubConfirmRefresh:true,githubDisconnectRefresh:true,functionDeepLink:true,googleRedirect:true,googleStartRetry:true,googleCallback:true,googleRead:true,googleDisconnect:true,googleReconnect:true,googleCancel:true,googleExpired:true,memberCallbackDiscard:true}));
