@@ -82,10 +82,11 @@ string comparison breaking ties between distinct Unicode paths.
 
 `CapabilityStore.transaction` is the current authorization seam. It rechecks the
 verified identity binding, workspace, principal and membership from PostgreSQL
-for every operation, and the current owner role for mutations. A foreign workspace ID is hidden with 404;
-forbidden actions on an in-workspace ID return 403. Members can retrieve only exact published skill versions with current
-[user grants](hosted-access.md). Agent credentials remain ENG-124 work. There is no
-anonymous storage route, signed URL, or browser database credential.
+for every operation, and the current owner role for mutations. A foreign
+workspace ID is hidden with 404; forbidden actions on an in-workspace ID return
+403. Members can retrieve only exact published skill versions with current
+[user grants](hosted-access.md). Agent credentials remain ENG-124 work. There is
+no anonymous storage route, signed URL, or browser database credential.
 
 Deletion marks the capability unavailable and removes file bytes atomically.
 Version/digest metadata and non-content audit records remain. Existing downloads

@@ -36,10 +36,10 @@ checks. Workspace and actor IDs cannot be supplied in grant creation requests.
 
 | Route | Behavior |
 | --- | --- |
-| `GET /v1/access/options` | Owner-only invited users, published versions, active connections and repositories |
-| `GET /v1/grants?cursor=…` | Owners see workspace grants; recipients see their own grants, 50 per page |
-| `POST /v1/grants` | Owner creates an immutable exact-version grant with expiry |
-| `DELETE /v1/grants/:id` | Owner revokes once; repeated revocation is idempotent |
+| `GET /v1/access/options` | Owner-only choices and repository scope |
+| `GET /v1/grants?cursor=…` | Workspace/own grants, 50 per page |
+| `POST /v1/grants` | Owner creates an exact-version grant |
+| `DELETE /v1/grants/:id` | Owner revokes idempotently |
 
 Options are bounded to 200 users, versions and connections; the console reports
 truncation. Repository choices use the existing connection scope (maximum 500).
