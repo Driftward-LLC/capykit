@@ -50,7 +50,7 @@ Drive user/agent grants and arbitrary Activepieces actions are not enabled here.
    another application's client or refresh tokens.
 4. Apply migration `006_hosted_app_connections.sql` after migrations 001–005, with
    the usual database backup. Recreate only the app service after adding the file.
-5. In Apps → Google Drive, review the scope and select Continue with Google.
+5. In Apps → Google Drive, review the scope and select Connect Google Drive.
    Use a dedicated test account to verify the callback and a known file ID.
 
 OAuth requests `openid email` and `drive.metadata.readonly`. This is account-wide
@@ -75,7 +75,34 @@ same account. The UI links to Google's account permissions for an explicit globa
 removal. Failed/superseded callback credentials are discarded, never persisted or
 revoked project-wide. Other workspaces retain their independently consented access.
 
-Without dedicated Google configuration, the catalog says Setup needed and exposes
-no Connect button. Configuration readiness is not proof of successful live OAuth;
+## Established connection flow
+
+Use the same interaction documented by
+[Zapier](https://help.zapier.com/hc/en-us/articles/8495965163405-How-to-get-started-with-Google-Drive-on-Zapier)
+and [n8n](https://docs.n8n.io/integrations/builtin/credentials/google/oauth-single-service):
+connect, choose an account at Google, approve Google's permission screen, return
+connected. Capykit reuses Google's hosted account chooser and consent UI through
+the existing OAuth redirect. A full-page redirect works on mobile without popup
+permissions. There is no additional Capykit checkbox or account selector.
+
+The single Connect Google Drive action follows the scope and workspace-owner
+disclosure and sends the existing explicit consent flag to the API. Reconnect
+required has the same direct action. Cancellation and expired callbacks return
+to the Drive detail screen with an explanation and a retry. The selected app is
+retained in the URL, including after refresh; OAuth codes and state are removed.
+
+Activepieces' connector packages do not include its hosted connection manager.
+Its [connection SDK](https://www.activepieces.com/docs/embedding/embed-connections)
+requires initialization through [enterprise embedding](https://www.activepieces.com/docs/embedding/embed-builder).
+Do not add that SDK without the corresponding service and license. Reusing a
+connection pattern does not permit using another application's OAuth credentials.
+Like self-hosted n8n, this deployment still needs its own registered Google client;
+that one-time operator task is separate from end-user account connection.
+
+Without dedicated Google configuration, the catalog says Not available yet and
+the detail screen explains why, with Check availability to retry after setup.
+It exposes no Connect button or client-secret inputs. Operator instructions above
+remain the deployment runbook, not a user onboarding form.
+Configuration readiness is not proof of successful live OAuth;
 a real account callback and read must still be verified. API tests use controlled
 provider responses, with real PostgreSQL RLS and real pinned connector code.
