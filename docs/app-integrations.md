@@ -50,8 +50,8 @@ Drive user/agent grants and arbitrary Activepieces actions are not enabled here.
    another application's client or refresh tokens.
 4. Apply migration `006_hosted_app_connections.sql` after migrations 001–005, with
    the usual database backup. Recreate only the app service after adding the file.
-5. In Apps → Google Drive, review the scope, select Continue with Google, and use a
-   dedicated test account to verify the callback and a known file ID.
+5. In Apps → Google Drive, review the scope and select Continue with Google.
+   Use a dedicated test account to verify the callback and a known file ID.
 
 OAuth requests `openid email` and `drive.metadata.readonly`. This is account-wide
 read-only metadata access, including shared files the account can access; it does
