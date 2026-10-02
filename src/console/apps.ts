@@ -64,7 +64,7 @@ function ConnectionTest({app,data,onSessionExpired,onFailure}:{app:AppId;data:Ca
 export function Apps({active,onSessionExpired,onCreateFunction}:{active:boolean;onSessionExpired:()=>void;onCreateFunction:()=>void}):React.ReactElement {
   const [selected,setSelected]=useState<AppId|null>(()=>{
     const url=new URL(window.location.href), app=url.searchParams.get("app");
-    return googleReturn?"google-drive":hasGitHubReturn()||url.searchParams.has("setup")?"github":app==="github"||app==="google-drive"?app:null;
+    return googleReturn?"google-drive":hasGitHubReturn()?"github":app==="github"||app==="google-drive"?app:url.searchParams.has("setup")?"github":null;
   });
   const [data,setData]=useState<Catalog|null>(null),[error,setError]=useState(""),[notice,setNotice]=useState("");
   const [noticeSuccess,setNoticeSuccess]=useState(false);
