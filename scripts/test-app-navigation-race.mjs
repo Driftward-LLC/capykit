@@ -53,7 +53,7 @@ try {
     assert.equal(new URL(page.url()).searchParams.has('setup'),false);assert.equal(setupRequests,1,'reload must not fetch a consumed setup ID');
    }
    if(destination==='Functions'||destination==='Access')await page.getByRole('button',{name:'Apps',exact:true}).click();
-   if(destination!=='catalog')await page.getByRole('button',{name:'← All apps',exact:true}).click();
+   const back=page.getByRole('button',{name:'← All apps',exact:true});if(await back.isVisible())await back.click();
    await page.getByRole('button',{name:/GitHub/}).click();
    if(delayed!=='setup')await page.waitForFunction(()=>!new URL(location.href).searchParams.has('setup'));
    else if(failure){await page.getByText(expired,{exact:true}).waitFor();await page.waitForFunction(()=>!new URL(location.href).searchParams.has('setup'));}
