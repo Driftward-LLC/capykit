@@ -19,7 +19,7 @@ try {
    else if(path==='/v1/apps') body={apps:[],github:[],google:{configured:false,connection:null}};
    else if(path==='/v1/connections') body={configured:false,connections:[],installationUrl:null,setup:null};
    else if(path==='/v1/capabilities') body={capabilities:[]};
-   else if(path==='/v1/access/options') body={principals:[],connections:[],capabilities:[]};
+   else if(path==='/v1/access/options') body={users:[],connections:[],versions:[],truncated:false};
    else if(path==='/v1/grants') body={grants:[],nextCursor:null};
    await route.fulfill({status,json:body});
   });
