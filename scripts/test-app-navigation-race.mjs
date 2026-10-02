@@ -10,7 +10,7 @@ const connection={id,status:'pending',account:null,repositories:[],permissions:{
 function deferred(){let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};}
 const results=[];
 try {
- for(const width of [390,1440]) for(const callback of [false,true]) for(const destination of ['drive','catalog','Functions','Access']) {
+ for(const width of [390,1440]) for(const callback of [false,true]) for(const failure of [false,true]) for(const destination of ['drive','catalog','Functions','Access']) {
   const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();page.setDefaultTimeout(10000);
   const started=deferred(),release=deferred(),errors=[];let setupRequests=0;
   page.on('pageerror',error=>errors.push(error.message));
@@ -20,10 +20,10 @@ try {
    if(path==='/v1/me')body={identity:{email:'owner@example.test',principalKind:'human'},workspace:{id:'workspace',role:'owner'}};
    else if(path==='/v1/apps')body={apps:[{id:'github',name:'GitHub',configured:true,connected:false,description:'Read issues'},{id:'google-drive',name:'Google Drive',configured:true,connected:false,description:'Read metadata'}],github:[connection],google:{configured:true,connection:null}};
    else if(path==='/v1/connections')body={configured:true,connections:[connection],installationUrl:'https://github.com/apps/example/installations/new',setup:null};
-   else if(path===`/v1/connections/github/pending/${id}`||path==='/v1/connections/github/callback'){setupRequests++;started.resolve();await release.promise;body=setup;}
+   else if(path===`/v1/connections/github/pending/${id}`||path==='/v1/connections/github/callback'){setupRequests++;started.resolve();await release.promise;if(failure)return route.fulfill({status:400,json:{error:{code:'CONNECT_SETUP_EXPIRED'}}});body=setup;}
    else if(path==='/v1/capabilities')body={capabilities:[]};
    else if(path==='/v1/grants')body={grants:[],nextCursor:null};
-   else if(path==='/v1/access/options')body={principals:[],capabilities:[],connections:[]};
+   else if(path==='/v1/access/options')body={users:[],versions:[],connections:[],truncated:false};
    await route.fulfill({json:body});
   });
   try {
@@ -34,14 +34,16 @@ try {
     if(destination==='drive')await page.getByRole('button',{name:/Google Drive.*Ready to connect/}).click();
    }else await page.getByRole('button',{name:destination,exact:true}).click();
    const navigation=page.url();release.resolve();
-   // The hidden review heading proves the delayed response reached React.
-   await page.getByRole('heading',{name:'Choose repositories for this workspace',exact:true,includeHidden:true}).waitFor({state:'attached'});
+   // Hidden review/error content proves the delayed response reached React.
+   const expired='Your GitHub review expired. Continue with GitHub to refresh it. No new repository access was approved.';
+   if(failure)await page.getByText(expired,{exact:true}).waitFor({state:'attached'});
+   else await page.getByRole('heading',{name:'Choose repositories for this workspace',exact:true,includeHidden:true}).waitFor({state:'attached'});
    assert.equal(page.url(),navigation,`late GitHub response changed ${destination} navigation (${width}px, callback=${callback})`);
    if(destination==='Functions'||destination==='Access')await page.getByRole('button',{name:'Apps',exact:true}).click();
    if(destination!=='catalog')await page.getByRole('button',{name:'← All apps',exact:true}).click();
    await page.getByRole('button',{name:/GitHub.*Ready to connect/}).click();
-   await page.getByRole('heading',{name:'Choose repositories for this workspace',exact:true}).waitFor();
-   await page.waitForFunction(setupId=>new URL(location.href).searchParams.get('setup')===setupId,id);
+   if(failure){await page.getByText(expired,{exact:true}).waitFor();await page.waitForFunction(()=>!new URL(location.href).searchParams.has('setup'));}
+   else {await page.getByRole('heading',{name:'Choose repositories for this workspace',exact:true}).waitFor();await page.waitForFunction(setupId=>new URL(location.href).searchParams.get('setup')===setupId,id);}
    assert.equal(setupRequests,1,'returning to GitHub must resume without replaying the callback or setup request');
    await page.getByRole('button',{name:'← All apps',exact:true}).click();await page.getByRole('button',{name:/Google Drive.*Ready to connect/}).click();
    await page.reload();await page.getByRole('heading',{name:'Connect Google Drive',exact:true}).waitFor();
@@ -49,8 +51,9 @@ try {
    // Old bookmarked URLs containing both parameters must honor the selected app.
    await page.goto(`${origin}/?tab=connections&app=google-drive&setup=${id}`);
    await page.getByRole('heading',{name:'Connect Google Drive',exact:true}).waitFor();
-   assert.deepEqual(errors,[]);results.push({width,callback,destination});
-  }finally{release.resolve();await context.close();}
+   assert.deepEqual(errors,[]);results.push({width,callback,failure,destination});
+  }catch(error){console.error(JSON.stringify({width,callback,failure,destination,url:page.url(),headings:await page.locator('h1,h2').allTextContents(),errors}));throw error;}
+  finally{release.resolve();await context.close();}
  }
  console.log(JSON.stringify({passed:true,cases:results.length,results}));
 }finally{await browser.close();}
