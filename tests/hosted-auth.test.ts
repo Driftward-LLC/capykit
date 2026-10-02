@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadHostedConfig } from "../src/hosted/config.js";
 import { AuthUnavailableError, createAuthGateway } from "../src/hosted/auth.js";
 
-const methods = vi.hoisted(() => ({ signInWithOtp: vi.fn(), verifyOtp: vi.fn(), refreshSession: vi.fn(), getUser: vi.fn(), signOut: vi.fn() }));
-vi.mock("@supabase/auth-js", () => ({ AuthClient: vi.fn(function () { return { ...methods, admin: { signOut: methods.signOut } }; }) }));
+const methods = vi.hoisted(() => ({ signInWithOtp: vi.fn(), verifyOtp: vi.fn(), refreshSession: vi.fn(), getUser: vi.fn(), signOut: vi.fn(), getUserById: vi.fn(), generateLink: vi.fn() }));
+vi.mock("@supabase/auth-js", () => ({ AuthClient: vi.fn(function () { return { ...methods, admin: { signOut: methods.signOut, getUserById: methods.getUserById, generateLink: methods.generateLink } }; }) }));
 const config = loadHostedConfig({ CAPYKIT_AUTH_URL: "http://auth:9999" });
 const subject = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const sessionId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -22,6 +22,40 @@ beforeEach(() => { vi.clearAllMocks(); for (const method of Object.values(method
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("GoTrue authentication boundary", () => {
+
+  it("exchanges a server-only native magic link for the exact existing, confirmed subject without sending mail", async () => {
+    const mapped = { ...config, tailscaleSignIn: { login: "owner@github", email: user.email, subject, proxyAddress: "127.0.0.1", serviceKey: "private-service-key" } };
+    const auth = createAuthGateway(mapped);
+    if (!auth) throw new Error("test auth missing");
+    methods.getUserById.mockResolvedValue({ data: { user: { ...user, email_confirmed_at: "2026-10-02" } }, error: null });
+    methods.generateLink.mockResolvedValue({ data: { user, properties: { hashed_token: "private-hash" } }, error: null });
+    methods.verifyOtp.mockResolvedValue({ data: { user, session }, error: null });
+    await expect(auth.signInTrusted?.(user.email, subject)).resolves.toEqual({ accessToken: session.access_token, refreshToken: session.refresh_token });
+    expect(methods.getUserById).toHaveBeenCalledWith(subject);
+    expect(methods.generateLink).toHaveBeenCalledWith({ type: "magiclink", email: user.email });
+    expect(methods.verifyOtp).toHaveBeenCalledWith({ type: "magiclink", token_hash: "private-hash" });
+    expect(methods.signInWithOtp).not.toHaveBeenCalled();
+    expect(vi.mocked(AuthClient).mock.calls[0]?.[0].headers).toMatchObject({ Authorization: "Bearer private-service-key" });
+    expect(vi.mocked(AuthClient).mock.calls[1]?.[0].headers).not.toHaveProperty("Authorization");
+  });
+  it("does not generate links for absent, different or unconfirmed accounts and rejects subject substitution", async () => {
+    const auth = createAuthGateway({ ...config, tailscaleSignIn: { login: "owner@github", email: user.email, subject, proxyAddress: "127.0.0.1", serviceKey: "private-service-key" } });
+    if (!auth) throw new Error("test auth missing");
+    for (const result of [{ data: { user: null }, error: { status: 404 } }, { data: { user: { ...user, id: "other" } }, error: null }, { data: { user: { ...user, email: "other@example.test" } }, error: null }, { data: { user }, error: null }]) {
+      methods.getUserById.mockResolvedValueOnce(result);
+      await expect(auth.signInTrusted?.(user.email, subject)).resolves.toBeUndefined();
+    }
+    expect(methods.generateLink).not.toHaveBeenCalled();
+    methods.getUserById.mockResolvedValue({ data: { user: { ...user, email_confirmed_at: "2026-10-02" } }, error: null });
+    methods.generateLink.mockResolvedValueOnce({ data: { user: { ...user, id: "other" }, properties: { hashed_token: "private-hash" } }, error: null });
+    await expect(auth.signInTrusted?.(user.email, subject)).rejects.toThrow("Authentication provider unavailable");
+    expect(methods.verifyOtp).not.toHaveBeenCalled();
+    methods.generateLink.mockResolvedValue({ data: { user, properties: { hashed_token: "private-hash" } }, error: null });
+    methods.verifyOtp.mockResolvedValue({ data: { user: { ...user, id: "other" }, session }, error: null });
+    await expect(auth.signInTrusted?.(user.email, subject)).rejects.toThrow("Authentication provider unavailable");
+    await expect(gateway().signInTrusted?.(user.email, subject)).resolves.toBeUndefined();
+  });
+
   it("disables account creation and keeps invited/unknown email responses indistinguishable", async () => {
     const auth = gateway();
     methods.signInWithOtp.mockResolvedValueOnce({ error: null }).mockResolvedValueOnce({ error: { message: "user not found" } });

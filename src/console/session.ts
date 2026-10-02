@@ -84,7 +84,7 @@ export async function sessionFetch(path: string, init: RequestInit = {}): Promis
   if (path === "/v1/auth/logout") return logout(init);
   if (path.startsWith("/v1/auth/")) {
     const response = await request(path, init);
-    if (path === "/v1/auth/verify" && response.ok) sessionGeneration++;
+    if (["/v1/auth/verify", "/v1/auth/tailscale"].includes(path) && response.ok) sessionGeneration++;
     return response;
   }
   const generation = sessionGeneration;

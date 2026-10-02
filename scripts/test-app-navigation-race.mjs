@@ -19,7 +19,8 @@ try {
    if(route.request().resourceType()==='document')return route.continue();
    const path=new URL(route.request().url()).pathname;let body={};
    const connected=finished&&delayed==='confirm',records=finished&&delayed==='cancel'?[]:[connected?activeConnection:connection];
-   if(path==='/v1/me')body={identity:{email:'owner@example.test',principalKind:'human'},workspace:{id:'workspace',role:'owner'}};
+   if(path==='/v1/auth/method')body={method:'email'};
+   else if(path==='/v1/me')body={identity:{email:'owner@example.test',principalKind:'human'},workspace:{id:'workspace',role:'owner'}};
    else if(path==='/v1/apps')body={apps:[{id:'github',name:'GitHub',configured:true,connected,description:'Read issues'},{id:'google-drive',name:'Google Drive',configured:true,connected:false,description:'Read metadata'}],github:records,google:{configured:true,connection:null}};
    else if(path==='/v1/connections')body={configured:true,connections:records,installationUrl:'https://github.com/apps/example/installations/new',setup:null};
    else if(path==='/v1/connections/github/confirm'||(path===`/v1/connections/github/pending/${id}`&&route.request().method()==='DELETE')){started.resolve();await release.promise;finished=true;body=delayed==='confirm'?activeConnection:{};}

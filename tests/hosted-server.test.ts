@@ -39,6 +39,7 @@ function fixture(overrides: { config?: HostedConfig; consoleDirectory?: string }
   };
   const auth = {
     requestOtp: vi.fn(async () => {}),
+    signInTrusted: vi.fn((): Promise<AuthSession | undefined> => Promise.resolve(session)),
     signOut: vi.fn(async () => {}),
     verifyOtp: vi.fn((): Promise<AuthSession | undefined> => Promise.resolve(session)),
     refresh: vi.fn<(token: string) => Promise<AuthSession | undefined>>().mockResolvedValue(renewedSession),
@@ -50,6 +51,77 @@ function fixture(overrides: { config?: HostedConfig; consoleDirectory?: string }
 }
 
 describe("hosted HTTP boundaries", () => {
+
+  const tailscaleConfig = { ...config, tailscaleSignIn: { login: "owner@example.test", email: identity.email, subject: identity.subject, proxyAddress: "127.0.0.1", serviceKey: "private-service-key" } };
+  const trustedHeaders = { origin, "tailscale-user-login": "owner@example.test" };
+  it("exchanges only the trusted proxy identity for an invited human's native session", async () => {
+    const { app, auth, database } = fixture({ config: tailscaleConfig });
+    expect((await app.inject({ url: "/v1/auth/method" })).json()).toEqual({ method: "tailscale" });
+    const signedIn = await app.inject({ method: "POST", url: "/v1/auth/tailscale", headers: trustedHeaders, payload: {} });
+    expect(signedIn.statusCode, signedIn.body).toBe(200);
+    expect(signedIn.cookies).toHaveLength(3);
+    expect(signedIn.cookies.find(({ name }) => name === "capykit_refresh")).toMatchObject({ httpOnly: true, secure: true, sameSite: "Strict", maxAge: rememberedAge });
+    expect(signedIn.body).not.toMatch(/verified-token|refresh-token|private-service-key/u);
+    expect(auth.requestOtp).not.toHaveBeenCalled();
+    expect(auth.signInTrusted).toHaveBeenCalledExactlyOnceWith(identity.email, identity.subject);
+    expect(database.resolveContext).toHaveBeenCalledTimes(2);
+  });
+  it("rejects missing, substituted and forged proxy identities before using the service credential", async () => {
+    const { app, auth } = fixture({ config: tailscaleConfig });
+    for (const headers of [{ origin }, { ...trustedHeaders, "tailscale-user-login": "someone-else" }, { ...trustedHeaders, "tailscale-user-login": "owner@example.test,owner@example.test" }]) {
+      const denied = await app.inject({ method: "POST", url: "/v1/auth/tailscale", headers, payload: {} });
+      expect(denied.statusCode).toBe(401); expect(denied.cookies).toHaveLength(0);
+    }
+    const direct = await app.inject({ method: "POST", url: "/v1/auth/tailscale", headers: trustedHeaders, remoteAddress: "172.25.0.9", payload: {} });
+    expect(direct.statusCode).toBe(401); expect(direct.cookies).toHaveLength(0);
+    expect(auth.signInTrusted).not.toHaveBeenCalled();
+  });
+  it("requires same-origin and CSRF for cookie-bearing Tailscale sign-in; accepts no chosen account", async () => {
+    const { app, auth } = fixture({ config: tailscaleConfig });
+    for (const headers of [{ "tailscale-user-login": "owner@example.test" }, { ...trustedHeaders, origin: "https://evil.test" }, { ...trustedHeaders, authorization: "Bearer verified-token" }, { ...trustedHeaders, cookie: renewalHeaders.cookie }, { ...trustedHeaders, cookie: renewalHeaders.cookie, "x-csrf-token": "wrong" }]) {
+      const denied = await app.inject({ method: "POST", url: "/v1/auth/tailscale", headers, payload: {} });
+      expect(denied.statusCode).toBe(403); expect(denied.cookies).toHaveLength(0);
+    }
+    expect((await app.inject({ method: "POST", url: "/v1/auth/tailscale", headers: trustedHeaders, payload: { email: "someone-else@example.test" } })).statusCode).toBe(400);
+    expect(auth.signInTrusted).not.toHaveBeenCalled();
+  });
+  it("denies uninvited, inactive and agent principals, mismatched subjects and post-exchange access removal", async () => {
+    const { app, auth, database } = fixture({ config: tailscaleConfig });
+    for (const membership of [undefined, { ...context, membership: { ...context.membership, active: false } }, { ...context, membership: { ...context.membership, principalKind: "agent" as const } }]) {
+      database.resolveContext.mockResolvedValueOnce(membership);
+      const denied = await app.inject({ method: "POST", url: "/v1/auth/tailscale", headers: trustedHeaders, payload: {} });
+      expect(denied.statusCode).toBe(401); expect(denied.cookies).toHaveLength(0);
+    }
+    expect(auth.signInTrusted).not.toHaveBeenCalled();
+    auth.verifyBearer.mockResolvedValueOnce({ ...identity, subject: "other-user" });
+    const mismatch = await app.inject({ method: "POST", url: "/v1/auth/tailscale", headers: trustedHeaders, payload: {} });
+    expect(mismatch.statusCode).toBe(401); expect(mismatch.cookies).toHaveLength(0);
+    database.resolveContext.mockResolvedValueOnce(context).mockResolvedValueOnce(undefined);
+    const removed = await app.inject({ method: "POST", url: "/v1/auth/tailscale", headers: trustedHeaders, payload: {} });
+    expect(removed.statusCode).toBe(401); expect(removed.cookies).toHaveLength(0);
+  });
+  it("fails closed for incomplete or unsafe Tailscale configuration", () => {
+    const env = { CAPYKIT_PUBLIC_BASE_URL: "https://preview.example.ts.net", CAPYKIT_AUTH_URL: "http://auth:9999", CAPYKIT_TAILSCALE_LOGIN: "owner@github", CAPYKIT_TAILSCALE_EMAIL: identity.email, CAPYKIT_TAILSCALE_SUBJECT: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", CAPYKIT_TAILSCALE_PROXY_ADDRESS: "172.25.0.1", CAPYKIT_TAILSCALE_SERVICE_KEY: "private-service-key" };
+    expect(loadHostedConfig(env).tailscaleSignIn).toMatchObject({ login: "owner@github", proxyAddress: "172.25.0.1" });
+    for (const key of Object.keys(env).filter(key => key.startsWith("CAPYKIT_TAILSCALE_"))) {
+      expect(() => loadHostedConfig({ ...env, [key]: "" })).toThrow(/Tailscale sign-in/u);
+    }
+    for (const changes of [{ CAPYKIT_PUBLIC_BASE_URL: origin }, { CAPYKIT_TAILSCALE_PROXY_ADDRESS: "0.0.0.0" }, { CAPYKIT_TAILSCALE_PROXY_ADDRESS: "172.25.0.0/16" }, { CAPYKIT_TAILSCALE_SUBJECT: "invalid" }, { CAPYKIT_TAILSCALE_SERVICE_KEY: "private\nheader" }]) {
+      expect(() => loadHostedConfig({ ...env, ...changes })).toThrow(/Tailscale sign-in/u);
+    }
+  });
+  it("keeps Tailscale sign-in disabled by default and bounds provider errors without exposing details", async () => {
+    const standard = fixture();
+    expect((await standard.app.inject({ url: "/v1/auth/method" })).json()).toEqual({ method: "email" });
+    expect((await standard.app.inject({ method: "POST", url: "/v1/auth/tailscale", headers: trustedHeaders, payload: {} })).statusCode).toBe(503);
+    expect(standard.auth.signInTrusted).not.toHaveBeenCalled();
+    const { app, auth } = fixture({ config: tailscaleConfig });
+    auth.signInTrusted.mockRejectedValueOnce(new AuthUnavailableError());
+    const unavailable = await app.inject({ method: "POST", url: "/v1/auth/tailscale", headers: trustedHeaders, payload: {} });
+    expect(unavailable.statusCode).toBe(503); expect(unavailable.cookies).toHaveLength(0);
+    expect(unavailable.json()).toMatchObject({ error: { code: "AUTHENTICATION_UNAVAILABLE" } });
+  });
+
   it("verifies an email code before issuing private session cookies and resolving current identity", async () => {
     const { app, auth, database } = fixture();
     const request = await app.inject({ method: "POST", url: "/v1/auth/otp", headers: { origin }, payload: { email: "Owner@example.test" } });

@@ -12,6 +12,7 @@ export class AuthUnavailableError extends Error {
 }
 
 export interface AuthGateway {
+  signInTrusted?(email: string, subject: string): Promise<AuthSession | undefined>;
   requestOtp(email: string, redirectTo: string): Promise<void>;
   verifyOtp(email: string, token: string): Promise<AuthSession | undefined>;
   refresh(refreshToken: string): Promise<AuthSession | undefined>;
@@ -38,15 +39,34 @@ export function createAuthGateway(config: HostedConfig): AuthGateway | undefined
   const { authUrl } = config;
   if (authUrl === undefined) return undefined;
   // OTP verification changes SDK session state. Keep each request's client isolated.
-  const client = () => new AuthClient({
+  const client = (serviceKey?: string) => new AuthClient({
     url: authUrl, autoRefreshToken: false, persistSession: false, detectSessionInUrl: false,
     // ponytail: one shared pilot quota; introduce trusted per-client keys when usage grows.
-    headers: { "x-capykit-auth-client": "capykit-api" },
+    headers: { "x-capykit-auth-client": "capykit-api", ...(serviceKey === undefined ? {} : { Authorization: `Bearer ${serviceKey}` }) },
     fetch: (input, init) => fetch(input, { ...init, redirect: "error", signal: AbortSignal.timeout(10_000) }),
   });
   // Native rotation handles stale-token reuse; this map only coalesces concurrent requests.
   const refreshing = new Map<string, Promise<AuthSession | undefined>>();
   return {
+    async signInTrusted(email, subject) {
+      const key = config.tailscaleSignIn?.serviceKey;
+      if (key === undefined) return undefined;
+      try {
+        const admin = client(key).admin;
+        // Never generate a link for a missing or different account: generateLink can create users.
+        const existing = await admin.getUserById(subject);
+        if (existing.error) {
+          if (existing.error.status === 404) return undefined;
+          throw new AuthUnavailableError();
+        }
+        if (existing.data.user.id !== subject || existing.data.user.email?.toLowerCase() !== email || !existing.data.user.email_confirmed_at) return undefined;
+        const link = await admin.generateLink({ type: "magiclink", email });
+        if (link.error || link.data.user.id !== subject || !link.data.properties.hashed_token) throw new AuthUnavailableError();
+        const verified = await client().verifyOtp({ type: "magiclink", token_hash: link.data.properties.hashed_token });
+        if (verified.error || verified.data.user?.id !== subject) throw new AuthUnavailableError();
+        return sessionTokens(verified.data.session);
+      } catch { throw new AuthUnavailableError(); }
+    },
     async requestOtp(email, redirectTo) {
       // Deliberately return the same public result for invited and unknown emails.
       await client().signInWithOtp({ email, options: { emailRedirectTo: redirectTo, shouldCreateUser: false } });

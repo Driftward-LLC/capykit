@@ -202,6 +202,22 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     setSessionCookies(reply, config, token, refreshToken);
     return reply.send({ status: "authenticated" });
   }
+  app.get("/v1/auth/method", () => ({ method: config.tailscaleSignIn === undefined ? "email" : "tailscale" }));
+  app.post("/v1/auth/tailscale", { schema: { body: { type: "object", additionalProperties: false, properties: {} } } }, async (request, reply) => {
+    if (request.headers.origin !== publicOrigin || request.headers.authorization !== undefined) return reply.code(403).send(stableError("CSRF_REQUIRED", request.id));
+    const mapping = config.tailscaleSignIn;
+    if (mapping === undefined || auth?.signInTrusted === undefined || database === undefined) return reply.code(503).send(stableError("CONFIGURATION_UNAVAILABLE", request.id));
+    // Serve strips caller-supplied identity headers. Publish this backend ONLY on loopback;
+    // the configured peer is the host/Docker gateway, never a forwarded client address.
+    const peer = request.socket.remoteAddress?.replace(/^::ffff:/u, "");
+    if (peer !== mapping.proxyAddress || request.headers["tailscale-user-login"] !== mapping.login) return reply.code(401).send(stableError("AUTHENTICATION_INVALID", request.id));
+    const invited = await database.resolveContext({ provider: "gotrue", subject: mapping.subject, email: mapping.email });
+    if (!invited?.membership.active || invited.membership.principalKind !== "human") return reply.code(401).send(stableError("MEMBERSHIP_INACTIVE", request.id));
+    const session = await auth.signInTrusted(mapping.email, mapping.subject);
+    const identity = session === undefined ? undefined : await auth.verifyBearer(session.accessToken);
+    if (identity?.subject !== mapping.subject || identity.email.toLowerCase() !== mapping.email) return reply.code(401).send(stableError("AUTHENTICATION_INVALID", request.id));
+    return establishSession(session?.accessToken, request, reply, session?.refreshToken);
+  });
   app.post<{ Body: { email: string; token: string } }>("/v1/auth/verify", { schema: { body: verifySchema } }, async (request, reply) => {
     if (request.headers.origin !== publicOrigin) return reply.code(403).send(stableError("CSRF_REQUIRED", request.id));
     if (auth === undefined || database === undefined) return reply.code(503).send(stableError("CONFIGURATION_UNAVAILABLE", request.id));

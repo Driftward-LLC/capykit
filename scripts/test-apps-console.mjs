@@ -13,7 +13,8 @@ for(const width of [320,390,430,1440]){
  let configured=false;
  await page.route('**/v1/**',async route=>{
   const path=new URL(route.request().url()).pathname;let body={};
-  if(path==='/v1/me')body={identity:{email:'owner@example.test',principalKind:'human'},workspace:{id:'workspace',role:'owner'}};
+  if(path==='/v1/auth/method')body={method:'email'};
+   else if(path==='/v1/me')body={identity:{email:'owner@example.test',principalKind:'human'},workspace:{id:'workspace',role:'owner'}};
   else if(path==='/v1/apps')body={apps:[{id:'github',name:'GitHub',configured:true,connected:true,description:'Read issues from selected repositories'},{id:'google-drive',name:'Google Drive',configured,connected:false,description:'Read file names and metadata'}],github:[connection],google:{configured,connection:null}};
   else if(path==='/v1/connections')body={configured:true,connections:[connection],installationUrl:'https://github.com/apps/example/installations/new',setup:null};
   else if(path==='/v1/capabilities')body={capabilities:[]};
