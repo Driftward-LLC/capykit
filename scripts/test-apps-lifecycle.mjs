@@ -11,7 +11,8 @@ function github(){return {id,status:githubActive?'active':'pending',account:{id:
 await page.route('**/v1/**',async route=>{
  if(route.request().resourceType()==='document')return route.continue();
  const path=new URL(route.request().url()).pathname;let body={};
- if(path==='/v1/me')body={identity:{email:'owner@example.test',principalKind:'human'},workspace:{id:'workspace',role}};
+ if(path==='/v1/auth/method')body={method:'email'};
+   else if(path==='/v1/me')body={identity:{email:'owner@example.test',principalKind:'human'},workspace:{id:'workspace',role}};
  else if(path==='/v1/apps')body={apps:[{id:'github',name:'GitHub',configured:true,connected:githubActive,description:'Read issues'},{id:'google-drive',name:'Google Drive',configured:true,connected:driveActive,description:'Read metadata'}],github:[github()],google:{configured:true,connection:driveActive||driveReconnect?{status:driveActive?'active':'reconnect_required',email:'drive@example.test'}:null}};
  else if(path==='/v1/connections')body={configured:true,connections:[github()],installationUrl:'https://github.com/apps/example/installations/new',setup:null};
  else if(path==='/v1/connections/google/callback'){callbackCount++;assert.ok(route.request().postDataJSON().state);driveActive=true;body={status:'connected'};}

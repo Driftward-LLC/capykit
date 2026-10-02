@@ -45,7 +45,7 @@ describe("console session renewal", () => {
       fetcher.mockResolvedValueOnce(response(status, code));
       expect((await sessionFetch("/v1/capabilities")).status).toBe(status);
     }
-    for (const action of ["otp", "verify", "session", "logout"]) {
+    for (const action of ["otp", "verify", "tailscale", "session", "logout"]) {
       fetcher.mockResolvedValueOnce(response(401));
       expect((await writeRequest(`/v1/auth/${action}`, "POST", {})).status).toBe(401);
     }
@@ -137,13 +137,13 @@ describe("console session renewal", () => {
     expect(fetcher.mock.calls.map(([path]) => path)).toEqual(["/v1/capabilities", "/v1/auth/refresh", "/v1/auth/logout"]);
   });
 
-  it("fences a successful identity response arriving after logout", async () => {
+  it.each(["logout", "verify", "tailscale"])("fences a successful identity response arriving after %s", async (action) => {
     const { sessionFetch, writeRequest } = await import("../src/console/session.js");
     const identity = deferred<Response>();
     fetcher.mockImplementation((path) => path === "/v1/me" ? identity.promise : Promise.resolve(response()));
     const request = sessionFetch("/v1/me");
     const rejected = expect(request).rejects.toThrow("Your session changed");
-    await writeRequest("/v1/auth/logout", "POST", {});
+    await writeRequest(`/v1/auth/${action}`, "POST", {});
     identity.resolve(response());
     await rejected;
   });

@@ -16,6 +16,16 @@ async function post(path: string, body?: unknown): Promise<Response> {
   return writeRequest(path, "POST", body ?? {});
 }
 
+async function signInMethod(): Promise<"email" | "tailscale"> {
+  const response = await sessionFetch("/v1/auth/method");
+  // Allow the console to run against a previous API release during a rollout.
+  if (response.status === 404) return "email";
+  if (!response.ok) throw new Error("sign-in unavailable");
+  const result = await response.json() as { method?: unknown };
+  if (result.method !== "email" && result.method !== "tailscale") throw new Error("sign-in unavailable");
+  return result.method;
+}
+
 function callbackError(): string {
   const url = new URL(window.location.href);
   if (!url.searchParams.has("error") && !new URLSearchParams(url.hash.slice(1)).has("error")) return "";
@@ -30,6 +40,7 @@ function App(): React.ReactElement {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [codeRequested, setCodeRequested] = useState(false);
+  const [authMethod, setAuthMethod] = useState<"email" | "tailscale">("email");
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [identityResolved, setIdentityResolved] = useState(false);
   const [returningFromGitHub] = useState(hasGitHubReturn);
@@ -42,7 +53,24 @@ function App(): React.ReactElement {
     setPending("session");
     if (initial) setStatus("Checking your session…");
     try {
-      const response = await sessionFetch("/v1/me");
+      const method = initial ? await signInMethod() : undefined;
+      if (method !== undefined) setAuthMethod(method);
+      let response = await sessionFetch("/v1/me");
+      if (response.status === 401 && initial) {
+        if (method === "tailscale") {
+          // A new session cannot resume an authorization bound to the previous browser session.
+          discardGoogleReturn(); discardGitHubReturn();
+          const connected = await post("/v1/auth/tailscale");
+          if (connected.status === 401) {
+            setCurrentUser(null); setIdentityResolved(true);
+            setStatus("Connect to Tailscale with your invited account to open this workspace.");
+            setError("This device’s Tailscale identity does not have access to this workspace.");
+            return;
+          }
+          if (!connected.ok) throw new Error("sign-in unavailable");
+          response = await sessionFetch("/v1/me");
+        }
+      }
       if (response.status === 401) {
         discardGoogleReturn();
         if (discardGitHubReturn()) setGitHubNotice("GitHub setup needs an existing signed-in session. Sign in below, then start a new GitHub authorization from Connections.");
@@ -179,6 +207,10 @@ function App(): React.ReactElement {
       h("p", { className: "eyebrow" }, "Your capabilities, together"),
       h("h1", null, "Welcome to Capykit"),
       h("p", { className: "muted", role: "status", "aria-live": "polite" }, status),
+      authMethod === "tailscale" ? h(React.Fragment, null,
+        h("p", { className: "small muted" }, "Use your connected Tailscale account. No email code needed."),
+        h("button", { type: "button", disabled, onClick: () => { setError(""); void loadIdentity(true); } }, pending === "session" ? "Opening workspace…" : "Continue with Tailscale"),
+      ) : h(React.Fragment, null,
       h("p", { className: "small muted" }, "Stay signed in for 30 days between visits."),
       h("form", { onSubmit: (event) => { void requestCode(event); } },
         h("label", { htmlFor: "email" }, "Invited email address"),
@@ -198,6 +230,7 @@ function App(): React.ReactElement {
         }),
         h("button", { type: "submit", disabled }, pending === "verify" ? "Verifying…" : "Sign in"),
       ) : null,
+      ),
       error === "" ? null : h("button", { type: "button", disabled, onClick: () => { void loadIdentity(); } }, "Retry session check"),
     ) : h(React.Fragment, null,
       currentUser.identity.principalKind === "human"
