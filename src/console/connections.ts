@@ -130,6 +130,11 @@ export function Connections({ onSessionExpired, active, onConnectionsChanged }: 
   const unfinished = connections.filter(unfinishedConnection);
   const resumable = unfinished.length === 1 ? unfinished[0] : undefined;
 
+  // Background results may update the saved review, but only the visible app owns navigation.
+  useEffect(() => {
+    if (active && !loading) setupInUrl(setup?.setupId);
+  }, [active, loading, setup]);
+
   useEffect(() => {
     if (!active || loading || setup === null || focusedSetup.current === setup.setupId || document.visibilityState !== "visible") return;
     const heading = reviewHeading.current;
@@ -167,7 +172,6 @@ export function Connections({ onSessionExpired, active, onConnectionsChanged }: 
 
   function showSetup(value: Setup): void {
     setSetup(value); setSelected(null); setInstallationId(value.candidates.length === 1 ? value.candidates[0]?.installationId ?? "" : ""); setRepositoryIds([]); setConsent(false);
-    setupInUrl(value.setupId);
   }
 
   useEffect(() => {
@@ -193,13 +197,13 @@ export function Connections({ onSessionExpired, active, onConnectionsChanged }: 
         } else if (returned !== null) {
           if (!controller.signal.aborted) setNotice(returned.notice);
         } else if (setupId !== null) {
-          if (!/^[a-f0-9-]{36}$/i.test(setupId)) { setupInUrl(); throw new Error("That setup link is invalid. Start a new GitHub authorization."); }
+          if (!/^[a-f0-9-]{36}$/i.test(setupId)) throw new Error("That setup link is invalid. Start a new GitHub authorization.");
           const response = await checked(await sessionFetch(`/v1/connections/github/pending/${encodeURIComponent(setupId)}`, { credentials: "same-origin", cache: "no-store" }));
           const value = await response.json() as Setup;
           if (!controller.signal.aborted) showSetup(value);
         }
       } catch (failure) {
-        if (!controller.signal.aborted) { setupInUrl(); setError(failure instanceof Error ? failure.message : "GitHub setup could not be completed. Start a new authorization."); }
+        if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : "GitHub setup could not be completed. Start a new authorization.");
       }
       try { if (!controller.signal.aborted) await refresh(); }
       catch (failure) { if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : "Could not load connections."); }
@@ -255,7 +259,7 @@ export function Connections({ onSessionExpired, active, onConnectionsChanged }: 
     await run(async () => {
       const response = await checked(await writeRequest("/v1/connections/github/confirm", "POST", { setupId: setup.setupId, installationId, repositoryIds, consent: true }));
       const value = await response.json() as Connection;
-      setSetup(null); setupInUrl(); setConsent(false); setRepositoryIds([]);
+      setSetup(null); setConsent(false); setRepositoryIds([]);
       await refresh(); setSelected(value); setNotice("GitHub is connected to the repositories you selected.");
     });
   }
@@ -266,7 +270,7 @@ export function Connections({ onSessionExpired, active, onConnectionsChanged }: 
       const response = await writeRequest(`/v1/connections/github/pending/${encodeURIComponent(setup.setupId)}`, "DELETE");
       // An expired or already-removed setup needs no further server cleanup.
       if (response.status !== 404 && response.status !== 410) await checked(response);
-      setSetup(null); setupInUrl(); setConsent(false); setRepositoryIds([]); setNotice("Setup canceled. No new repository access was approved.");
+      setSetup(null); setConsent(false); setRepositoryIds([]); setNotice("Setup canceled. No new repository access was approved.");
       await refresh();
     });
   }
