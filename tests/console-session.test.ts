@@ -19,6 +19,25 @@ describe("console session renewal", () => {
   });
   afterEach(() => { vi.unstubAllGlobals(); });
 
+  it("selects public CSRF for renewal and writes when private cookies coexist", async () => {
+    const { sessionFetch, writeRequest, setPublicSignupSession } = await import("../src/console/session.js");
+    cookies.cookie = "capykit_csrf=private-proof; capykit_public_csrf=public-proof";
+    setPublicSignupSession(true);
+    fetcher.mockResolvedValueOnce(response(401)).mockResolvedValueOnce(response()).mockResolvedValueOnce(response());
+    expect((await sessionFetch("/v1/me")).status).toBe(200);
+    expect(new Headers(fetcher.mock.calls[1]?.[1]?.headers).get("x-csrf-token")).toBe("public-proof");
+    fetcher.mockResolvedValueOnce(response());
+    await writeRequest("/v1/auth/logout", "POST", {});
+    expect(new Headers(fetcher.mock.calls[3]?.[1]?.headers).get("x-csrf-token")).toBe("public-proof");
+    cookies.cookie = "capykit_csrf=private-proof";
+    fetcher.mockResolvedValueOnce(response(401));
+    expect((await sessionFetch("/v1/me")).status).toBe(401);
+    expect(fetcher.mock.calls).toHaveLength(5);
+    setPublicSignupSession(false); fetcher.mockResolvedValueOnce(response());
+    await writeRequest("/v1/auth/logout", "POST", {});
+    expect(new Headers(fetcher.mock.calls[5]?.[1]?.headers).get("x-csrf-token")).toBe("private-proof");
+  });
+
   it("renews one time and replays the same JSON mutation with fresh CSRF", async () => {
     const { writeRequest } = await import("../src/console/session.js");
     fetcher.mockResolvedValueOnce(response(401)).mockImplementationOnce(() => {

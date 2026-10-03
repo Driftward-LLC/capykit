@@ -2,11 +2,17 @@ let refreshing: Promise<boolean> | undefined;
 let loggingOut: Promise<Response> | undefined;
 let refreshVersion = 0;
 let sessionGeneration = 0;
+let csrfCookieName = "capykit_csrf";
+
+export function setPublicSignupSession(enabled: boolean): void {
+  csrfCookieName = enabled ? "capykit_public_csrf" : "capykit_csrf";
+}
 
 const renewalUnavailable = "Could not renew your session. Check your connection and try again. Your unsaved work is still here.";
 
 function csrfToken(): string | undefined {
-  return document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith("capykit_csrf="))?.slice("capykit_csrf=".length) || undefined;
+  const prefix = `${csrfCookieName}=`;
+  return document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(prefix))?.slice(prefix.length) || undefined;
 }
 
 function request(path: string, init: RequestInit): Promise<Response> {

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { CapabilityLibrary } from "./library.js";
-import { sessionFetch, writeRequest } from "./session.js";
+import { sessionFetch, writeRequest, setPublicSignupSession } from "./session.js";
 import { discardGitHubReturn, hasGitHubReturn } from "./connections.js";
 import { Apps, discardGoogleReturn } from "./apps.js";
 import { Access } from "./access.js";
@@ -16,18 +16,24 @@ async function post(path: string, body?: unknown): Promise<Response> {
   return writeRequest(path, "POST", body ?? {});
 }
 
-async function signInMethod(): Promise<"email" | "tailscale"> {
+type SignInMethod = "email" | "tailscale" | "google";
+async function signInMethod(): Promise<{ method: SignInMethod; available: boolean }> {
   const response = await sessionFetch("/v1/auth/method");
-  // Allow the console to run against a previous API release during a rollout.
-  if (response.status === 404) return "email";
+  if (response.status === 404) { setPublicSignupSession(false); return { method: "email", available: true }; }
   if (!response.ok) throw new Error("sign-in unavailable");
-  const result = await response.json() as { method?: unknown };
-  if (result.method !== "email" && result.method !== "tailscale") throw new Error("sign-in unavailable");
-  return result.method;
+  const result = await response.json() as { method?: unknown; available?: unknown };
+  if (result.method !== "email" && result.method !== "tailscale" && result.method !== "google") throw new Error("sign-in unavailable");
+  setPublicSignupSession(result.method === "google");
+  return { method: result.method, available: result.method === "google" ? result.available === true : true };
 }
 
 function callbackError(): string {
   const url = new URL(window.location.href);
+  const googleError = url.searchParams.get("auth");
+  if (googleError?.startsWith("google-")) {
+    window.history.replaceState(null, "", url.pathname);
+    return googleError === "google-cancelled" ? "Google sign-in was cancelled. You can try again." : googleError === "google-expired" ? "Your sign-in attempt expired. Continue with Google to start again." : "Google sign-in could not be completed. Please try again.";
+  }
   if (!url.searchParams.has("error") && !new URLSearchParams(url.hash.slice(1)).has("error")) return "";
   window.history.replaceState(null, "", url.pathname);
   return "That sign-in link expired or could not be verified. Request a new email code below.";
@@ -40,11 +46,12 @@ function App(): React.ReactElement {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [codeRequested, setCodeRequested] = useState(false);
-  const [authMethod, setAuthMethod] = useState<"email" | "tailscale">("email");
+  const [authMethod, setAuthMethod] = useState<SignInMethod>("email");
+  const [googleAvailable, setGoogleAvailable] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [identityResolved, setIdentityResolved] = useState(false);
   const [returningFromGitHub] = useState(hasGitHubReturn);
-  const [pending, setPending] = useState<"session" | "otp" | "verify" | "logout" | null>("session");
+  const [pending, setPending] = useState<"session" | "otp" | "verify" | "logout" | "google" | null>("session");
   const [status, setStatus] = useState("Checking your session…");
   const [error, setError] = useState(callbackError);
 
@@ -54,10 +61,10 @@ function App(): React.ReactElement {
     if (initial) setStatus("Checking your session…");
     try {
       const method = initial ? await signInMethod() : undefined;
-      if (method !== undefined) setAuthMethod(method);
+      if (method !== undefined) { setAuthMethod(method.method); setGoogleAvailable(method.available); }
       let response = await sessionFetch("/v1/me");
       if (response.status === 401 && initial) {
-        if (method === "tailscale") {
+        if (method?.method === "tailscale") {
           // A new session cannot resume an authorization bound to the previous browser session.
           discardGoogleReturn(); discardGitHubReturn();
           const connected = await post("/v1/auth/tailscale");
@@ -79,7 +86,7 @@ function App(): React.ReactElement {
         window.history.replaceState(null, "", `${url.pathname}${url.search}`);
         setCurrentUser(null);
         setIdentityResolved(true);
-        setStatus(initial ? "Sign in with your invited email address." : "Your session expired or access is no longer available. Sign in again.");
+        setStatus(initial ? (method?.method === "google" ? "Sign up or sign in with your Google account." : "Sign in with your invited email address.") : "Your session expired or access is no longer available. Sign in again.");
       } else if (!response.ok) {
         throw new Error("session unavailable");
       } else {
@@ -122,6 +129,18 @@ function App(): React.ReactElement {
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [currentUser, loadIdentity, pending]);
+
+  async function continueWithGoogle(): Promise<void> {
+    setPending("google"); setError("");
+    try {
+      const response = await post("/v1/auth/google/start");
+      if (!response.ok) throw new Error("Google unavailable");
+      const body = await response.json() as { authorizationUrl: string };
+      const url = new URL(body.authorizationUrl);
+      if (url.origin !== "https://accounts.google.com" || url.username || url.password) throw new Error("Google unavailable");
+      window.location.assign(url.href);
+    } catch { setError("Google sign-in is temporarily unavailable. Please try again."); setPending(null); }
+  }
 
   async function requestCode(event: React.SubmitEvent<HTMLElement>): Promise<void> {
     event.preventDefault();
@@ -207,7 +226,15 @@ function App(): React.ReactElement {
       h("p", { className: "eyebrow" }, "Your capabilities, together"),
       h("h1", null, "Welcome to Capykit"),
       h("p", { className: "muted", role: "status", "aria-live": "polite" }, status),
-      authMethod === "tailscale" ? h(React.Fragment, null,
+      authMethod === "google" ? h(React.Fragment, null,
+        h("p", { className: "muted" }, "Create your own workspace. No invitation needed."),
+        googleAvailable ? h("button", { type: "button", disabled, onClick: () => { void continueWithGoogle(); } }, pending === "google" ? "Opening Google…" : "Continue with Google") : h(React.Fragment, null,
+          h("p", { className: "message", role: "status" }, "Google sign-in is temporarily unavailable. Please try again shortly."),
+          h("button", { type: "button", disabled, onClick: () => { void loadIdentity(true); } }, "Try again"),
+        ),
+        h("p", { className: "small muted" }, "Sign-in uses your name and email. Connecting Google Drive is a separate step."),
+        h("p", { className: "small muted" }, "Stay signed in for 30 days between visits."),
+      ) : authMethod === "tailscale" ? h(React.Fragment, null,
         h("p", { className: "small muted" }, "Use your connected Tailscale account. No email code needed."),
         h("button", { type: "button", disabled, onClick: () => { setError(""); void loadIdentity(true); } }, pending === "session" ? "Opening workspace…" : "Continue with Tailscale"),
       ) : h(React.Fragment, null,
