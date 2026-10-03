@@ -62,8 +62,8 @@ verification before offering Drive connections broadly. See
    existing image and database. It does not inherit the private GitHub
    credentials or provider volume, whose registered callback belongs to the
    private origin. Preserve the private app,
-   PostgreSQL and inbox. Public session/refresh cookies have distinct names,
-   so private preview sessions do not silently bypass customer signup.
+   PostgreSQL and inbox. Public session, refresh and CSRF cookies have distinct
+   names, so private preview sessions do not silently bypass customer signup.
 5. Configure the HTTPS public route. Before changing Tailscale, capture the
    current configuration and verify every existing handler. Port 10000 currently
    belongs to Capykit's webhook ingress: preserve `/v1/webhooks/github` on its

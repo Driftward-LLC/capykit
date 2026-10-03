@@ -458,8 +458,19 @@ describe("public Google signup HTTP boundaries", () => {
     expect(auth.verifyBearer).toHaveBeenCalledWith(session.accessToken);
     expect(provisionIdentity).toHaveBeenCalledExactlyOnceWith(identity);
     expect(result.cookies.find(({ name }) => name === "capykit_public_refresh")).toMatchObject({ httpOnly: true, secure: true, sameSite: "Strict", maxAge: rememberedAge });
+    expect(result.cookies.find(({ name }) => name === "capykit_public_csrf")).toMatchObject({ secure: true, sameSite: "Strict" });
+    expect(result.cookies.find(({ name }) => name === "capykit_public_csrf")?.httpOnly).not.toBe(true);
+    expect(result.cookies.some(({ name }) => name === "capykit_csrf")).toBe(false);
     expect(result.cookies.find(({ name }) => name === "capykit_google_verifier")?.value).toBe("");
     expect(result.body).not.toMatch(/verified-token|refresh-token/u);
+  });
+  it("uses only public CSRF and preserves private cookies on public logout", async () => {
+    const { app } = publicFixture();
+    const cookie = "capykit_session=verified-token; capykit_refresh=private-refresh; capykit_csrf=private-proof; capykit_public_session=verified-token; capykit_public_refresh=refresh-token; capykit_public_csrf=public-proof";
+    expect((await app.inject({ method: "POST", url: "/v1/auth/logout", headers: { origin, cookie, "x-csrf-token": "private-proof" }, payload: {} })).statusCode).toBe(403);
+    const result = await app.inject({ method: "POST", url: "/v1/auth/logout", headers: { origin, cookie, "x-csrf-token": "public-proof" }, payload: {} });
+    expect(result.statusCode).toBe(200);
+    expect(result.cookies.map(({ name }) => name).sort()).toEqual(["capykit_public_csrf", "capykit_public_refresh", "capykit_public_session"]);
   });
   it("rejects missing/wrong-browser verifiers, expired codes and invalid native sessions without provisioning", async () => {
     const { app, googleSignIn, auth, provisionIdentity } = publicFixture();

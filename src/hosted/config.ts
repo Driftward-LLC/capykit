@@ -82,7 +82,7 @@ export function loadHostedConfig(env: NodeJS.ProcessEnv = process.env): HostedCo
     authUrl: authUrl === undefined ? undefined : internalAuthOrigin(authUrl),
     sessionCookieName: publicSignup ? "capykit_public_session" : "capykit_session",
     refreshCookieName: publicSignup ? "capykit_public_refresh" : "capykit_refresh",
-    csrfCookieName: "capykit_csrf",
+    csrfCookieName: publicSignup ? "capykit_public_csrf" : "capykit_csrf",
     secureCookies: publicBaseUrl.startsWith("https://"),
     ...(tailscaleSignIn === undefined ? {} : { tailscaleSignIn }),
   };

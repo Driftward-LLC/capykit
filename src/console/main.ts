@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { CapabilityLibrary } from "./library.js";
-import { sessionFetch, writeRequest } from "./session.js";
+import { sessionFetch, writeRequest, setPublicSignupSession } from "./session.js";
 import { discardGitHubReturn, hasGitHubReturn } from "./connections.js";
 import { Apps, discardGoogleReturn } from "./apps.js";
 import { Access } from "./access.js";
@@ -19,10 +19,11 @@ async function post(path: string, body?: unknown): Promise<Response> {
 type SignInMethod = "email" | "tailscale" | "google";
 async function signInMethod(): Promise<{ method: SignInMethod; available: boolean }> {
   const response = await sessionFetch("/v1/auth/method");
-  if (response.status === 404) return { method: "email", available: true };
+  if (response.status === 404) { setPublicSignupSession(false); return { method: "email", available: true }; }
   if (!response.ok) throw new Error("sign-in unavailable");
   const result = await response.json() as { method?: unknown; available?: unknown };
   if (result.method !== "email" && result.method !== "tailscale" && result.method !== "google") throw new Error("sign-in unavailable");
+  setPublicSignupSession(result.method === "google");
   return { method: result.method, available: result.method === "google" ? result.available === true : true };
 }
 
