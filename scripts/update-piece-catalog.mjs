@@ -14,11 +14,12 @@ function text(value,max){if(typeof value!=='string'||!value.trim()||value.length
 const pieces=rows.map(row=>{
  const pieceName=text(row.name,160);if(!/^@activepieces\/[a-z0-9][a-z0-9-]*$/u.test(pieceName))throw new Error('Invalid package name');
  const id=pieceName.startsWith('@activepieces/piece-')?pieceName.slice('@activepieces/piece-'.length):'package-'+pieceName.slice('@activepieces/'.length);
+ if(!/^[a-z0-9][a-z0-9-]{0,119}$/u.test(id))throw new Error('Invalid catalog identifier');
  const version=text(row.version,40);if(!/^\d+\.\d+\.\d+$/u.test(version))throw new Error('Invalid version');
  for(const count of [row.actions,row.triggers])if(!Number.isSafeInteger(count)||count<0||count>10000)throw new Error('Invalid capability count');
  const categories=row.categories??[];if(!Array.isArray(categories)||categories.some(c=>typeof c!=='string'||! /^[A-Z_]{1,60}$/u.test(c)))throw new Error('Invalid categories');
  const auths=row.auth==null?[]:Array.isArray(row.auth)?row.auth:[row.auth];
- const authentication=Array.from(new Set(auths.map(a=>{if(!methods[a.type])throw new Error('Unknown authentication method');return methods[a.type];})));if(!authentication.length)authentication.push('No authentication required');
+ const authentication=Array.from(new Set(auths.map(a=>{if(!Object.hasOwn(methods,a.type))throw new Error('Unknown authentication method');return methods[a.type];})));if(!authentication.length)authentication.push('No authentication required');
  let logoUrl=null;try{const url=new URL(row.logoUrl);if(url.protocol==='https:'&&url.hostname==='cdn.activepieces.com'&&!url.username&&!url.password&&!url.search&&!url.hash&&url.pathname.startsWith('/pieces/'))logoUrl=url.href;}catch{/* Use an initial when no trusted logo is supplied. */}
  return {id,pieceName,name:text(row.displayName,160),description:row.description?text(row.description,1000):'',version,logoUrl,categories:Array.from(new Set(categories)).sort(),actionCount:row.actions,triggerCount:row.triggers,authentication,deprecated:Boolean(row.deprecated)};
 }).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
