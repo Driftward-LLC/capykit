@@ -166,6 +166,7 @@ button.danger { color: #fff; }
 .app-search input { margin-top: 4px; border-radius: 12px; min-height: 54px; }
 .app-filters { display: flex; gap: 24px; margin: 20px 0 12px; border-bottom: 1px solid #2b3631; }
 .app-filters button { background: transparent; color: #b4bdc6; border: 0; border-radius: 0; padding: 12px 4px; }
+.app-filters button:hover:enabled { background: #22362c; }
 .app-filters button[aria-pressed="true"] { color: #94ecc6; border-bottom: 3px solid #94ecc6; }
 .app-list { list-style: none; padding: 0; margin: 0; }
 .app-list li { border-bottom: 1px solid #2b3631; }
