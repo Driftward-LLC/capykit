@@ -88,7 +88,6 @@ account chooser; they never enter client credentials in Capykit.
    correct account. Read one known file's metadata through the connection test.
    Configuration readiness alone does not establish that live OAuth works.
 
-
 OAuth requests `openid email` and `drive.metadata.readonly`. This is account-wide
 read-only metadata access, including shared files the account can access; it does
 not permit reading file contents or writing files. The UI explicitly discloses
