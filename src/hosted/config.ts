@@ -19,6 +19,7 @@ export interface HostedConfig {
   readonly csrfCookieName: string;
   readonly secureCookies: boolean;
   readonly tailscaleSignIn?: TailscaleSignInConfig;
+  readonly publicSignup?: boolean;
 }
 
 function splitOrigins(value: string | undefined): readonly string[] {
@@ -51,6 +52,9 @@ function internalAuthOrigin(value: string): string {
 }
 
 export function loadHostedConfig(env: NodeJS.ProcessEnv = process.env): HostedConfig {
+  const signupValue = optionalEnv("CAPYKIT_PUBLIC_SIGNUP", env);
+  if (signupValue !== undefined && !["true", "false"].includes(signupValue)) throw new Error("CAPYKIT_PUBLIC_SIGNUP must be true or false.");
+  const publicSignup = signupValue === "true";
   const publicBaseUrl = configuredOrigin(optionalEnv("CAPYKIT_PUBLIC_BASE_URL", env) ?? "http://localhost:3000");
   const callbackOrigins = splitOrigins(optionalEnv("CAPYKIT_ALLOWED_CALLBACK_ORIGINS", env)).map(configuredOrigin);
   const authUrl = optionalEnv("CAPYKIT_AUTH_URL", env);
@@ -66,16 +70,18 @@ export function loadHostedConfig(env: NodeJS.ProcessEnv = process.env): HostedCo
       serviceKey.length > 16_384 || /[\r\n\0]/u.test(serviceKey)) throw new Error("Tailscale sign-in requires a complete identity mapping, exact proxy IP, HTTPS tailnet origin and server-only auth service key.");
     tailscaleSignIn = { login, email: email.toLowerCase(), subject: subject.toLowerCase(), proxyAddress, serviceKey };
   }
+  if (publicSignup && tailscaleSignIn) throw new Error("Public signup cannot use a private Tailscale identity mapping.");
   const port = Number(optionalEnv("PORT", env) ?? "3000");
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("PORT must be an integer from 0 to 65535.");
   return {
     port,
+    publicSignup,
     publicBaseUrl,
     allowedCallbackOrigins: callbackOrigins.length === 0 ? [publicBaseUrl] : callbackOrigins,
     databaseUrl: optionalEnv("DATABASE_URL", env),
     authUrl: authUrl === undefined ? undefined : internalAuthOrigin(authUrl),
-    sessionCookieName: "capykit_session",
-    refreshCookieName: "capykit_refresh",
+    sessionCookieName: publicSignup ? "capykit_public_session" : "capykit_session",
+    refreshCookieName: publicSignup ? "capykit_public_refresh" : "capykit_refresh",
     csrfCookieName: "capykit_csrf",
     secureCookies: publicBaseUrl.startsWith("https://"),
     ...(tailscaleSignIn === undefined ? {} : { tailscaleSignIn }),

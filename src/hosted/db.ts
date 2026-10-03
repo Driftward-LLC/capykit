@@ -9,6 +9,7 @@ export interface DatabaseReadiness {
 export interface HostedDatabase {
   readonly pool: Pool;
   close(): Promise<void>;
+  provisionIdentity?(identity: VerifiedIdentity): Promise<void>;
   readiness(): Promise<DatabaseReadiness>;
   resolveContext(identity: VerifiedIdentity): Promise<AuthenticatedContext | undefined>;
 }
@@ -50,6 +51,9 @@ export function createHostedDatabase(databaseUrl: string | undefined): HostedDat
       } catch {
         return { status: "unavailable", reason: "connection_failed" };
       }
+    },
+    async provisionIdentity(identity) {
+      await pool.query("select provision_google_workspace($1::uuid, $2)", [identity.subject, identity.email]);
     },
     async resolveContext(identity) {
       const result = await pool.query<WorkspaceMembership>(

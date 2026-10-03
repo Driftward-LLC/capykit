@@ -1,3 +1,4 @@
+import { createGoogleSignIn, type GoogleSignIn } from "./google-sign-in.js";
 import cookie from "@fastify/cookie";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -35,6 +36,7 @@ export function loadGithubConfig(env: NodeJS.ProcessEnv = process.env, publicBas
 }
 
 interface ServerDeps {
+  googleSignIn?: GoogleSignIn;
   readonly config?: HostedConfig;
   readonly database?: HostedDatabase | undefined;
   readonly auth?: AuthGateway | undefined;
@@ -119,6 +121,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   const drive = database ? new GoogleConnections(database.pool, google, googleConfig) : undefined;
   const setupOptions = deps.githubSetup === undefined ? loadGithubSetupOptions() : undefined;
   const githubSetup = deps.githubSetup ?? (setupOptions === undefined ? undefined : new GithubSetup(setupOptions, config.publicBaseUrl));
+  const googleSignIn = deps.googleSignIn ?? (config.publicSignup && config.authUrl ? createGoogleSignIn(config.authUrl, publicOrigin) : undefined);
   const app = Fastify({ logger: false, genReqId: () => randomUUID(), bodyLimit: 16 * 1024,
     requestTimeout: 120_000, connectionTimeout: 30_000, ajv: { customOptions: { removeAdditional: false } } });
   const grants = database === undefined ? undefined : new GrantStore(database.pool);
@@ -186,6 +189,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   });
 
   app.post<{ Body: { email: string; redirectTo?: string } }>("/v1/auth/otp", { schema: { body: otpSchema } }, async (request, reply) => {
+    if (config.publicSignup) return reply.code(404).send(stableError("NOT_FOUND", request.id));
     const redirectTo = request.body.redirectTo ?? config.publicBaseUrl;
     let redirect: URL;
     try { redirect = new URL(redirectTo); } catch { return reply.code(400).send(stableError("INVALID_REQUEST", request.id)); }
@@ -202,7 +206,49 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     setSessionCookies(reply, config, token, refreshToken);
     return reply.send({ status: "authenticated" });
   }
-  app.get("/v1/auth/method", () => ({ method: config.tailscaleSignIn === undefined ? "email" : "tailscale" }));
+  const googleCookie = "capykit_google_verifier";
+  const googleCookieOptions = { path: "/v1/auth/google/callback", httpOnly: true, secure: config.secureCookies, sameSite: "lax" as const };
+  // ponytail: eight concurrent login operations per API process; use shared admission
+  // if public signup outgrows this deployment. GoTrue owns code expiry and replay.
+  let googleOperations = 0;
+  async function googleOperation<T>(run: () => Promise<T>): Promise<T> {
+    if (googleOperations >= 8) throw new AuthUnavailableError();
+    googleOperations++;
+    try { return await run(); } finally { googleOperations--; }
+  }
+  app.get("/v1/auth/method", async () => config.publicSignup ? { method: "google", available: googleSignIn ? await googleSignIn.available() : false } : { method: config.tailscaleSignIn === undefined ? "email" : "tailscale" });
+  app.post("/v1/auth/google/start", { schema: { body: { type: "object", additionalProperties: false, properties: {} } } }, async (request, reply) => {
+    if (request.headers.origin !== publicOrigin || request.headers.authorization !== undefined) return reply.code(403).send(stableError("CSRF_REQUIRED", request.id));
+    if (!config.publicSignup || !googleSignIn || !database?.provisionIdentity || !auth) return reply.code(503).send(stableError("CONFIGURATION_UNAVAILABLE", request.id));
+    const started = await googleOperation(() => googleSignIn.start());
+    reply.setCookie(googleCookie, started.verifier, { ...googleCookieOptions, maxAge: 600 });
+    return { authorizationUrl: started.authorizationUrl };
+  });
+  app.get("/v1/auth/google/provider/callback", async (request, reply) => {
+    reply.header("referrer-policy", "no-referrer");
+    if (!config.publicSignup || !googleSignIn || request.url.length > 8192) return await reply.redirect(`${publicOrigin}/?auth=google-failed`);
+    const input = new URL(request.url, publicOrigin).searchParams;
+    const params = new URLSearchParams();
+    for (const key of ["code", "state", "error"]) { const value = input.get(key); if (value) params.set(key, value); }
+    try { return await reply.redirect(await googleOperation(() => googleSignIn.providerCallback(params))); }
+    catch { return await reply.redirect(`${publicOrigin}/?auth=google-failed`); }
+  });
+  app.get<{ Querystring: { code?: string } }>("/v1/auth/google/callback", async (request, reply) => {
+    reply.header("referrer-policy", "no-referrer");
+    reply.clearCookie(googleCookie, googleCookieOptions);
+    const verifier = request.cookies[googleCookie], code = request.query.code;
+    if (!config.publicSignup || !googleSignIn || !auth || !database?.provisionIdentity || !verifier || !/^[A-Za-z0-9_-]{43}$/u.test(verifier) || typeof code !== "string" || !code || code.length > 4096 || /[\r\n\0]/u.test(code)) return await reply.redirect(`${publicOrigin}/?auth=google-expired`);
+    try {
+      const session = await googleOperation(() => googleSignIn.exchange(code, verifier));
+      const identity = session ? await auth.verifyBearer(session.accessToken) : undefined;
+      if (!identity || !session) return await reply.redirect(`${publicOrigin}/?auth=google-failed`);
+      await database.provisionIdentity(identity);
+      const context = await database.resolveContext(identity);
+      if (!context?.membership.active || context.membership.principalKind !== "human") return await reply.redirect(`${publicOrigin}/?auth=google-failed`);
+      setSessionCookies(reply, config, session.accessToken, session.refreshToken);
+      return await reply.redirect(`${publicOrigin}/?tab=connections`);
+    } catch { return await reply.redirect(`${publicOrigin}/?auth=google-failed`); }
+  });
   app.post("/v1/auth/tailscale", { schema: { body: { type: "object", additionalProperties: false, properties: {} } } }, async (request, reply) => {
     if (request.headers.origin !== publicOrigin || request.headers.authorization !== undefined) return reply.code(403).send(stableError("CSRF_REQUIRED", request.id));
     const mapping = config.tailscaleSignIn;
@@ -219,6 +265,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     return establishSession(session?.accessToken, request, reply, session?.refreshToken);
   });
   app.post<{ Body: { email: string; token: string } }>("/v1/auth/verify", { schema: { body: verifySchema } }, async (request, reply) => {
+    if (config.publicSignup) return reply.code(404).send(stableError("NOT_FOUND", request.id));
     if (request.headers.origin !== publicOrigin) return reply.code(403).send(stableError("CSRF_REQUIRED", request.id));
     if (auth === undefined || database === undefined) return reply.code(503).send(stableError("CONFIGURATION_UNAVAILABLE", request.id));
     const session = await auth.verifyOtp(request.body.email.trim().toLowerCase(), request.body.token);

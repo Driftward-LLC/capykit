@@ -1,3 +1,4 @@
+import type { GoogleSignIn } from "../src/hosted/google-sign-in.js";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -30,7 +31,7 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
-function fixture(overrides: { config?: HostedConfig; consoleDirectory?: string } = {}) {
+function fixture(overrides: { config?: HostedConfig; consoleDirectory?: string; googleSignIn?: GoogleSignIn } = {}) {
   const pool = new Pool();
   const database = {
     pool, close: () => pool.end(),
@@ -416,6 +417,68 @@ describe("hosted HTTP boundaries", () => {
     expect(loadHostedConfig({ CAPYKIT_AUTH_URL: "http://auth:9999/" }).authUrl).toBe("http://auth:9999");
     for (const value of ["invalid-provider-url", "ftp://auth:9999", "http://user:secret@auth:9999", "http://auth:9999/path", "http://auth:9999?secret=value", "http://auth:9999#fragment"]) {
       expect(() => loadHostedConfig({ CAPYKIT_AUTH_URL: value })).toThrow(/Authentication URL/u);
+    }
+  });
+});
+
+
+describe("public Google signup HTTP boundaries", () => {
+  function publicFixture(available = true) {
+    const googleSignIn = { available: vi.fn(() => Promise.resolve(available)), start: vi.fn(() => Promise.resolve({ authorizationUrl: "https://accounts.google.com/o/oauth2/v2/auth?state=native", verifier: "v".repeat(43) })), providerCallback: vi.fn<(query: URLSearchParams) => Promise<string>>().mockResolvedValue(`${origin}/v1/auth/google/callback?code=native`), exchange: vi.fn<() => Promise<AuthSession | undefined>>().mockResolvedValue(session) };
+    const value = fixture({ config: loadHostedConfig({ CAPYKIT_PUBLIC_SIGNUP: "true", CAPYKIT_PUBLIC_BASE_URL: origin, DATABASE_URL: "postgres://unused", CAPYKIT_AUTH_URL: "http://auth:9999" }), googleSignIn });
+    const provisionIdentity = vi.fn(() => Promise.resolve());
+    Object.assign(value.database, { provisionIdentity });
+    return { ...value, googleSignIn, provisionIdentity };
+  }
+  it("offers Google signup, creates a short-lived private verifier and accepts no user-selected identity or redirect", async () => {
+    const { app, googleSignIn } = publicFixture();
+    expect((await app.inject({ url: "/v1/auth/method" })).json()).toEqual({ method: "google", available: true });
+    for (const headers of [{}, { origin: "https://evil.test" }, { origin, authorization: "Bearer verified-token" }]) expect((await app.inject({ method: "POST", url: "/v1/auth/google/start", headers, payload: {} })).statusCode).toBe(403);
+    expect((await app.inject({ method: "POST", url: "/v1/auth/google/start", headers: { origin }, payload: { workspaceId: "driftward", redirectTo: "https://evil.test" } })).statusCode).toBe(400);
+    expect(googleSignIn.start).not.toHaveBeenCalled();
+    const result = await app.inject({ method: "POST", url: "/v1/auth/google/start", headers: { origin }, payload: {} });
+    expect(result.statusCode).toBe(200);
+    expect(result.cookies).toEqual([expect.objectContaining({ name: "capykit_google_verifier", httpOnly: true, secure: true, sameSite: "Lax", maxAge: 600, path: "/v1/auth/google/callback" })]);
+    expect(result.body).not.toContain("v".repeat(43));
+  });
+  it("verifies native identity before provisioning and writes normal remembered sessions without exposing tokens", async () => {
+    const { app, auth, provisionIdentity, googleSignIn } = publicFixture();
+    const result = await app.inject({ url: "/v1/auth/google/callback?code=native", headers: { cookie: `capykit_google_verifier=${"v".repeat(43)}` } });
+    expect(result.statusCode).toBe(302); expect(result.headers.location).toBe(`${origin}/?tab=connections`);
+    expect(googleSignIn.exchange).toHaveBeenCalledWith("native", "v".repeat(43));
+    expect(auth.verifyBearer).toHaveBeenCalledWith(session.accessToken);
+    expect(provisionIdentity).toHaveBeenCalledExactlyOnceWith(identity);
+    expect(result.cookies.find(({ name }) => name === "capykit_public_refresh")).toMatchObject({ httpOnly: true, secure: true, sameSite: "Strict", maxAge: rememberedAge });
+    expect(result.cookies.find(({ name }) => name === "capykit_google_verifier")?.value).toBe("");
+    expect(result.body).not.toMatch(/verified-token|refresh-token/u);
+  });
+  it("rejects missing/wrong-browser verifiers, expired codes and invalid native sessions without provisioning", async () => {
+    const { app, googleSignIn, auth, provisionIdentity } = publicFixture();
+    for (const url of ["/v1/auth/google/callback?code=native", "/v1/auth/google/callback"]) {
+      expect((await app.inject({ url })).headers.location).toBe(`${origin}/?auth=google-expired`);
+    }
+    expect(googleSignIn.exchange).not.toHaveBeenCalled();
+    googleSignIn.exchange.mockResolvedValueOnce(undefined);
+    expect((await app.inject({ url: "/v1/auth/google/callback?code=expired", headers: { cookie: `capykit_google_verifier=${"v".repeat(43)}` } })).headers.location).toBe(`${origin}/?auth=google-failed`);
+    auth.verifyBearer.mockResolvedValueOnce(undefined);
+    const denied = await app.inject({ url: "/v1/auth/google/callback?code=native", headers: { cookie: `capykit_google_verifier=${"v".repeat(43)}` } });
+    expect(denied.headers.location).toBe(`${origin}/?auth=google-failed`); expect(provisionIdentity).not.toHaveBeenCalled();
+    expect(denied.cookies.filter(({ name }) => name !== "capykit_google_verifier")).toHaveLength(0);
+  });
+  it("forwards no caller cookies, headers or extra query fields to GoTrue's callback", async () => {
+    const { app, googleSignIn } = publicFixture();
+    const result = await app.inject({ url: "/v1/auth/google/provider/callback?code=provider-code&state=native-state&redirect_to=https://evil.test&scope=drive", headers: { cookie: "private=cookie", authorization: "Bearer private" } });
+    expect(result.headers.location).toBe(`${origin}/v1/auth/google/callback?code=native`);
+    expect(googleSignIn.providerCallback.mock.calls[0]?.[0].toString()).toBe("code=provider-code&state=native-state");
+  });
+  it("does not establish authority if provisioning fails, or membership becomes inactive", async () => {
+    const { app, provisionIdentity, database } = publicFixture();
+    provisionIdentity.mockRejectedValueOnce(new Error("private database failure"));
+    for (const revoked of [false, true]) {
+      if (revoked) database.resolveContext.mockResolvedValueOnce(undefined);
+      const denied = await app.inject({ url: "/v1/auth/google/callback?code=native", headers: { cookie: `capykit_google_verifier=${"v".repeat(43)}` } });
+      expect(denied.headers.location).toBe(`${origin}/?auth=google-failed`);
+      expect(denied.cookies.filter(({ name }) => name !== "capykit_google_verifier")).toHaveLength(0);
     }
   });
 });
