@@ -1,3 +1,4 @@
+import { ActionAccess } from "./action-access.js";
 import React, { useEffect, useState } from "react";
 import { sessionFetch, writeRequest } from "./session.js";
 const h = React.createElement;
@@ -109,5 +110,6 @@ export function Access({ onSessionExpired, active }: { onSessionExpired: () => v
         g.status === "revoked" ? null : revokeId !== g.id ? h("button", { type: "button", className: "text-button danger-text", disabled, onClick: () => { setRevokeId(g.id); } }, `Revoke access for ${g.recipientName}`) : h("div", null, h("p", null, "Revoke this grant? Future authorized requests stop; already downloaded copies cannot be recalled."), h("div", { className: "actions" }, h("button", { type: "button", className: "danger", disabled, onClick: () => { void revoke(g.id); } }, "Confirm revoke"), h("button", { type: "button", className: "secondary", disabled, onClick: () => { setRevokeId(null); } }, "Keep access"))),
       )), cursor === null ? null : h("button", { type: "button", className: "secondary", disabled, onClick: () => { void more(); } }, "Load more grants"),
     ),
+    h(ActionAccess,{active,onSessionExpired}),
   );
 }

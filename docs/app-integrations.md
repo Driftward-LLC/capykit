@@ -5,35 +5,107 @@ The first two are GitHub and Google Drive. Activepieces' full catalog is not
 installed or implicitly available. The approved mobile design uses a dark theme,
 vertical app rows, search, a connected filter, and bottom navigation on phones.
 
-## Connection tests
+## Available actions
 
-Workspace owners can explicitly read one issue from an approved GitHub repository,
-or read one Drive file's metadata using the connected Google account. These tests
-run pinned Activepieces actions (`piece-github@0.9.0/get_issue_ai` and
-`piece-google-drive@0.11.0/drive_get_file`), retaining the community license in
-[LICENSE.activepieces](LICENSE.activepieces). No Activepieces server or enterprise
-embedding SDK is used.
+A connected app exposes a vertical list of reviewed read-only actions. Choose an
+action, supply its inputs, and run it in Apps. Owners can run actions against their
+workspace connections. Members and agents see only actions covered by current,
+explicit grants. Google Drive accepts a file or folder link as well as an ID.
 
-The API verifies current identity/membership/owner authority, then uses the current
-connection generation. GitHub installation tokens are restricted to the selected
-repository ID and revoked after each test. A renamed repository is resolved by its
-immutable ID. Each provider read and the returned result are reauthorized. Tests
-are audited without provider response bodies, file IDs or credentials.
+| App | Action | Returned fields |
+| --- | --- | --- |
+| GitHub | Get Issue (Agent) | Number, title and state from an approved repo |
+| Google Drive | Get File or Folder | ID, name and MIME type |
+| Google Drive | Search Files and Folders | Name matches, with optional folder |
+| Google Drive | List files | Names directly inside a folder |
 
-A child process runs only these two trusted, pinned actions. It receives no host
-environment or provider credentials. Nock intercepts the exact action request,
-blocks other HTTP requests, and relays it to the parent. The parent supplies a
-fixed provider URL and credential, rejects redirects, limits responses to 256 KiB
-and 10 seconds, and sends the verified response back. Only projected issue/file
-fields return to the browser. Child lifetime is 15 seconds, V8 heap is 128 MiB,
-output is at most 32 KiB, and two children may run per API process. This is a
-transport boundary for trusted dependencies, **not a sandbox for user code**.
+Drive lists return at most 25 results per request. Next 25 results uses the
+returned continuation token; there is no automatic full-account crawl. Drive
+access permits account-wide metadata reads, including shared files accessible to
+the connected account. It does not download file contents or write files.
 
-Published function grants remain bound to their existing immutable version and
-`github.issues.list.v1` contract. They do not authorize these owner connection
-tests. Uploaded function execution remains ENG-125, including its isolated
-runtime, durable admission, idempotency, quotas and worker fencing requirements.
-Drive user/agent grants and arbitrary Activepieces actions are not enabled here.
+The action labels and selected input metadata come from pinned Activepieces
+packages: `piece-github@0.9.0` and `piece-google-drive@0.11.0`. The checked-in
+snapshot is `src/hosted/action-definitions.json`. Capykit's small allowlist adds
+strict input contracts, limited response projections and authorization around
+those definitions. Search and folder listing use the pinned search action with a
+restricted parent-broker query. Activepieces' full catalog, server and enterprise
+embedding SDK are not installed. The community license remains in
+[LICENSE.activepieces](LICENSE.activepieces).
+
+The shared API is `GET /v1/actions` and
+`POST /v1/actions/:id/run` with `{connectionId, input}`. Discovery includes input
+schemas and the caller's permitted connection/repository choices. Browser calls
+use the existing authenticated session and same-origin CSRF protection. The old
+connection-test URLs delegate to this same execution path.
+
+## Grant access and connect an agent
+
+In Access, create an agent with an expiry, save its once-visible key, then grant
+specific actions and connections. A key identifies the agent but grants no app
+access by itself. GitHub grants also select approved repository IDs. Human
+workspace members can receive the same action grants. Grants pin the connection
+generation and connector version; reconnecting an account requires new grants.
+
+Only a SHA-256 key hash is stored. Keys and grants require explicit expiration
+within one year; the console defaults to 30 days. Rotate key revokes the old key
+and preserves the agent's existing grants. Revoke key blocks authentication;
+revoke action access blocks that grant. Each call checks current identity,
+membership, role, key, grant, connection and repository authority. A bound run
+cannot switch to another grant after revocation.
+
+Install Capykit in the agent's environment, set `CAPYKIT_BASE_URL` to the deployed
+HTTPS origin and `CAPYKIT_API_KEY` through its private secret configuration, then
+launch:
+
+```text
+capykit-mcp --remote
+```
+
+This stdio bridge exposes `list_actions`, `get_action` and `run_action`, forwarding
+to the same API used by the web console. It never receives a GitHub or Google
+credential. Redirects are rejected and errors are sanitized. Local registry MCP
+keeps its existing four discovery tools and does not execute actions. This is
+not the full versioned-capability remote discovery API planned under ENG-124.
+
+## Execution boundary
+
+GitHub installation tokens are restricted to the selected immutable repository
+ID and revoked after each invocation. Repository renames are resolved by that ID.
+Google refresh credentials remain encrypted on the backend. Reads and returned
+results are reauthorized. Metadata-only audits record the actor, action, bound
+grant and outcome, without inputs, provider response bodies or credentials.
+
+A child process runs trusted, pinned connector code without host environment or
+provider credentials. Nock intercepts the exact request and blocks other HTTP
+requests. The parent supplies a fixed provider URL and credential, rejects
+redirects, limits responses to 256 KiB and 10 seconds, and returns the verified
+response. Child lifetime is 15 seconds, V8 heap is 128 MiB, output is at most
+32 KiB, and two children may run per API process. This is a transport boundary for
+trusted dependencies, **not a sandbox for user code**.
+
+Published function/skill grants remain separate, bound to their existing immutable
+versions and contracts. Direct action grants do not authorize uploaded code.
+Uploaded function execution remains ENG-125, including isolated runtime,
+durable admission, idempotency, quotas, run history and worker fencing. Direct
+action results are synchronous and are not stored as durable function runs.
+
+## Deployment and verification
+
+Back up the database and deployment configuration before applying additive
+`008_connector_actions.sql` after migrations 001–007. The API readiness check
+requires the action tables. Initialization applies migration008 automatically
+for new deployments. Existing deployments must apply it explicitly, then recreate
+only app containers. Preserve auth, PostgreSQL, inbox, provider storage,
+encryption keys and routes. Rollback may use the prior app image while leaving the
+additive tables intact; do not restore the database over subsequent activity.
+
+Tests exercise real PostgreSQL RLS, actual pinned connector code and controlled
+provider transport, including tenant isolation, fresh role checks, repository
+scoping, revocation, rotation and generation changes. Browser checks exercise
+360/390/768/1440px layouts against controlled API responses. These checks do not
+prove a real customer's Google consent or provider read; those live acceptance
+steps must be recorded separately.
 
 ## Google operator setup
 
@@ -85,7 +157,7 @@ account chooser; they never enter client credentials in Capykit.
 5. In Apps → Google Drive, select Check availability or reload. Read the scope
    disclosure and select Connect Google Drive. Choose a permitted Google test
    account, approve at Google, and verify the return shows Connected with the
-   correct account. Read one known file's metadata through the connection test.
+   correct account. Read one known file's metadata through Get File or Folder.
    Configuration readiness alone does not establish that live OAuth works.
 
 OAuth requests `openid email` and `drive.metadata.readonly`. This is account-wide
