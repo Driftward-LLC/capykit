@@ -14,10 +14,10 @@ explicit grants. Google Drive accepts a file or folder link as well as an ID.
 
 | App | Action | Returned fields |
 | --- | --- | --- |
-| GitHub | Get Issue (Agent) | Number, title and state from an approved repository |
+| GitHub | Get Issue (Agent) | Number, title and state from an approved repo |
 | Google Drive | Get File or Folder | ID, name and MIME type |
-| Google Drive | Search Files and Folders | Name matches, optionally within one folder |
-| Google Drive | List files | Names directly inside a folder, without recursion |
+| Google Drive | Search Files and Folders | Name matches, with optional folder |
+| Google Drive | List files | Names directly inside a folder |
 
 Drive lists return at most 25 results per request. Next 25 results uses the
 returned continuation token; there is no automatic full-account crawl. Drive
