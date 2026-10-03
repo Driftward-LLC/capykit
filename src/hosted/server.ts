@@ -19,8 +19,9 @@ import { GithubError, GithubProvider, loadGithubConfig as loadEnvironmentGithubC
 import { GithubSetup, loadGithubSetupOptions, readStoredGithubConfig } from "./github-setup.js";
 import { createWebhookIngress } from "./webhook-ingress.js";
 import { GoogleConnections, GoogleProvider, loadGoogleConfig, type GoogleConfig } from "./google.js";
-import { runConnector } from "./activepieces.js";
-import { providerJson } from "./provider-http.js";
+import { ActionAccess } from "./action-access.js";
+import { runAction } from "./action-runner.js";
+
 import { GrantError, GrantStore } from "./grants.js";
 export { verifyArtifact } from "./artifacts.js";
 export { ConnectionStore } from "./connections.js";
@@ -125,6 +126,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   const app = Fastify({ logger: false, genReqId: () => randomUUID(), bodyLimit: 16 * 1024,
     requestTimeout: 120_000, connectionTimeout: 30_000, ajv: { customOptions: { removeAdditional: false } } });
   const grants = database === undefined ? undefined : new GrantStore(database.pool);
+  const actionAccess = database ? new ActionAccess(database.pool) : undefined;
   const capabilities = database === undefined ? undefined : new CapabilityStore(database.pool);
   const contexts = new WeakMap<FastifyRequest, AuthenticatedContext>();
   // ponytail: one artifact transfer per API process bounds memory for 32 MiB bundles;
@@ -305,7 +307,8 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     return reply.send({ status: "logged_out" });
   });
   app.get("/v1/me", { schema: { response: { 200: meResponseSchema, 401: errorResponseSchema } } }, async (request, reply) => {
-    const context = await authenticatedContext(bearerToken(request, config), database, auth);
+    const token = bearerToken(request, config);
+    const context = token?.startsWith("ck_agent_") ? await actionAccess?.authenticate(token) : await authenticatedContext(token, database, auth);
     if (context === undefined) return reply.code(401).send(stableError("AUTHENTICATION_REQUIRED", request.id));
     if (!context.membership.active) return reply.code(401).send(stableError("MEMBERSHIP_INACTIVE", request.id));
     return {
@@ -316,7 +319,8 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
 
   async function requireIdentity(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     if (capabilities === undefined) { reply.code(503).send(stableError("CONFIGURATION_UNAVAILABLE", request.id)); return; }
-    const context = await authenticatedContext(bearerToken(request, config), database, auth);
+    const token = bearerToken(request, config);
+    const context = token?.startsWith("ck_agent_") ? await actionAccess?.authenticate(token) : await authenticatedContext(token, database, auth);
     if (context === undefined || !context.membership.active) { reply.code(401).send(stableError("AUTHENTICATION_REQUIRED", request.id)); return; }
     contexts.set(request, context);
   }
@@ -393,17 +397,6 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     if (!drive) throw new ConnectionError("CONFIGURATION_UNAVAILABLE", 503);
     return drive;
   }
-  async function appAudit(context: AuthenticatedContext, appId: "github" | "google-drive", action: string): Promise<void> {
-    if (!database) throw new ConnectionError("CONFIGURATION_UNAVAILABLE", 503);
-    const client = await database.pool.connect();
-    try {
-      await client.query("begin");
-      requireWorkspaceOwner(await authorizeWorkspace(client, context));
-      await client.query("insert into app_connection_audit(workspace_id,principal_id,app,action) values($1,$2,$3,$4)", [context.membership.workspaceId,context.membership.principalId,appId,action]);
-      await client.query("commit");
-    } catch (error) { await client.query("rollback"); throw error; }
-    finally { client.release(); }
-  }
   app.get("/v1/apps", authenticated, async request => {
     const context = contextFor(request);
     const records = await connectionStore().list(context);
@@ -418,40 +411,19 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     await driveStore().callback(contextFor(request),sessionFor(request),request.body); return { status: "connected" };
   });
   app.delete("/v1/connections/google", authenticated, async (request,reply) => { await driveStore().disconnect(contextFor(request)); return reply.code(204).send(); });
-  app.post<{ Body: { connectionId: string; repositoryId: string; issueNumber: number } }>("/v1/apps/github/test", { ...authenticated, schema: { body: { type: "object", additionalProperties:false, required:["connectionId","repositoryId","issueNumber"],properties:{ connectionId:{type:"string",format:"uuid"},repositoryId:{type:"string",pattern:"^[1-9][0-9]{0,15}$"},issueNumber:{type:"integer",minimum:1,maximum:Number.MAX_SAFE_INTEGER} } } } }, async request => {
-    const context = contextFor(request); const { connectionId, repositoryId, issueNumber } = request.body;
-    const check = async () => {
-      const record = await connectionStore().detail(context, connectionId);
-      if (record.status !== "active" || !record.repositories.some(repo => repo.id === repositoryId)) throw new ConnectionError("CONNECTION_INACTIVE",403);
-    };
-    await check(); await appAudit(context,"github","test_started");
-    try {
-      const result = await connectionStore().withInstallationToken({ workspaceId:context.membership.workspaceId,connectionId,repositoryIds:[repositoryId],permission:"github.issue.read.v1" }, async (token,assertAccess) => {
-        await check(); await assertAccess();
-        const headers = { authorization:`Bearer ${token}`, accept:"application/vnd.github+json", "x-github-api-version":"2022-11-28" };
-        const repo = await providerJson(`https://api.github.com/repositories/${repositoryId}`,{headers});
-        if (String(repo.id) !== repositoryId || typeof repo.full_name !== "string" || !/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/.test(repo.full_name)) throw new ConnectionError("PROVIDER_RESPONSE_INVALID",502);
-        const resource = repo.full_name;
-        const result = await runConnector({action:"github.get-issue",resource,issueNumber}, async signal => {
-          await check(); await assertAccess();
-          return providerJson(`https://api.github.com/repos/${resource}/issues/${String(issueNumber)}`,{headers},signal);
-        });
-        await check(); return result;
-      });
-      await appAudit(context,"github","test_succeeded"); return { result };
-    } catch (error) { await appAudit(context,"github","test_failed").catch(() => {}); throw error; }
+  function actionStore(): ActionAccess { if(!actionAccess)throw new ConnectionError("CONFIGURATION_UNAVAILABLE",503);return actionAccess; }
+  app.get("/v1/actions",authenticated,async request=>actionStore().catalog(contextFor(request)));
+  app.post<{Params:{id:string};Body:{connectionId:string;input:unknown}}>("/v1/actions/:id/run",{...authenticated,schema:{body:{type:"object",additionalProperties:false,required:["connectionId","input"],properties:{connectionId:{type:"string",format:"uuid"},input:{type:"object"}}}}},async request=>runAction(actionStore(),connectionStore(),driveStore(),contextFor(request),request.params.id,request.body.connectionId,request.body.input));
+  app.get("/v1/action-access",authenticated,async request=>actionStore().options(contextFor(request)));
+  app.post("/v1/agents/keys",authenticated,async(request,reply)=>reply.code(201).send(await actionStore().issueKey(contextFor(request),request.body)));
+  app.delete<{Params:{id:string}}>("/v1/agents/keys/:id",authenticated,async(request,reply)=>{await actionStore().revokeKey(contextFor(request),request.params.id);return reply.code(204).send();});
+  app.post("/v1/action-grants",authenticated,async(request,reply)=>reply.code(201).send(await actionStore().grant(contextFor(request),request.body)));
+  app.delete<{Params:{id:string}}>("/v1/action-grants/:id",authenticated,async(request,reply)=>{await actionStore().revokeGrant(contextFor(request),request.params.id);return reply.code(204).send();});
+  // Keep the preview's old connection-test URLs on the same authorization/execution path.
+  app.post<{Body:{connectionId:string;repositoryId:string;issueNumber:number}}>("/v1/apps/github/test",authenticated,async request=>{
+    const {connectionId,...input}=request.body;return runAction(actionStore(),connectionStore(),driveStore(),contextFor(request),"github.get-issue.v1",connectionId,input);
   });
-  app.post<{ Body: { fileId: string } }>("/v1/apps/google-drive/test", { ...authenticated, schema: { body: { type:"object",additionalProperties:false,required:["fileId"],properties:{fileId:{type:"string",pattern:"^[A-Za-z0-9_-]{1,200}$"}} } } }, async request => {
-    const context=contextFor(request); const {fileId}=request.body;
-    await appAudit(context,"google-drive","test_started");
-    try {
-      const result = await driveStore().withToken(context, async(token,check) => runConnector({action:"drive.get-file",resource:fileId}, async signal => {
-        await check();
-        return providerJson(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {headers:{authorization:`Bearer ${token}`}},signal);
-      }));
-      await appAudit(context,"google-drive","test_succeeded"); return {result};
-    } catch(error) { await appAudit(context,"google-drive","test_failed").catch(() => {}); throw error; }
-  });
+  app.post<{Body:{fileId:string}}>("/v1/apps/google-drive/test",authenticated,async request=>runAction(actionStore(),connectionStore(),driveStore(),contextFor(request),"drive.get-file.v1",contextFor(request).membership.workspaceId,request.body));
   app.get("/v1/connections", authenticated, async (request) => {
     const context = contextFor(request);
     const records = await connectionStore().list(context);

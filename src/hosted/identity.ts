@@ -2,10 +2,11 @@ export type PrincipalKind = "human" | "agent";
 export type MembershipRole = "owner" | "member";
 
 export interface VerifiedIdentity {
-  readonly provider: "gotrue";
+  readonly provider: "gotrue" | "capykit-agent";
   readonly subject: string;
   readonly email: string;
   readonly sessionId?: string;
+  readonly credentialId?: string;
 }
 
 export interface WorkspaceMembership {

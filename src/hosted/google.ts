@@ -125,19 +125,30 @@ export class GoogleConnections {
     // Google's account settings for explicit project-wide revocation.
   }
 
-  async withToken<T>(context: AuthenticatedContext, run: (token: string, check: () => Promise<void>) => Promise<T>): Promise<T> {
+  async withToken<T>(context: AuthenticatedContext, run: (token: string, check: () => Promise<void>) => Promise<T>, authorize?: () => Promise<void>): Promise<T> {
+    // An explicit action authorization may permit a member/agent read. Management remains owner-only.
+    const read = async <R>(fn: (row: GoogleRow | undefined) => R): Promise<R> => {
+      if (!authorize) return this.owner(context, (_client, row) => fn(row));
+      await authorize();
+      const client = await this.pool.connect();
+      try {
+        await client.query("begin"); await authorizeWorkspace(client, context);
+        const row = (await client.query<GoogleRow>("select * from google_connections where workspace_id=$1", [context.membership.workspaceId])).rows[0];
+        const value = fn(row); await client.query("commit"); return value;
+      } catch(error) { await client.query("rollback"); throw error; } finally { client.release(); }
+    };
     const { provider, config } = this.configured();
-    const initial = await this.owner(context, (_client,row) => {
+    const initial = await read(row => {
       if (!row || row.status !== "active" || !row.refresh_token) return fail("CONNECTION_INACTIVE",403);
       return row;
     });
-    const check = async () => { await this.owner(context, (_client,row) => {
+    const check = async () => { await read(row => {
       if (row?.status !== "active" || row.generation !== initial.generation) fail("CONNECTION_INACTIVE",403);
     }); };
     let token: string;
     try { token = await provider.refresh(unseal<string>(config,initial.refresh_token,this.aad(initial,"refresh"))); }
     catch(error) {
-      if (error instanceof ConnectionError && error.code === "PROVIDER_AUTHORIZATION_EXPIRED") {
+      if (error instanceof ConnectionError && error.code === "PROVIDER_AUTHORIZATION_EXPIRED" && context.membership.principalKind === "human" && context.membership.role === "owner") {
         await this.owner(context, async (client,row) => {
           if (row?.generation === initial.generation && row.status === "active") await client.query("update google_connections set status='reconnect_required',generation=generation+1,refresh_token=null,updated_at=now() where workspace_id=$1", [row.workspace_id]);
         });
