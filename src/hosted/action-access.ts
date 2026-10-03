@@ -3,19 +3,19 @@ import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
 import { ConnectionError } from './connections.js';
 import { authorizeWorkspace, requireWorkspaceOwner } from './workspace-access.js';
-import { canManageWorkspace, type AuthenticatedContext } from './identity.js';
+import { canManageWorkspace, type AuthenticatedContext, type WorkspaceMembership } from './identity.js';
 import { actions, describeAction, getAction } from './actions.js';
 
-const uuid=z.string().uuid();
-const expiry=z.string().datetime({offset:true}).refine(value=>Date.parse(value)>Date.now()+1000&&Date.parse(value)<=Date.now()+365*86400000);
+const uuid=z.uuid();
+const expiry=z.iso.datetime({offset:true}).refine(value=>Date.parse(value)>Date.now()+1000&&Date.parse(value)<=Date.now()+365*86400000);
 const fail=(code:string,status=400):never=>{throw new ConnectionError(code,status);};
 function parse<T>(schema:z.ZodType<T>,input:unknown):T {const result=schema.safeParse(input);return result.success?result.data:fail('INVALID_REQUEST');}
 interface Connection {id:string;generation:number;name:string;repositories:{id:string;name:string}[];}
 export interface ActionAuthorization { actionId:string;connectionId:string;generation:number;repositoryId?:string;grantId:string|null; }
 export class ActionAccess {
  constructor(readonly pool:Pool) {}
- private async transaction<T>(context:AuthenticatedContext,run:(client:PoolClient)=>Promise<T>,owner=false):Promise<T> {
-  const client=await this.pool.connect();try{await client.query('begin');const membership=await authorizeWorkspace(client,context);if(owner)requireWorkspaceOwner(membership);const result=await run(client);await client.query('commit');return result;}catch(error){await client.query('rollback');throw error;}finally{client.release();}
+ private async transaction<T>(context:AuthenticatedContext,run:(client:PoolClient,membership:WorkspaceMembership)=>Promise<T>,owner=false):Promise<T> {
+  const client=await this.pool.connect();try{await client.query('begin');const membership=await authorizeWorkspace(client,context);if(owner)requireWorkspaceOwner(membership);const result=await run(client,membership);await client.query('commit');return result;}catch(error){await client.query('rollback');throw error;}finally{client.release();}
  }
  private async audit(client:PoolClient,context:AuthenticatedContext,event:string,actionId:string|null=null,grantId:string|null=null) {
   await client.query('insert into connector_action_audit(workspace_id,actor_principal_id,event,action_id,grant_id) values($1,$2,$3,$4,$5)',[context.membership.workspaceId,context.membership.principalId,event,actionId,grantId]);
@@ -39,11 +39,19 @@ export class ActionAccess {
   const repositories=(await client.query<{id:string;name:string}>('select repository_id as id,full_name as name from connection_repositories where workspace_id=$1 and connection_id=$2 order by full_name limit 500',[workspace,id])).rows;
   return {id,generation:row.generation,name:row.account?.login??'GitHub',repositories};
  }
- private async authorize(client:PoolClient,context:AuthenticatedContext,actionId:string,connectionId:string,repositoryId?:string,bound?:ActionAuthorization):Promise<ActionAuthorization> {
-  const action=getAction(actionId);const connection=await this.connection(client,context,actionId,connectionId);
+ private async authorize(client:PoolClient,context:AuthenticatedContext,current:WorkspaceMembership,actionId:string,connectionId:string,repositoryId?:string,bound?:ActionAuthorization):Promise<ActionAuthorization> {
+  const action=getAction(actionId);
+  const owner=canManageWorkspace(current);
+  if(action.app==='google-drive'&&connectionId!==current.workspaceId)return fail('NOT_FOUND',404);
+  if(bound?.grantId===null&&!owner)return fail('FORBIDDEN',403);
+  if(!owner) {
+    const eligible=await client.query('select id from connector_action_grants where workspace_id=$1 and recipient_principal_id=$2 and action_id=$3 and connection_id=$4 and connector_version=$5 and revoked_at is null and expires_at>now() and ($6::uuid is null or id=$6)',[current.workspaceId,current.principalId,actionId,connectionId,action.version,bound?.grantId??null]);
+    if(!eligible.rowCount)return fail('FORBIDDEN',403);
+  }
+  const connection=await this.connection(client,context,actionId,connectionId);
   if(bound&&connection.generation!==bound.generation)fail('CONNECTION_INACTIVE',403);
   if(action.app==='github'&&(!repositoryId||!connection.repositories.some(r=>r.id===repositoryId)))fail('FORBIDDEN',403);
-  if(canManageWorkspace(context.membership)&&(!bound||bound.grantId===null))return {actionId,connectionId,generation:connection.generation,grantId:null,...(repositoryId?{repositoryId}:{})};
+  if(owner&&(!bound||bound.grantId===null))return {actionId,connectionId,generation:connection.generation,grantId:null,...(repositoryId?{repositoryId}:{})};
   const grant=(await client.query<{id:string}>(`select id from connector_action_grants where workspace_id=$1 and recipient_principal_id=$2 and action_id=$3
    and connection_id=$4 and generation=$5 and connector_version=$6 and revoked_at is null and expires_at>now()
    and ($7::text is null or $7=any(repository_ids)) and ($8::uuid is null or id=$8) order by created_at,id limit 1`,[context.membership.workspaceId,context.membership.principalId,actionId,connectionId,connection.generation,action.version,repositoryId??null,bound?.grantId??null])).rows[0];
@@ -52,14 +60,14 @@ export class ActionAccess {
  }
  async bind(context:AuthenticatedContext,actionId:string,connectionId:string,repositoryId?:string):Promise<ActionAuthorization> {
   if(!uuid.safeParse(connectionId).success)fail('INVALID_REQUEST');
-  return this.transaction(context,client=>this.authorize(client,context,actionId,connectionId,repositoryId));
+  return this.transaction(context,(client,membership)=>this.authorize(client,context,membership,actionId,connectionId,repositoryId));
  }
  async check(context:AuthenticatedContext,bound:ActionAuthorization):Promise<void> {
-  await this.transaction(context,client=>this.authorize(client,context,bound.actionId,bound.connectionId,bound.repositoryId,bound).then(()=>{}));
+  await this.transaction(context,(client,membership)=>this.authorize(client,context,membership,bound.actionId,bound.connectionId,bound.repositoryId,bound).then(()=>{}));
  }
  async catalog(context:AuthenticatedContext) {
-  return this.transaction(context,async client=>{
-   const owner=canManageWorkspace(context.membership);
+  return this.transaction(context,async (client,membership)=>{
+   const owner=canManageWorkspace(membership);
    const grants=(await client.query<{action_id:string;connection_id:string;generation:number;connector_version:string;repository_ids:string[]}>('select action_id,connection_id,generation,connector_version,repository_ids from connector_action_grants where workspace_id=$1 and recipient_principal_id=$2 and revoked_at is null and expires_at>now() limit 500',[context.membership.workspaceId,context.membership.principalId])).rows;
    const github=(await client.query<{id:string}>("select id from provider_connections where workspace_id=$1 and status='active' order by id limit 200",[context.membership.workspaceId])).rows;
    const result=[];
@@ -116,6 +124,6 @@ export class ActionAccess {
   },true);
  }
  async revokeGrant(context:AuthenticatedContext,id:string) {
-  parse(uuid,id);await this.transaction(context,async client=>{const row=await client.query('update connector_action_grants set revoked_at=now() where workspace_id=$1 and id=$2 and revoked_at is null returning action_id',[context.membership.workspaceId,id]);if(row.rowCount)await this.audit(client,context,'grant_revoked',row.rows[0].action_id as string,id);},true);
+  parse(uuid,id);await this.transaction(context,async client=>{const row=await client.query<{action_id:string}>('update connector_action_grants set revoked_at=now() where workspace_id=$1 and id=$2 and revoked_at is null returning action_id',[context.membership.workspaceId,id]);if(row.rowCount)await this.audit(client,context,'grant_revoked',row.rows[0]?.action_id??null,id);},true);
  }
 }

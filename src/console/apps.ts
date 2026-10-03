@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActionConsole } from "./actions.js";
 import { Connections, hasGitHubReturn } from "./connections.js";
 import { sessionFetch, writeRequest } from "./session.js";
 const h = React.createElement;
@@ -6,7 +7,7 @@ type AppId = "github" | "google-drive";
 interface Catalog {
   apps: { id: AppId; name: string; configured: boolean; connected: boolean; description: string }[];
   github: { id: string; status: string; account: { login: string } | null; repositories: { id: string; fullName: string }[] }[];
-  google: { configured: boolean; connection: { status: string; email: string | null } | null };
+  google: { configured: boolean; connection: { status: string; email: string | null; updatedAt?: string } | null };
 }
 let googleReturn: { code: string; state: string } | { notice: string } | null = (() => {
   const url = new URL(window.location.href);
@@ -38,29 +39,6 @@ async function json<T>(response: Response, expired: () => void): Promise<T> {
 function AppIcon({id}:{id:AppId}): React.ReactElement {
   return h("span",{className:`app-icon ${id}`,"aria-hidden":true},id==="github" ? h("svg",{viewBox:"0 0 24 24",fill:"currentColor"},h("path",{d:"M12 .8a11.4 11.4 0 0 0-3.6 22.2c.6.1.8-.2.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.8-1.3-1.8-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6a4.7 4.7 0 0 1 1.2-3.2c-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2a4.7 4.7 0 0 1 1.2 3.2c0 4.7-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.4c0 .4.2.7.8.6A11.4 11.4 0 0 0 12 .8Z"})) : h("svg",{viewBox:"0 0 48 48"},h("path",{fill:"#0F9D58",d:"M17 5 2 31l8 13 15-26Z"}),h("path",{fill:"#F4B400",d:"M17 5h15l15 26H32Z"}),h("path",{fill:"#4285F4",d:"M10 44h30l7-13H17Z"})));
 }
-function ConnectionTest({app,data,onSessionExpired,onFailure}:{app:AppId;data:Catalog;onSessionExpired:()=>void;onFailure:(message:string)=>void}):React.ReactElement {
-  const repositories=data.github.filter(c=>c.status==="active").flatMap(c=>c.repositories.map(r=>({value:`${c.id}:${r.id}`,name:r.fullName})));
-  const [repository,setRepository]=useState(repositories[0]?.value??"");
-  const [resource,setResource]=useState(""); const [busy,setBusy]=useState(false); const [error,setError]=useState("");
-  const [result,setResult]=useState<Record<string,unknown>|null>(null);
-  async function test(event:React.SubmitEvent<HTMLElement>) {
-    event.preventDefault(); setBusy(true);setError("");setResult(null);
-    try {
-      const [connectionId,repositoryId]=repository.split(":");
-      const body=app==="github"?{connectionId,repositoryId,issueNumber:Number(resource)}:{fileId:resource.trim()};
-      const response=await json<{result:Record<string,unknown>}>(await writeRequest(`/v1/apps/${app}/test`,"POST",body),onSessionExpired);
-      setResult(response.result);
-    } catch(error) {const message=error instanceof Error?error.message:"Connection test failed.";setError(message);onFailure(message);} finally{setBusy(false);}
-  }
-  return h("section",{className:"panel connection-test","aria-label":"Test connection"},h("h2",null,"Try your connection"),h("p",{className:"muted"},app==="github"?"Read one issue from an approved repository. Nothing will be changed.":"Read a file’s name, ID and type. File contents will not be opened or changed."),
-    h("form",{onSubmit:(event)=>{void test(event);}},
-      app!=="github"?null:h("label",null,"Repository",h("select",{value:repository,disabled:busy,onChange:(event:React.ChangeEvent<HTMLSelectElement>)=>{setRepository(event.currentTarget.value);setResult(null);}},...repositories.map(r=>h("option",{key:r.value,value:r.value},r.name)))),
-      h("label",null,app==="github"?"Issue number":"Drive file ID",h("input",{required:true,type:app==="github"?"number":"text",...(app==="github"?{min:1,step:1,inputMode:"numeric" as const}:{pattern:"[A-Za-z0-9_-]{1,200}",maxLength:200}),value:resource,disabled:busy,onChange:event=>{setResource((event.currentTarget).value);setResult(null);},placeholder:app==="github"?"e.g. 12":"The ID in the file’s Drive URL"})),
-      h("button",{type:"submit",disabled:busy||(app==="github"&&!repository)},busy?"Reading…":"Test connection")),
-    error?h("p",{className:"message error",role:"alert"},error):null,
-    result?h("div",{className:"test-result",role:"status"},h("h3",null,"Connection works"),h("dl",null,...Object.entries(result).flatMap(([key,value])=>[h("dt",{key:`${key}-label`},key),h("dd",{key},String(value))]))):null,
-    h("p",{className:"small muted"},"This is an owner-only connection test. Running published functions is not available yet."));
-}
 export function Apps({active,onSessionExpired,onCreateFunction}:{active:boolean;onSessionExpired:()=>void;onCreateFunction:()=>void}):React.ReactElement {
   const [selected,setSelected]=useState<AppId|null>(()=>{
     const url=new URL(window.location.href), app=url.searchParams.get("app");
@@ -79,7 +57,6 @@ export function Apps({active,onSessionExpired,onCreateFunction}:{active:boolean;
     setBusy(true);
     void writeRequest("/v1/connections/google/callback","POST",callback).then(response=>json(response,onSessionExpired)).then(async()=>{setNoticeSuccess(true);setNotice("Google Drive is connected.");await load();}).catch((error:unknown)=>{setError(error instanceof Error?error.message:"Google Drive setup failed.");}).finally(()=>{setBusy(false);});
   },[load,onSessionExpired]);
-  function testFailure(message:string){void load().then(()=>{setError(message);});}
   function open(id:AppId|null){setSelected(id);setError("");setNotice("");setDisconnecting(false);const url=new URL(window.location.href);if(id)url.searchParams.set("app",id);else url.searchParams.delete("app");if(id!=="github")url.searchParams.delete("setup");window.history.replaceState(null,"",url);void load();requestAnimationFrame(()=>heading.current?.focus());}
   async function connect(){if(busy)return;setBusy(true);setError("");setNotice("");try{const value=await json<{authorizationUrl:string}>(await writeRequest("/v1/connections/google/start","POST",{consent:true}),onSessionExpired);const url=new URL(value.authorizationUrl);if(url.origin!=="https://accounts.google.com")throw new Error("Unexpected authorization URL.");window.location.assign(url.href);}catch(error){setError(error instanceof Error?error.message:"Could not start Google setup.");setBusy(false);}}
   async function checkAvailability(){setBusy(true);setNotice("");try{const value=await load();if(value){setNoticeSuccess(value.google.configured);setNotice(value.google.configured?"Google Drive is ready. Connect your account below.":"Google Drive is still unavailable. Your administrator needs to finish setup.");}}finally{setBusy(false);}}
@@ -95,10 +72,10 @@ export function Apps({active,onSessionExpired,onCreateFunction}:{active:boolean;
       data===null?h("p",{role:"status"},error?"Use Refresh apps to try again.":"Loading apps…"):apps.length===0?h("p",{className:"empty-state"},query?"No apps match your search.":"No connected apps yet. Choose All apps to connect your first app."):h("ul",{className:"app-list"},...apps.map(app=>h("li",{key:app.id},h("button",{type:"button",className:"app-row",onClick:()=>{ open(app.id); }},h(AppIcon,{id:app.id}),h("span",{className:"app-row-copy"},h("strong",null,app.name),h("span",{className:app.connected?"app-connected":"muted"},app.connected?"● Connected":!app.configured?"Not available yet":app.id==="google-drive"&&google?.status==="reconnect_required"?"Reconnect required":"Ready to connect"),h("span",{className:"small muted"},app.connected&&app.id==="google-drive"?google?.email:app.description)),h("span",{"aria-hidden":true},"›"))))),
       h("button",{type:"button",className:"create-function",onClick:onCreateFunction},"＋ Create a function"),
       h("p",{className:"small muted catalog-note"},"GitHub and Google Drive are the first supported apps. More Activepieces integrations will be added as their connection flows are ready.")),
-    h("div",{hidden:selected!=="github"},h(Connections,{onSessionExpired,active:active&&selected==="github",onConnectionsChanged:()=>{void load();}}),data?.apps.find(app=>app.id==="github")?.connected?h(ConnectionTest,{key:JSON.stringify(data.github),app:"github",data,onSessionExpired,onFailure:testFailure}):null),
+    h("div",{hidden:selected!=="github"},selected==="github"&&data?.apps.find(app=>app.id==="github")?.connected?h(ActionConsole,{key:JSON.stringify(data.github),app:"github",onSessionExpired}):null,h("details",{open:!data?.apps.find(app=>app.id==="github")?.connected,className:"connection-management"},h("summary",null,"Manage GitHub connection"),h(Connections,{onSessionExpired,active:active&&selected==="github",onConnectionsChanged:()=>{void load();}}))),
     selected!=="google-drive"||!data?null:h(React.Fragment,null,
       h("section",{className:"panel drive-connection"},h(AppIcon,{id:"google-drive"}),h("h2",null,google?.status==="active"?"Connected account":!data.google.configured?"Google Drive isn’t available yet":google?.status==="reconnect_required"?"Reconnect Google Drive":"Connect Google Drive"),
-        google?.status==="active"?h(React.Fragment,null,h("p",null,google.email),h("p",{className:"muted"},"Read-only access to file names and metadata. Only workspace owners can test this connection."),h("p",{className:"small muted"},h("a",{href:"https://myaccount.google.com/connections",target:"_blank",rel:"noopener noreferrer"},"Manage Capykit’s Google account permission ↗"),". Removing it there disconnects every workspace using this Google account."),
+        google?.status==="active"?h(React.Fragment,null,h("p",null,google.email),h("p",{className:"muted"},"Read-only access to file names and metadata. Choose an action below."),h("p",{className:"small muted"},h("a",{href:"https://myaccount.google.com/connections",target:"_blank",rel:"noopener noreferrer"},"Manage Capykit’s Google account permission ↗"),". Removing it there disconnects every workspace using this Google account."),
           disconnecting?h("div",{className:"connection-confirm"},h("p",null,"Disconnect Google Drive from this workspace? Capykit will remove its saved credentials. Other workspaces and your Google account permissions will stay unchanged."),h("div",{className:"actions"},h("button",{type:"button",className:"danger",disabled:busy,onClick:()=>{void disconnect();}},"Confirm disconnect"),h("button",{type:"button",className:"secondary",disabled:busy,onClick:()=>{ setDisconnecting(false); }},"Keep connected"))):h("button",{type:"button",className:"secondary",onClick:()=>{ setDisconnecting(true); }},"Disconnect")):
         !data.google.configured?h(React.Fragment,null,h("p",{className:"muted"},"Your administrator needs to enable Google Drive for this Capykit deployment. There’s nothing to authorize yet."),h("button",{type:"button",className:"secondary",disabled:busy,onClick:()=>{void checkAvailability();}},busy?"Checking…":"Check availability"),h("p",{className:"small muted"},"Once enabled: connect → choose your Google account → approve access at Google → return here connected.")):
         h(React.Fragment,null,
@@ -106,5 +83,5 @@ export function Apps({active,onSessionExpired,onCreateFunction}:{active:boolean;
           h("p",{className:"muted"},"Choose your account and approve access securely at Google. You’ll return here when connected."),
           h("p",{id:"drive-access",className:"small muted"},"Connecting allows workspace owners to read file names and metadata across this account’s Drive, including shared files it can access. Capykit cannot read file contents or change files."),
           h("button",{type:"button",disabled:busy,"aria-describedby":"drive-access",onClick:()=>{void connect();}},busy?"Connecting…":google?.status==="reconnect_required"?"Reconnect Google Drive":"Connect Google Drive"))),
-      google?.status==="active"?h(ConnectionTest,{app:"google-drive",data,onSessionExpired,onFailure:testFailure}):null));
+      google?.status==="active"?h(ActionConsole,{key:google.updatedAt,app:"google-drive",onSessionExpired}):null));
 }

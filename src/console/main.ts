@@ -4,6 +4,7 @@ import { CapabilityLibrary } from "./library.js";
 import { sessionFetch, writeRequest, setPublicSignupSession } from "./session.js";
 import { discardGitHubReturn, hasGitHubReturn } from "./connections.js";
 import { Apps, discardGoogleReturn } from "./apps.js";
+import { ActionConsole } from "./actions.js";
 import { Access } from "./access.js";
 import "./style.css";
 
@@ -263,10 +264,10 @@ function App(): React.ReactElement {
       currentUser.identity.principalKind === "human"
         ? h(React.Fragment, { key: currentUser.workspace.id },
           h("nav", { className: "workspace-nav", "aria-label": "Workspace" },
-            ...(currentUser.workspace.role === "owner" ? ["connections", "capabilities", "access"] : ["capabilities"]).map((name) => h("button", { key: name, type: "button", className: tab === name ? "active" : "", "aria-current": tab === name ? "page" : undefined, onClick: () => { setTab(name); setGitHubNotice(""); const url = new URL(window.location.href); url.searchParams.set("tab", name); if (name !== "connections") url.searchParams.delete("setup"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } }, name === "capabilities" ? "Functions" : name === "connections" ? "Apps" : "Access")),
+            ...(currentUser.workspace.role === "owner" ? ["connections", "capabilities", "access"] : ["connections", "capabilities"]).map((name) => h("button", { key: name, type: "button", className: tab === name ? "active" : "", "aria-current": tab === name ? "page" : undefined, onClick: () => { setTab(name); setGitHubNotice(""); const url = new URL(window.location.href); url.searchParams.set("tab", name); if (name !== "connections") url.searchParams.delete("setup"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } }, name === "capabilities" ? "Functions" : name === "connections" ? "Apps" : "Access")),
           ),
-          h("div", { hidden: currentUser.workspace.role === "owner" && tab !== "capabilities" }, h(CapabilityLibrary, { createFunctionRequest, onSessionExpired: sessionExpired, manage: currentUser.workspace.role === "owner" })),
-          currentUser.workspace.role !== "owner" ? null : h("div", { hidden: tab !== "connections" }, h(Apps, { onSessionExpired: sessionExpired, active: tab === "connections", onCreateFunction: () => { setCreateFunctionRequest(value => value + 1); setTab("capabilities"); const url = new URL(window.location.href); url.searchParams.set("tab","capabilities"); url.searchParams.delete("setup"); window.history.replaceState(null,"",`${url.pathname}${url.search}`); } })),
+          h("div", { hidden: tab !== "capabilities" }, h(CapabilityLibrary, { createFunctionRequest, onSessionExpired: sessionExpired, manage: currentUser.workspace.role === "owner" })),
+          currentUser.workspace.role !== "owner" ? h("div",{hidden:tab!=="connections"},h(ActionConsole,{onSessionExpired:sessionExpired})) : h("div", { hidden: tab !== "connections" }, h(Apps, { onSessionExpired: sessionExpired, active: tab === "connections", onCreateFunction: () => { setCreateFunctionRequest(value => value + 1); setTab("capabilities"); const url = new URL(window.location.href); url.searchParams.set("tab","capabilities"); url.searchParams.delete("setup"); window.history.replaceState(null,"",`${url.pathname}${url.search}`); } })),
           currentUser.workspace.role !== "owner" ? null : h("div", { hidden: tab !== "access" }, h(Access, { onSessionExpired: sessionExpired, active: tab === "access" })),
         )
         : h("section", { className: "panel", "aria-label": "Capability access" }, h("h1", null, "Your workspace"), h("p", null, "Your account is active. Capability access is currently available to workspace owners. Member and agent access will become available through grants.")),

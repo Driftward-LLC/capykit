@@ -66,7 +66,7 @@ describe.skipIf(databaseUrl === undefined)("GitHub connection HTTP and PostgreSQ
     const client = await admin.connect();
     try {
       await client.query(`set search_path=${schema},public`);
-      for (const name of ["001_hosted_workspace_identity.sql", "002_hosted_database_access.sql", "003_hosted_capabilities.sql", "004_hosted_connections.sql", "005_hosted_grants.sql", "006_hosted_app_connections.sql"]) {
+      for (const name of ["001_hosted_workspace_identity.sql", "002_hosted_database_access.sql", "003_hosted_capabilities.sql", "004_hosted_connections.sql", "005_hosted_grants.sql", "006_hosted_app_connections.sql", "008_connector_actions.sql"]) {
         await client.query((await readFile(new URL(`../scripts/migrations/${name}`, import.meta.url), "utf8")).replaceAll("capykit_runtime", runtimeRole));
       }
       for (const id of workspaces) await client.query("insert into workspaces(id,slug,name) values($1,$2,'Connection HTTP test')", [id, id]);
@@ -435,6 +435,9 @@ describe.skipIf(databaseUrl === undefined)("GitHub connection HTTP and PostgreSQ
     const fetcher=vi.fn<typeof fetch>().mockImplementation(url=>Promise.resolve(new Response(JSON.stringify((typeof url === "string" ? url : url instanceof URL ? url.href : url.url).includes("/repositories/")?{id:123,full_name:"test-team/repo"}:{number:12,title:"Brokered read",state:"open",body:"private body"}))));
     vi.stubGlobal("fetch",fetcher);
     try {
+      const empty=await app.inject({method:"POST",url:"/v1/apps/github/test",headers:browserHeaders});
+      expect(empty.statusCode).toBe(400);expect(empty.json<{error:{code:string}}>().error.code).toBe("INVALID_REQUEST");
+      expect(mint).not.toHaveBeenCalled();expect(fetcher).not.toHaveBeenCalled();
       const response=await app.inject({method:"POST",url:"/v1/apps/github/test",headers:browserHeaders,payload});
       expect(response.statusCode,response.body).toBe(200);
       expect(response.json()).toEqual({result:{number:12,title:"Brokered read",state:"open"}});

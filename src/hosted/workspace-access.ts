@@ -33,7 +33,7 @@ export async function authorizeWorkspace(client: PoolClient, context: Authentica
     if (!key || membership.principalKind !== "agent" || membership.role !== "member") throw new HostedAccessError("MEMBERSHIP_INACTIVE", 401);
     const current = await client.query<{ active: boolean }>("select connector_agent_credential_active($1,$2,$3::uuid) as active", [workspaceId,principalId,key]);
     if (!current.rows[0]?.active) throw new HostedAccessError("MEMBERSHIP_INACTIVE", 401);
-  } else if (membership.principalKind !== "human") throw new HostedAccessError("MEMBERSHIP_INACTIVE", 401);
+  }
   return membership;
 }
 

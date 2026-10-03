@@ -41,6 +41,10 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
     expect(await database.readiness()).toEqual({ status: "unavailable", reason: "connection_failed" });
     await database.pool.query(`begin; ${connections}\n${grants}\ncommit;`);
     await database.pool.query(`begin; ${migration}\n${access}\n${artifacts}\n${connections}\ncommit;`);
+    expect(await database.readiness()).toEqual({ status: "unavailable", reason: "connection_failed" });
+    for (const name of ["006_hosted_app_connections.sql", "008_connector_actions.sql"]) {
+      await database.pool.query((await readFile(new URL(`../scripts/migrations/${name}`, import.meta.url), "utf8")).replaceAll("capykit_runtime", runtimeRole));
+    }
     expect(await database.readiness()).toEqual({ status: "ready", reason: "ok" });
   });
 

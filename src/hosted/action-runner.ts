@@ -12,6 +12,7 @@ export async function runAction(access:ActionAccess,connections:ConnectionStore,
  const check=()=>access.check(context,bound);
  await access.event(context,'run_started',bound);
  try {
+  await check();
   let result:Record<string,unknown>;
   if(action.app==='github') {
    result=await connections.withInstallationToken({workspaceId:context.membership.workspaceId,connectionId,repositoryIds:[String(input.repositoryId)],permission:'github.issue.read.v1'},async(token,assertAccess)=>{
@@ -32,8 +33,8 @@ export async function runAction(access:ActionAccess,connections:ConnectionStore,
      await check();await assertAccess();const data=await providerJson(`https://www.googleapis.com/drive/v3/files/${String(input.fileId)}?supportsAllDrives=true`,{headers},signal);await check();await assertAccess();return data;
     });
     const url=new URL('https://www.googleapis.com/drive/v3/files');
-    url.search=new URLSearchParams({q:driveQuery(actionId,input),fields:driveFields,pageSize:'25',supportsAllDrives:'true',includeItemsFromAllDrives:'false',corpora:'user',...(input.pageToken?{pageToken:String(input.pageToken)}:{})}).toString();
-    return runConnector({action:'drive.search-files',resource:'search',name:action.id==='drive.find-files.v1'?String(input.name):'',...(input.folderId?{folderId:String(input.folderId)}:{})},async signal=>{
+    url.search=new URLSearchParams({q:driveQuery(actionId,input),fields:driveFields,pageSize:'25',supportsAllDrives:'true',includeItemsFromAllDrives:'false',corpora:'user',...(typeof input.pageToken==='string'?{pageToken:input.pageToken}:{})}).toString();
+    return runConnector({action:'drive.search-files',resource:'search',name:action.id==='drive.find-files.v1'?String(input.name):'',...(typeof input.folderId==='string'?{folderId:input.folderId}:{})},async signal=>{
      await check();await assertAccess();const data=await providerJson(url.href,{headers},signal);
      if(!Array.isArray(data.files))throw new ConnectionError('PROVIDER_RESPONSE_INVALID',502);
      await check();await assertAccess();return data;

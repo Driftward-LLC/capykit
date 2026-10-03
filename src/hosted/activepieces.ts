@@ -8,7 +8,7 @@ let running = 0;
 export async function runConnector(input: ConnectorInput, request: (signal: AbortSignal) => Promise<Record<string, unknown>>): Promise<Record<string, unknown>> {
   if (!/^[A-Za-z0-9_-]{1,200}$/.test(input.resource) && !(input.action === "github.get-issue" && /^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/.test(input.resource))) throw new ConnectionError("INVALID_REQUEST", 400);
   if (input.action === "github.get-issue" && (!Number.isSafeInteger(input.issueNumber) || input.issueNumber < 1)) throw new ConnectionError("INVALID_REQUEST", 400);
-  if (input.action === "drive.search-files" && (input.name.length > 120 || /['\\\u0000-\u001f]/u.test(input.name) || (input.folderId !== undefined && !/^[A-Za-z0-9_-]{1,200}$/u.test(input.folderId)))) throw new ConnectionError("INVALID_REQUEST",400);
+  if (input.action === "drive.search-files" && (input.name.length > 120 || (/['\\]/u.test(input.name) || Array.from({length:input.name.length},(_,i)=>input.name.charCodeAt(i)).some(c=>c<32)) || (input.folderId !== undefined && !/^[A-Za-z0-9_-]{1,200}$/u.test(input.folderId)))) throw new ConnectionError("INVALID_REQUEST",400);
   // ponytail: two trusted actions per API process; durable uploaded-code admission belongs to ENG-125.
   if (running >= 2) throw new ConnectionError("CONNECTOR_BUSY", 429);
   running++;

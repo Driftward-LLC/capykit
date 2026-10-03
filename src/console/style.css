@@ -190,3 +190,15 @@ button.app-row:hover:enabled { background: #18271f; }
 }
 
 .account > span { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Connector actions use the same vertical list on phones and desktops. */
+.action-list,.action-files {list-style:none;padding:0;margin:0;}
+.action-list li+li,.action-files li+li {border-top:1px solid var(--border,#294038);}
+.action-row {display:flex;justify-content:space-between;align-items:center;gap:16px;width:100%;text-align:left;background:transparent;color:inherit;border:0;border-radius:0;padding:20px 0;min-height:64px;}
+.action-row span span,.action-files li span {display:block;margin-top:6px;}
+.action-files li {padding:16px 0;overflow-wrap:anywhere;}
+.action-result {margin-top:24px;overflow-wrap:anywhere;}
+.connector-actions form,.action-access form {display:grid;gap:16px;}
+.connector-actions .connection-back {margin-bottom:16px;}
+.connection-management summary {min-height:44px;cursor:pointer;padding:12px 0;}
+.agent-key {display:block;padding:16px;border:1px solid var(--border,#294038);border-radius:12px;overflow-wrap:anywhere;user-select:all;font-size:14px;}

@@ -420,7 +420,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   app.post("/v1/action-grants",authenticated,async(request,reply)=>reply.code(201).send(await actionStore().grant(contextFor(request),request.body)));
   app.delete<{Params:{id:string}}>("/v1/action-grants/:id",authenticated,async(request,reply)=>{await actionStore().revokeGrant(contextFor(request),request.params.id);return reply.code(204).send();});
   // Keep the preview's old connection-test URLs on the same authorization/execution path.
-  app.post<{Body:{connectionId:string;repositoryId:string;issueNumber:number}}>("/v1/apps/github/test",authenticated,async request=>{
+  app.post<{Body:{connectionId:string;repositoryId:string;issueNumber:number}}>("/v1/apps/github/test",{...authenticated,schema:{body:{type:"object",additionalProperties:false,required:["connectionId","repositoryId","issueNumber"],properties:{connectionId:{type:"string",format:"uuid"},repositoryId:{type:"string",pattern:"^[0-9]+$"},issueNumber:{type:"integer",minimum:1,maximum:Number.MAX_SAFE_INTEGER}}}}},async request=>{
     const {connectionId,...input}=request.body;return runAction(actionStore(),connectionStore(),driveStore(),contextFor(request),"github.get-issue.v1",connectionId,input);
   });
   app.post<{Body:{fileId:string}}>("/v1/apps/google-drive/test",authenticated,async request=>runAction(actionStore(),connectionStore(),driveStore(),contextFor(request),"drive.get-file.v1",contextFor(request).membership.workspaceId,request.body));
