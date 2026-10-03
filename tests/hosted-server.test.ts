@@ -410,6 +410,9 @@ describe("hosted HTTP boundaries", () => {
     const root = await app.inject({ url: "/" });
     expect(root.statusCode).toBe(200);
     expect(root.body).toContain("/assets/index-test.js");
+    expect(root.headers["content-security-policy"]).toContain("img-src 'self' https://cdn.activepieces.com;");
+    expect(root.headers["content-security-policy"]).toContain("script-src 'self';");
+    expect(root.headers["content-security-policy"]).toContain("connect-src 'self';");
     const asset = await app.inject({ url: "/assets/index-test.js" });
     expect(asset.statusCode).toBe(200);
     expect(asset.headers["content-type"]).toContain("text/javascript");

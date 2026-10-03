@@ -167,7 +167,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     return reply.code(ready ? 200 : 503).send({ status: ready ? "ready" : "unavailable", database: db.reason, missing });
   });
   async function serveConsole(_request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> {
-    reply.header("content-security-policy", `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'${githubSetup ? " https://github.com" : ""}`);
+    reply.header("content-security-policy", `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://cdn.activepieces.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'${githubSetup ? " https://github.com" : ""}`);
     reply.header("referrer-policy", "no-referrer");
     return reply.type("text/html").send(await readFile(join(consoleDirectory, "index.html")));
   }
