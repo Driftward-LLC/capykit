@@ -28,6 +28,11 @@ grant connect on database capykit to capykit_auth;
 \i /opt/capykit/migrations/001_hosted_workspace_identity.sql
 \i /opt/capykit/migrations/002_hosted_database_access.sql
 \i /opt/capykit/migrations/003_hosted_capabilities.sql
+\i /opt/capykit/migrations/004_hosted_connections.sql
+\i /opt/capykit/migrations/005_hosted_grants.sql
+\i /opt/capykit/migrations/006_hosted_app_connections.sql
+\i /opt/capykit/migrations/007_public_google_signup.sql
+\i /opt/capykit/migrations/008_connector_actions.sql
 
 create role capykit_api login nosuperuser nocreatedb nocreaterole
   inherit noreplication nobypassrls password :'api_password';

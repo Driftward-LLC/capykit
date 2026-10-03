@@ -5,7 +5,7 @@ x-logging: &logging
     max-file: "3"
 
 services:
-  app:
+  app: &app
     image: ${CAPYKIT_IMAGE:-capykit-hosted:local}
     build:
       context: .
@@ -19,14 +19,33 @@ services:
     cpus: 0.5
     mem_limit: 512m
     pids_limit: 128
-    environment:
+    env_file:
+      - path: ${CAPYKIT_GITHUB_ENV_FILE:-/etc/driftward/capykit-github.env}
+        required: false
+      - path: ${CAPYKIT_GOOGLE_ENV_FILE:-/etc/driftward/capykit-google.env}
+        required: false
+    environment: &app-environment
       NODE_ENV: production
       PORT: "3000"
+      CAPYKIT_WEBHOOK_PORT: "3001"
       DATABASE_URL: postgresql://capykit_api:${CAPYKIT_DB_PASSWORD:?Set a generated hex database password}@postgres:5432/capykit
       CAPYKIT_AUTH_URL: http://auth:9999
+      CAPYKIT_TAILSCALE_LOGIN: ${CAPYKIT_TAILSCALE_LOGIN:-}
+      CAPYKIT_TAILSCALE_EMAIL: ${CAPYKIT_TAILSCALE_EMAIL:-}
+      CAPYKIT_TAILSCALE_SUBJECT: ${CAPYKIT_TAILSCALE_SUBJECT:-}
+      CAPYKIT_TAILSCALE_PROXY_ADDRESS: ${CAPYKIT_TAILSCALE_PROXY_ADDRESS:-}
+      CAPYKIT_TAILSCALE_SERVICE_KEY: ${CAPYKIT_TAILSCALE_SERVICE_KEY:-}
       CAPYKIT_PUBLIC_BASE_URL: ${CAPYKIT_PUBLIC_BASE_URL:?Set the exact HTTPS origin}
+      CAPYKIT_GITHUB_CONFIG_FILE: /var/lib/capykit/providers/github.json
+      CAPYKIT_GITHUB_SETUP_WORKSPACE_ID: ${CAPYKIT_GITHUB_SETUP_WORKSPACE_ID:-}
+      CAPYKIT_GITHUB_SETUP_PRINCIPAL_ID: ${CAPYKIT_GITHUB_SETUP_PRINCIPAL_ID:-}
+      CAPYKIT_GITHUB_SETUP_ORGANIZATION: ${CAPYKIT_GITHUB_SETUP_ORGANIZATION:-}
+      CAPYKIT_GITHUB_WEBHOOK_URL: ${CAPYKIT_GITHUB_WEBHOOK_URL:-}
+    volumes:
+      - provider-config:/var/lib/capykit/providers
     ports:
       - "127.0.0.1:${CAPYKIT_HTTP_PORT:-19121}:3000"
+      - "127.0.0.1:${CAPYKIT_WEBHOOK_HTTP_PORT:-19123}:3001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,6 +58,30 @@ services:
       retries: 5
       start_period: 20s
     logging: *logging
+
+  public-app:
+    <<: *app
+    profiles: [public]
+    env_file:
+      - path: ${CAPYKIT_GOOGLE_ENV_FILE:-/etc/driftward/capykit-google.env}
+        required: false
+    volumes: []
+    environment:
+      <<: *app-environment
+      CAPYKIT_PUBLIC_BASE_URL: ${CAPYKIT_PUBLIC_SIGNUP_BASE_URL:-${CAPYKIT_PUBLIC_BASE_URL}}
+      CAPYKIT_PUBLIC_SIGNUP: "true"
+      CAPYKIT_GITHUB_CONFIG_FILE: ""
+      CAPYKIT_TAILSCALE_LOGIN: ""
+      CAPYKIT_TAILSCALE_EMAIL: ""
+      CAPYKIT_TAILSCALE_SUBJECT: ""
+      CAPYKIT_TAILSCALE_PROXY_ADDRESS: ""
+      CAPYKIT_TAILSCALE_SERVICE_KEY: ""
+      CAPYKIT_GITHUB_SETUP_WORKSPACE_ID: ""
+      CAPYKIT_GITHUB_SETUP_PRINCIPAL_ID: ""
+      CAPYKIT_GITHUB_SETUP_ORGANIZATION: ""
+      CAPYKIT_GITHUB_WEBHOOK_URL: ""
+    ports:
+      - "127.0.0.1:${CAPYKIT_PUBLIC_HTTP_PORT:-19124}:3000"
 
   postgres:
     image: postgres:17.11-alpine3.24@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
@@ -81,12 +124,16 @@ services:
       GOTRUE_API_PORT: "9999"
       API_EXTERNAL_URL: ${CAPYKIT_PUBLIC_BASE_URL:?Set the exact HTTPS origin}
       GOTRUE_SITE_URL: ${CAPYKIT_PUBLIC_BASE_URL:?Set the exact HTTPS origin}
-      GOTRUE_URI_ALLOW_LIST: ${CAPYKIT_PUBLIC_BASE_URL:?Set the exact HTTPS origin}
+      GOTRUE_URI_ALLOW_LIST: ${CAPYKIT_AUTH_REDIRECT_ALLOW_LIST:-${CAPYKIT_PUBLIC_BASE_URL}}
       GOTRUE_DB_DRIVER: postgres
       GOTRUE_DB_DATABASE_URL: postgresql://capykit_auth:${CAPYKIT_AUTH_DB_PASSWORD:?Set a generated hex auth database password}@postgres:5432/capykit?sslmode=disable
       GOTRUE_DB_NAMESPACE: auth
       GOTRUE_DB_MAX_POOL_SIZE: "5"
-      GOTRUE_DISABLE_SIGNUP: "true"
+      GOTRUE_DISABLE_SIGNUP: ${CAPYKIT_DISABLE_SIGNUP:-true}
+      GOTRUE_EXTERNAL_GOOGLE_ENABLED: ${CAPYKIT_AUTH_GOOGLE_ENABLED:-false}
+      GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: ${CAPYKIT_GOOGLE_CLIENT_ID:-}
+      GOTRUE_EXTERNAL_GOOGLE_SECRET: ${CAPYKIT_GOOGLE_CLIENT_SECRET:-}
+      GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: ${CAPYKIT_AUTH_GOOGLE_REDIRECT_URI:-}
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
       GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
       GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
@@ -97,6 +144,7 @@ services:
       GOTRUE_MAILER_SUBJECTS_MAGIC_LINK: Your Capykit sign-in code
       GOTRUE_JWT_SECRET: ${CAPYKIT_AUTH_JWT_SECRET:?Set a generated hex JWT signing secret}
       GOTRUE_JWT_EXP: "3600"
+      GOTRUE_SESSIONS_INACTIVITY_TIMEOUT: "720h"
       GOTRUE_JWT_AUD: authenticated
       GOTRUE_JWT_ADMIN_ROLES: service_role
       GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
@@ -152,5 +200,6 @@ services:
     logging: *logging
 
 volumes:
+  provider-config:
   postgres-data:
   mailpit-data:

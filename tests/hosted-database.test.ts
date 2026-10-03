@@ -30,11 +30,21 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
       .replaceAll("capykit_runtime", runtimeRole).replaceAll("'anon'", `'${browserRole}'`);
     const artifacts = (await readFile(new URL("../scripts/migrations/003_hosted_capabilities.sql", import.meta.url), "utf8"))
       .replaceAll("capykit_runtime", runtimeRole).replaceAll("'anon'", `'${browserRole}'`);
+    const connections = (await readFile(new URL("../scripts/migrations/004_hosted_connections.sql", import.meta.url), "utf8"))
+      .replaceAll("capykit_runtime", runtimeRole).replaceAll("'anon'", `'${browserRole}'`);
+    const grants = (await readFile(new URL("../scripts/migrations/005_hosted_grants.sql", import.meta.url), "utf8"))
+      .replaceAll("capykit_runtime", runtimeRole).replaceAll("'anon'", `'${browserRole}'`);
     await admin.query(`create role ${browserRole} nologin`);
     await database.pool.query(`begin; ${migration}\n${access}\ncommit;`);
     expect(await database.readiness()).toEqual({ status: "unavailable", reason: "connection_failed" });
     await database.pool.query(`begin; ${artifacts}\ncommit;`);
-    await database.pool.query(`begin; ${migration}\n${access}\n${artifacts}\ncommit;`);
+    expect(await database.readiness()).toEqual({ status: "unavailable", reason: "connection_failed" });
+    await database.pool.query(`begin; ${connections}\n${grants}\ncommit;`);
+    await database.pool.query(`begin; ${migration}\n${access}\n${artifacts}\n${connections}\ncommit;`);
+    expect(await database.readiness()).toEqual({ status: "unavailable", reason: "connection_failed" });
+    for (const name of ["006_hosted_app_connections.sql", "008_connector_actions.sql"]) {
+      await database.pool.query((await readFile(new URL(`../scripts/migrations/${name}`, import.meta.url), "utf8")).replaceAll("capykit_runtime", runtimeRole));
+    }
     expect(await database.readiness()).toEqual({ status: "ready", reason: "ok" });
   });
 
@@ -99,7 +109,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
          from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = $2 and c.relkind = 'r'`, [browserRole, schema],
     );
-    expect(protectedTables.rows).toHaveLength(10);
+    expect(protectedTables.rows).toHaveLength(23);
     expect(protectedTables.rows.every((table) => table.relrowsecurity && !table.can_select)).toBe(true);
     await admin.query(`grant usage on schema ${schema} to ${browserRole}; grant select on ${schema}.workspaces to ${browserRole}`);
     const client = await admin.connect();

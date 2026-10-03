@@ -35,7 +35,7 @@ describe("container image packaging contract", () => {
       defaultRegistryMountMode: "read-only",
     }));
     expect(metadata.baseImage).toEqual(expect.stringMatching(/^node:22\.18\.0-bookworm-slim@sha256:[a-f0-9]{64}$/));
-    expect(metadata.requiredBuildArtifacts).toEqual(["dist", "schemas", "package.json", "package-lock.json", "README.md", "LICENSE"]);
+    expect(metadata.requiredBuildArtifacts).toEqual(["dist", "schemas", "package.json", "package-lock.json", "README.md", "LICENSE", "docs/LICENSE.activepieces"]);
   });
 
   it("publishes versioned multi-architecture GHCR images from tagged releases", () => {

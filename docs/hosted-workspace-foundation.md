@@ -8,8 +8,10 @@ inside this deployment, rather than depending on their hosted platform.
 
 This foundation provides invited-user sign-in and durable workspace identity.
 The [capability library](hosted-capabilities.md) adds complete skill/function
-artifacts and immutable versions. Connections, grants, execution, and run history
-remain the later ENG-123 through ENG-126 milestones. The worker executable is a
+artifacts and immutable versions. [GitHub connections](hosted-connections.md)
+provide the ENG-123 lifecycle; [user grants](hosted-access.md) add scoped access.
+Agent credentials, remote MCP, execution, and run history remain ENG-124 through
+ENG-126. The worker executable is a
 one-shot readiness check, not an execution queue consumer.
 
 ## Portable deployment
@@ -28,6 +30,8 @@ Create a protected configuration file outside the repository with these values:
 - `CAPYKIT_AUTH_DB_PASSWORD`: password for the auth schema owner.
 - `CAPYKIT_AUTH_JWT_SECRET`: at least 32 random bytes for GoTrue signing.
 - Optional `CAPYKIT_HTTP_PORT` and `CAPYKIT_MAIL_PORT`: default 19121 and 19122.
+- Optional `CAPYKIT_WEBHOOK_HTTP_PORT`: default 19123, webhook-only listener.
+- Optional `CAPYKIT_GITHUB_ENV_FILE`: protected dedicated App configuration.
 - Optional `CAPYKIT_IMAGE`: an immutable application image tag for deployment and
   rollback; the default is suitable for local builds.
 
@@ -48,9 +52,9 @@ Tailscale host, use separate Serve ports pointing to the corresponding loopback
 ports; preserve existing routes. Tailnet access is the test inbox's access
 boundary. Everyone allowed into that inbox can read staging login codes.
 
-The API receives only `DATABASE_URL`, `CAPYKIT_AUTH_URL`, its public origin, and
-its port. The application does not receive database-owner credentials, an auth
-admin token, or the auth signing secret. The server-only auth URL can use HTTP
+The API receives `DATABASE_URL`, `CAPYKIT_AUTH_URL`, its public origin, listener
+ports, and optional dedicated GitHub App configuration. It receives no database
+owner credentials, auth admin token, or auth signing secret. The auth URL uses HTTP
 inside the private container network. Public URLs still require HTTPS except on
 loopback.
 
@@ -63,7 +67,7 @@ or using this deployment with real customers.
 ## Database and first owner
 
 The fresh-volume initializer creates separate database roles, then applies
-migrations 001 through 003 in one transaction. RLS protects all application tables.
+migrations 001 through 004 in one transaction. RLS protects all application tables.
 `capykit_api` inherits `capykit_runtime`: the four identity tables remain read-only,
 while capability operations require transaction-scoped workspace/owner context.
 The runtime cannot create tables or act as a database owner.
@@ -72,7 +76,7 @@ migrations and owner bootstrap separately.
 
 Initialization runs only on an empty Postgres volume. For upgrades, take a backup
 and apply new migrations explicitly with operator credentials. Never delete a
-volume to force initialization. Apply 001 through 003 together when creating an
+volume to force initialization. Apply 001 through 004 together when creating an
 application schema manually, so tables are never committed without access rules.
 
 `scripts/provision-hosted-owner.mjs` is an operator-only command. It creates a
@@ -116,17 +120,46 @@ the static template from `/auth/email-template`; this route contains the templat
 placeholder, never a real code. Unknown and invited emails get the same public
 request response. Codes expire and have provider rate limits.
 
-Successful verification creates Secure, HttpOnly, SameSite=Strict session
-cookies. Access and refresh tokens are never returned to browser JavaScript or
-stored in browser storage. Unsafe cookie-authenticated requests require the
-matching origin and double-submit CSRF token. Callback origins are explicit.
+Successful verification remembers the browser for 30 days, renewed as the app
+is used. Access tokens still expire after one hour. Access and rotating refresh
+tokens stay in Secure, HttpOnly, SameSite=Strict cookies, never response JSON or
+JavaScript storage. The refresh cookie is scoped to `/v1/auth`; the readable
+CSRF cookie has the same persistent lifetime. Cookie issuance requires the exact
+application Origin. Unsafe cookie-authenticated requests require that Origin
+and the matching double-submit CSRF token. Callback origins are explicit.
+
+When an API rejects an expired login before executing a request, the console
+POSTs `/v1/auth/refresh` with CSRF protection and retries the request once.
+Renewal checks the provider session and current workspace membership before
+updating cookies. The CSRF token stays stable during renewal; new login rotates
+it. Concurrent requests share renewal, and supporting browsers coordinate tabs
+with Web Locks. GoTrue's native token rotation and reuse protection remain on.
+Temporary provider/network failures retain the session and unsaved work for
+retry. Confirmed expiration, revocation or inactive membership requires login.
+
+Compose sets `GOTRUE_SESSIONS_INACTIVITY_TIMEOUT=720h` so GoTrue also rejects
+renewal after 30 days without a refresh. This is a rolling inactivity limit,
+not an absolute lifetime. See the provider's
+[session behavior](https://supabase.com/docs/guides/auth/sessions) and pinned
+[GoTrue configuration](https://github.com/supabase/auth/blob/v2.197.0/internal/conf/configuration.go).
+Standalone deployments should apply the same auth-service setting.
 
 Every protected request verifies the provider session and reads current workspace
 membership. Inactive workspaces, principals, or memberships are denied on the
 next request. Owner/creator attribution does not imply an execution grant.
-Logout clears cookies and revokes the current GoTrue session; subsequent requests
-still validate with GoTrue rather than trusting a JWT offline. Sessions expire
-after one hour; this foundation does not implement silent refresh.
+Logout waits for pending renewal, revokes the current GoTrue session with a
+fresh token when necessary, and clears all three cookies. A transient failure
+keeps the session available for another sign-out attempt. Subsequent requests
+still validate the provider session rather than trusting a JWT offline. Late
+responses cannot make a revoked provider session valid again.
+
+GitHub setup binds to the provider-verified session ID and identity, which remain
+stable across token rotation. A new login is a different session and cannot
+resume another session's pending GitHub approval. Sessions created before this
+upgrade lack a refresh cookie and need one more email-code login. In-progress
+GitHub authorizations should be restarted after the upgrade. The explicit
+`/v1/auth/session` bearer import remains short-lived because it supplies no
+refresh credential.
 
 Workspace-owned relationships use compound database constraints to reject
 cross-workspace substitutions. Browser roles have no direct table access. No

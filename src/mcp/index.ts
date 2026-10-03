@@ -1,3 +1,4 @@
+import { createRemoteActionServer } from "./remote.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -203,6 +204,10 @@ function parseArgs(argv: readonly string[]): CapykitMcpServerOptions {
 export async function main(argv: readonly string[] = process.argv.slice(2)): Promise<void> {
   if (argv.includes("--http")) {
     throw new Error("Streamable HTTP transport is deferred for v0.1; run capykit-mcp over stdio.");
+  }
+  if (argv.includes("--remote")) {
+    if (argv.length !== 1) throw new Error("Use --remote by itself; local --registry and --config modes are separate.");
+    await createRemoteActionServer().connect(new StdioServerTransport()); return;
   }
   await createServer(parseArgs(argv)).connect(new StdioServerTransport());
 }

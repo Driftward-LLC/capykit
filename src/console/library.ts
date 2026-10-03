@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { sessionFetch, writeRequest } from "./session.js";
 
 const h = React.createElement;
 const MiB = 1024 * 1024;
@@ -13,15 +14,6 @@ interface Capability { id: string; slug: string; name: string; kind: CapabilityK
 interface CapabilityDetail extends Capability {
   draft: (ArtifactSummary & { version: string; updatedAt: string }) | null;
   versions: (ArtifactSummary & { version: string; publishedAt: string })[];
-}
-
-export function writeRequest(path: string, method: "POST" | "PUT" | "DELETE", body?: unknown): Promise<Response> {
-  const csrf = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith("capykit_csrf="))?.slice("capykit_csrf=".length);
-  return fetch(path, {
-    method, credentials: "same-origin",
-    headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...(csrf === undefined ? {} : { "x-csrf-token": csrf }) },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
 }
 
 function bytesLabel(bytes: number): string {
@@ -99,7 +91,7 @@ function Summary({ artifact }: { artifact: ArtifactSummary }): React.ReactElemen
 }
 
 const errorMessages: Record<string, string> = {
-  FORBIDDEN: "Your current role cannot perform this action. Capability access is limited to workspace owners until grants are available.",
+  FORBIDDEN: "Your current role cannot perform this action. Ask a workspace owner for an exact-version grant if access is missing.",
   NOT_FOUND: "This capability or version is no longer available. Refresh the library.",
   INVALID_REQUEST: "Check the capability identifier, version, and file format, then try again.",
   ARTIFACT_INVALID: "The artifact did not pass validation. Check SKILL.md metadata, relative paths, file limits, and credential files. Functions require an async handler in index.mjs with the supported contract.",
@@ -110,7 +102,7 @@ const errorMessages: Record<string, string> = {
   CSRF_REQUIRED: "Your session needs refreshing. Reload the page and try again.",
 };
 
-export function CapabilityLibrary({ onSessionExpired }: { onSessionExpired: () => void }): React.ReactElement {
+export function CapabilityLibrary({ onSessionExpired, manage = true, createFunctionRequest = 0 }: { onSessionExpired: () => void; manage?: boolean; createFunctionRequest?: number }): React.ReactElement {
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [selected, setSelected] = useState<CapabilityDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,6 +116,7 @@ export function CapabilityLibrary({ onSessionExpired }: { onSessionExpired: () =
   const [version, setVersion] = useState("1.0.0");
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [deleting, setDeleting] = useState(false);
+  useEffect(() => { if (createFunctionRequest > 0 && manage) { setCreating(true); setKind("function"); } }, [createFunctionRequest, manage]);
 
   async function checked(response: Response): Promise<Response> {
     if (response.status === 401) {
@@ -145,14 +138,14 @@ export function CapabilityLibrary({ onSessionExpired }: { onSessionExpired: () =
   }
 
   async function refresh(): Promise<void> {
-    const response = await checked(await fetch("/v1/capabilities", { credentials: "same-origin", cache: "no-store" }));
+    const response = await checked(await sessionFetch("/v1/capabilities", { credentials: "same-origin", cache: "no-store" }));
     const result = await response.json() as { capabilities: Capability[] };
     setCapabilities(result.capabilities);
   }
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch("/v1/capabilities", { credentials: "same-origin", cache: "no-store", signal: controller.signal }).then(async (response) => {
+    void sessionFetch("/v1/capabilities", { credentials: "same-origin", cache: "no-store", signal: controller.signal }).then(async (response) => {
       if (response.status === 401) { onSessionExpired(); return; }
       if (!response.ok) throw new Error("Could not load your capabilities. Retry when your connection is available.");
       const result = await response.json() as { capabilities: Capability[] };
@@ -167,7 +160,7 @@ export function CapabilityLibrary({ onSessionExpired }: { onSessionExpired: () =
 
   async function open(id: string): Promise<void> {
     await run(async () => {
-      const response = await checked(await fetch(`/v1/capabilities/${encodeURIComponent(id)}`, { credentials: "same-origin", cache: "no-store" }));
+      const response = await checked(await sessionFetch(`/v1/capabilities/${encodeURIComponent(id)}`, { credentials: "same-origin", cache: "no-store" }));
       show(await response.json() as CapabilityDetail);
     });
   }
@@ -217,7 +210,7 @@ export function CapabilityLibrary({ onSessionExpired }: { onSessionExpired: () =
   async function download(publishedVersion: string): Promise<void> {
     if (selected === null) return;
     await run(async () => {
-      const response = await checked(await fetch(`/v1/capabilities/${encodeURIComponent(selected.id)}/versions/${encodeURIComponent(publishedVersion)}/download`, { credentials: "same-origin", cache: "no-store" }));
+      const response = await checked(await sessionFetch(`/v1/capabilities/${encodeURIComponent(selected.id)}/versions/${encodeURIComponent(publishedVersion)}/download`, { credentials: "same-origin", cache: "no-store" }));
       const url = URL.createObjectURL(await response.blob());
       const anchor = document.createElement("a");
       anchor.href = url; anchor.download = `${selected.slug}-${publishedVersion}.capykit.json`;
@@ -237,8 +230,8 @@ export function CapabilityLibrary({ onSessionExpired }: { onSessionExpired: () =
 
   const dirty = files.length > 0;
   return h("section", { className: "library", "aria-label": "Capability library", "aria-busy": loading || pending },
-    h("div", { className: "section-heading" }, h("div", null, h("p", { className: "eyebrow" }, "Workspace library"), h("h1", null, "Capabilities"), h("p", { className: "muted" }, "Store complete skills and reviewed functions. Publish versions you can reuse anywhere.")),
-      h("button", { type: "button", disabled: pending, onClick: () => { setCreating(true); setError(""); setNotice(""); } }, "New capability")),
+    h("div", { className: "section-heading" }, h("div", null, h("p", { className: "eyebrow" }, "Workspace library"), h("h1", null, "Functions & skills"), h("p", { className: "muted" }, manage ? "Store complete skills and reviewed functions. Publish versions you can reuse anywhere." : "Browse versions granted to you by a workspace owner.")),
+      !manage ? null : h("button", { type: "button", disabled: pending, onClick: () => { setCreating(true); setError(""); setNotice(""); } }, "New capability")),
     error === "" ? null : h("p", { className: "message error", role: "alert" }, error),
     notice === "" ? null : h("p", { className: "message success", role: "status" }, notice),
     creating ? h("section", { className: "panel", "aria-label": "Create capability" },
@@ -246,7 +239,7 @@ export function CapabilityLibrary({ onSessionExpired }: { onSessionExpired: () =
       h("form", { onSubmit: (event) => { void create(event); } },
         h("div", { className: "form-grid" },
           h("label", null, "Name", h("input", { required: true, maxLength: 120, value: name, disabled: pending, onChange: (event) => { setName(event.currentTarget.value); }, placeholder: "Repository triage" })),
-          h("label", null, "Identifier", h("input", { required: true, maxLength: 80, pattern: "[a-z0-9]+(?:-[a-z0-9]+)*", value: slug, disabled: pending, onChange: (event) => { setSlug(event.currentTarget.value); }, placeholder: "repository-triage", "aria-describedby": "identifier-help" })),
+          h("label", null, "Identifier", h("input", { autoCapitalize: "none", autoCorrect: "off", spellCheck: false, required: true, maxLength: 80, pattern: "[a-z0-9]+(?:-[a-z0-9]+)*", value: slug, disabled: pending, onChange: (event) => { setSlug(event.currentTarget.value); }, placeholder: "repository-triage", "aria-describedby": "identifier-help" })),
           h("label", null, "Kind", h("select", { value: kind, disabled: pending, onChange: (event: React.ChangeEvent<HTMLSelectElement>) => { setKind(event.currentTarget.value as CapabilityKind); } }, h("option", { value: "skill" }, "Skill bundle"), h("option", { value: "function" }, "Function"))),
         ),
         h("p", { id: "identifier-help", className: "muted small" }, "Use a stable lowercase identifier with letters, numbers, or hyphens. It cannot be changed later."),
@@ -255,13 +248,14 @@ export function CapabilityLibrary({ onSessionExpired }: { onSessionExpired: () =
     h("div", { className: "library-layout" },
       h("aside", { className: "panel library-nav", "aria-label": "Your capabilities" },
         h("div", { className: "section-heading compact" }, h("h2", null, "Your library"), h("button", { type: "button", className: "text-button", disabled: pending || loading, onClick: () => { void run(refresh); } }, "Refresh")),
-        loading ? h("p", { role: "status" }, "Loading capabilities…") : capabilities.length === 0 ? h("p", { className: "muted" }, "No capabilities yet. Create a skill or function to get started.") : h("ul", { className: "capability-list" }, ...capabilities.map((capability) => h("li", { key: capability.id },
+        loading ? h("p", { role: "status" }, "Loading capabilities…") : capabilities.length === 0 ? h("p", { className: "muted" }, manage ? "No capabilities yet. Create a skill or function to get started." : "No capabilities have been granted to you. Ask your workspace owner for access.") : h("ul", { className: "capability-list" }, ...capabilities.map((capability) => h("li", { key: capability.id },
           h("button", { type: "button", className: selected?.id === capability.id ? "capability-item active" : "capability-item", "aria-current": selected?.id === capability.id ? "true" : undefined, disabled: pending, onClick: () => { void open(capability.id); } }, h("span", { className: "kind-badge" }, capability.kind), h("strong", null, capability.name), h("span", { className: "muted small" }, capability.slug)),
         ))),
       ),
-      selected === null ? h("section", { className: "panel empty-state" }, h("h2", null, "A home for reusable capabilities"), h("p", { className: "muted" }, "Choose a capability to inspect its draft, publish a version, or download its complete contents."), h("p", { className: "muted small" }, "Skills include SKILL.md and their supporting files. Functions currently support github.issues.list.v1. Publishing makes a version available to workspace owners; grants and execution come later.")) : h("div", { className: "capability-detail" },
+      selected === null ? h("section", { className: "panel empty-state" }, h("h2", null, "A home for reusable capabilities"), h("p", { className: "muted" }, manage ? "Choose a capability to inspect its draft, publish a version, or download its complete contents." : "Choose a granted capability to inspect its published versions and download authorized skills."), h("p", { className: "muted small" }, "Skills include SKILL.md and their supporting files. Functions currently support github.issues.list.v1. Publishing creates no recipient grant. Owners manage version access in Access; function execution is the next milestone.")) : h("div", { className: "capability-detail" },
         h("section", { className: "panel" },
           h("div", { className: "section-heading" }, h("div", null, h("span", { className: "kind-badge" }, selected.kind), h("h2", null, selected.name), h("p", { className: "muted" }, selected.slug)), h("button", { type: "button", className: "secondary", disabled: pending, onClick: () => { void open(selected.id); } }, "Reload capability")),
+          !manage ? null : h(React.Fragment, null,
           h("h3", null, selected.draft === null ? "Upload a draft" : "Replace the draft"),
           h("p", { className: "muted" }, selected.kind === "skill" ? "Choose the complete folder with SKILL.md at its root. Include scripts, references, and binary assets. SKILL.md needs name and description frontmatter. Maximum 512 files, 8 MiB per file, 32 MiB total." : "Upload one UTF-8 index.mjs, up to 1 MiB, exporting an async handler without imports or dependencies. This function uses the fixed github.issues.list.v1 contract."),
           h("form", { onSubmit: (event) => { void saveDraft(event); } },
@@ -279,8 +273,8 @@ export function CapabilityLibrary({ onSessionExpired }: { onSessionExpired: () =
               ))),
             h("div", { className: "actions" }, h("button", { type: "submit", disabled: pending || !dirty }, pending ? "Working…" : "Save and validate draft"), !dirty ? null : h("button", { type: "button", className: "secondary", disabled: pending, onClick: () => { setFiles([]); setVersion(selected.draft?.version ?? "1.0.0"); setNotice(""); } }, "Discard selected files")),
           ),
-        ),
-        selected.draft === null ? null : h("section", { className: "panel", "aria-label": "Saved draft" }, h("div", { className: "section-heading" }, h("h3", null, `Draft · ${selected.draft.version}`), h("span", { className: "status-badge" }, "Unpublished")),
+        )),
+        !manage || selected.draft === null ? null : h("section", { className: "panel", "aria-label": "Saved draft" }, h("div", { className: "section-heading" }, h("h3", null, `Draft · ${selected.draft.version}`), h("span", { className: "status-badge" }, "Unpublished")),
           h(Summary, { artifact: selected.draft }),
           h("p", { className: "muted small" }, "Publishing permanently fixes these files, their executable flags, and the contract to this version. A later change requires a new version."),
           h("button", { type: "button", disabled: pending || dirty || version.trim() !== selected.draft.version, onClick: () => { void publish(); } }, `Publish ${selected.draft.version}`),
@@ -288,11 +282,11 @@ export function CapabilityLibrary({ onSessionExpired }: { onSessionExpired: () =
         ),
         h("section", { className: "panel", "aria-label": "Published versions" }, h("h3", null, "Published versions"),
           selected.versions.length === 0 ? h("p", { className: "muted" }, "No published versions yet.") : selected.versions.map((published) => h("article", { className: "published-version", key: published.version },
-            h("div", { className: "section-heading" }, h("div", null, h("h4", null, published.version), h("p", { className: "muted small" }, `Published ${new Date(published.publishedAt).toLocaleString()}`)), h("button", { type: "button", className: "secondary", disabled: pending, onClick: () => { void download(published.version); } }, `Download ${published.version}`)), h(Summary, { artifact: published }),
+            h("div", { className: "section-heading" }, h("div", null, h("h4", null, published.version), h("p", { className: "muted small" }, `Published ${new Date(published.publishedAt).toLocaleString()}`)), !manage && selected.kind === "function" ? null : h("button", { type: "button", className: "secondary", disabled: pending, onClick: () => { void download(published.version); } }, `Download ${published.version}`)), h(Summary, { artifact: published }),
           )),
           h("p", { className: "muted small" }, "Downloads include every file as base64, original paths, executable flags, a verified digest, and invocation guidance in one portable JSON artifact."),
         ),
-        h("section", { className: "panel deletion", "aria-label": "Delete capability" },
+        !manage ? null : h("section", { className: "panel deletion", "aria-label": "Delete capability" },
           deleting ? h("div", null, h("h3", null, `Delete ${selected.name}?`), h("p", null, "This removes its draft and all published versions from the workspace. Future downloads stop immediately. Existing downloaded copies and backups are not erased."), h("div", { className: "actions" }, h("button", { type: "button", className: "danger", disabled: pending, onClick: () => { void remove(); } }, "Delete capability and versions"), h("button", { type: "button", className: "secondary", disabled: pending, onClick: () => { setDeleting(false); } }, "Keep capability"))) : h("button", { type: "button", className: "text-button danger-text", disabled: pending, onClick: () => { setDeleting(true); } }, "Delete capability"),
         ),
       ),

@@ -8,7 +8,8 @@ API, CLI, or MCP. See the
 
 The source checkout includes a Docker-hosted web app with invited-user sign-in
 and a [versioned skill and function library](docs/hosted-capabilities.md).
-GitHub connections, recipient grants, and hosted function execution are the next
+[GitHub connections](docs/hosted-connections.md) add owner consent and selected
+repositories. Recipient grants and hosted function execution are the next
 milestones. The installable discovery catalog answers three questions:
 
 - What tools are available?
@@ -137,6 +138,10 @@ Connections still need their own authentication. See
 and the complete setup flow. Profile commands are currently unreleased.
 
 ## Development
+
+The web console is mobile first. Apply the
+[phone acceptance criteria](docs/mobile-first.md) to every UI change before
+expanding the layout for desktop use.
 
 The TypeScript application has explicit boundaries under `src/`: `core` owns
 catalog behavior, `cli` owns the `capykit` command, `mcp` owns the read-only
