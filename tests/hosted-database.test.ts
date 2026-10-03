@@ -109,7 +109,7 @@ describe.skipIf(databaseUrl === undefined)("hosted PostgreSQL boundaries", () =>
          from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = $2 and c.relkind = 'r'`, [browserRole, schema],
     );
-    expect(protectedTables.rows).toHaveLength(18);
+    expect(protectedTables.rows).toHaveLength(23);
     expect(protectedTables.rows.every((table) => table.relrowsecurity && !table.can_select)).toBe(true);
     await admin.query(`grant usage on schema ${schema} to ${browserRole}; grant select on ${schema}.workspaces to ${browserRole}`);
     const client = await admin.connect();
