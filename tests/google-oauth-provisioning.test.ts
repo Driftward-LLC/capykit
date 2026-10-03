@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 const directories: string[] = [];
 const origin = "https://capykit.example.test:19121";
 const callback = `${origin}/v1/connections/google/callback`;
-const client = { web: { project_id: "capykit-preview", client_id: "123-preview.apps.googleusercontent.com", client_secret: "test-secret-never-print-123456", auth_uri: "https://accounts.google.com/o/oauth2/auth", token_uri: "https://oauth2.googleapis.com/token", redirect_uris: [callback] } };
+const client = { web: { project_id: "capykit-preview", client_id: "123-preview.apps.googleusercontent.com", client_secret: "test-secret-1234", auth_uri: "https://accounts.google.com/o/oauth2/auth", token_uri: "https://oauth2.googleapis.com/token", redirect_uris: [callback] } };
 afterEach(async () => { await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
 async function fixture(input: unknown = client) {
   const directory = await mkdtemp(join(tmpdir(), "capykit-google-config-")); directories.push(directory);
@@ -41,12 +41,12 @@ describe("operator Google OAuth import", () => {
   it("preserves the encryption key while rotating the same client's secret", async () => {
     const { target, source, run } = await fixture(); expect(run().status).toBe(0);
     const before = await readFile(target, "utf8");
-    await writeFile(source, JSON.stringify({ web: { ...client.web, client_secret: "rotated-secret-never-print-123" } }));
+    await writeFile(source, JSON.stringify({ web: { ...client.web, client_secret: "rotated-secret-12" } }));
     const result = run(); expect(result.status).toBe(0);
     const after = await readFile(target, "utf8");
     expect(after.split("CAPYKIT_GOOGLE_ENCRYPTION_KEY=")[1]).toEqual(before.split("CAPYKIT_GOOGLE_ENCRYPTION_KEY=")[1]);
-    expect(after).toContain("rotated-secret-never-print-123");
-    expect(result.stdout + result.stderr).not.toContain("rotated-secret-never-print-123");
+    expect(after).toContain("rotated-secret-12");
+    expect(result.stdout + result.stderr).not.toContain("rotated-secret-12");
   });
   it.each([
     { installed: client.web },
