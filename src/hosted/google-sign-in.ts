@@ -50,7 +50,7 @@ export function createGoogleSignIn(authUrl: string, origin: string): GoogleSignI
       return url.href;
     },
     async exchange(code, verifier) {
-      // Per-request SDK storage; only the documented PKCE verifier is seeded.
+      // Per-request SDK storage; seed its PKCE verifier without persisting tokens.
       // Native GoTrue exchanges/consumes the auth code and issues normal sessions.
       const storageKey = "capykit-google";
       const storage = new Map([[`${storageKey}-code-verifier`, JSON.stringify(verifier)]]);

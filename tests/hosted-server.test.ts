@@ -430,6 +430,15 @@ describe("public Google signup HTTP boundaries", () => {
     Object.assign(value.database, { provisionIdentity });
     return { ...value, googleSignIn, provisionIdentity };
   }
+  it("keeps private sessions and email-code login out of the public signup flow", async () => {
+    const { app, auth } = publicFixture();
+    expect((await app.inject({ url: "/v1/me", headers: { cookie: "capykit_session=verified-token" } })).statusCode).toBe(401);
+    expect(auth.verifyBearer).not.toHaveBeenCalled();
+    for (const [url, payload] of [["/v1/auth/otp", { email: identity.email }], ["/v1/auth/verify", { email: identity.email, token: "123456" }]] as const) expect((await app.inject({ method: "POST", url, headers: { origin }, payload })).statusCode).toBe(404);
+    expect(auth.requestOtp).not.toHaveBeenCalled(); expect(auth.verifyOtp).not.toHaveBeenCalled();
+    expect(() => loadHostedConfig({ CAPYKIT_PUBLIC_SIGNUP: "yes" })).toThrow();
+    expect(() => loadHostedConfig({ CAPYKIT_PUBLIC_SIGNUP: "true", CAPYKIT_PUBLIC_BASE_URL: "https://example.ts.net", CAPYKIT_AUTH_URL: "http://auth:9999", CAPYKIT_TAILSCALE_LOGIN: "owner@github", CAPYKIT_TAILSCALE_EMAIL: identity.email, CAPYKIT_TAILSCALE_SUBJECT: "12345678-1234-4321-8123-123456789012", CAPYKIT_TAILSCALE_PROXY_ADDRESS: "172.25.0.1", CAPYKIT_TAILSCALE_SERVICE_KEY: "test-only-service-key" })).toThrow("Public signup cannot use a private Tailscale identity mapping.");
+  });
   it("offers Google signup, creates a short-lived private verifier and accepts no user-selected identity or redirect", async () => {
     const { app, googleSignIn } = publicFixture();
     expect((await app.inject({ url: "/v1/auth/method" })).json()).toEqual({ method: "google", available: true });
