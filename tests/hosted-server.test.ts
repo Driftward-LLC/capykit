@@ -347,6 +347,18 @@ describe("hosted HTTP boundaries", () => {
     expect(malformed.body).not.toContain("SENTINEL");
   });
 
+  it("lets authenticated members browse upstream metadata without owner connection authority", async () => {
+    const {app,database}=fixture();
+    expect((await app.inject({url:"/v1/apps/catalog"})).statusCode).toBe(401);
+    database.resolveContext.mockResolvedValue({...context,membership:{...context.membership,role:"member"}});
+    const response=await app.inject({url:"/v1/apps/catalog",headers:{authorization:`Bearer ${session.accessToken}`}});
+    expect(response.statusCode).toBe(200);
+    const catalog=response.json<{apps:{id:string;configured:boolean;connected:boolean}[];catalog:{count:number}}>();
+    expect(catalog.apps.length).toBe(catalog.catalog.count);expect(catalog.apps.length).toBeGreaterThan(700);
+    expect(catalog.apps.every(app=>!app.connected&&!app.configured)).toBe(true);
+    expect(response.body).not.toContain(session.accessToken);
+  });
+
   it("reports unavailable configuration/database with a failing HTTP readiness status", async () => {
     const { app, database } = fixture();
     expect((await app.inject({ url: "/health/ready" })).statusCode).toBe(200);

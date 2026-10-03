@@ -21,6 +21,7 @@ import { createWebhookIngress } from "./webhook-ingress.js";
 import { GoogleConnections, GoogleProvider, loadGoogleConfig, type GoogleConfig } from "./google.js";
 import { ActionAccess } from "./action-access.js";
 import { runAction } from "./action-runner.js";
+import { appCatalog, catalogProvenance } from "./piece-catalog.js";
 
 import { GrantError, GrantStore } from "./grants.js";
 export { verifyArtifact } from "./artifacts.js";
@@ -397,14 +398,15 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     if (!drive) throw new ConnectionError("CONFIGURATION_UNAVAILABLE", 503);
     return drive;
   }
+  app.get("/v1/apps/catalog", authenticated, () => ({apps:appCatalog(),catalog:catalogProvenance}));
   app.get("/v1/apps", authenticated, async request => {
     const context = contextFor(request);
     const records = await connectionStore().list(context);
     const googleState = await driveStore().detail(context);
-    return { apps: [
+    return { apps: appCatalog([
       { id: "github", name: "GitHub", configured: Boolean(github), connected: records.some(row => row.status === "active"), description: "Read issues from selected repositories", connector: "@activepieces/piece-github@0.9.0" },
       { id: "google-drive", name: "Google Drive", configured: googleState.configured, connected: googleState.connection?.status === "active", description: "Read file names and metadata", connector: "@activepieces/piece-google-drive@0.11.0" },
-    ], github: records, google: googleState };
+    ]), catalog:catalogProvenance, github: records, google: googleState };
   });
   app.post("/v1/connections/google/start", { ...authenticated, schema: { body: { type: "object", additionalProperties: false, required: ["consent"], properties: { consent: { const: true } } } } }, async request => driveStore().start(contextFor(request), sessionFor(request)));
   app.post<{ Body: { code: string; state: string } }>("/v1/connections/google/callback", { ...authenticated, schema: { body: { type: "object", additionalProperties: false, required: ["code","state"], properties: { code: { type:"string", minLength:1,maxLength:4096 }, state: { type:"string",pattern:"^[A-Za-z0-9_-]{43}$" } } } } }, async request => {

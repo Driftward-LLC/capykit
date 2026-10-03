@@ -202,3 +202,12 @@ button.app-row:hover:enabled { background: #18271f; }
 .connector-actions .connection-back {margin-bottom:16px;}
 .connection-management summary {min-height:44px;cursor:pointer;padding:12px 0;}
 .agent-key {display:block;padding:16px;border:1px solid var(--border,#294038);border-radius:12px;overflow-wrap:anywhere;user-select:all;font-size:14px;}
+.app-category { display: block; max-width: 32rem; margin: 16px 0; }
+.catalog-icon { position: relative; border-radius: 12px; background: #1d3027; font-size: 24px; font-weight: 700; }
+.catalog-icon img { position: absolute; width: 40px; height: 40px; object-fit: contain; background: #101913; }
+.catalog-icon img[hidden] { display: none; }
+.catalog-description { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.catalog-more { width: 100%; margin: 20px 0; }
+.piece-details dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; }
+.piece-details dt { color: #acb8c0; }
+.piece-details dd { margin: 0; overflow-wrap: anywhere; }

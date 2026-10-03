@@ -213,3 +213,40 @@ remain the deployment runbook, not a user onboarding form.
 Configuration readiness is not proof of successful live OAuth;
 a real account callback and read must still be verified. API tests use controlled
 provider responses, with real PostgreSQL RLS and real pinned connector code.
+
+## Full Activepieces catalog
+
+Apps also lists every piece in the imported public Activepieces catalog, including
+utility pieces that do not need an account. Search matches names, descriptions
+and categories. Category and Connected filters combine with search. Rows load
+40 at a time; Show more apps reveals the next group. Each piece has a stable
+app URL, action/trigger counts, connection methods and upstream detail link.
+
+Catalog-only entries say Available through Activepieces and explain that they
+cannot yet connect or execute in Capykit. There is no inactive Connect button or
+secret-entry form for these entries. GitHub and Drive keep their existing
+connection flows and restricted action allowlist; upstream action counts describe
+Activepieces, not the number of executable Capykit actions. Members can browse
+metadata and use their granted native actions without owner management controls.
+
+The checked-in snapshot is `src/hosted/piece-catalog.json`. It records the source
+URL, retrieval timestamp, raw-source SHA-256, count and normalized piece metadata.
+The application serves this snapshot without fetching or executing upstream code.
+`GET /v1/apps/catalog` returns authenticated metadata only, without workspace
+connections, credentials or grants. `GET /v1/apps` retains owner connection state.
+The MCP action catalog continues to expose only granted executable actions.
+
+To refresh explicitly from the official public endpoint:
+
+```bash
+node scripts/update-piece-catalog.mjs
+```
+
+For a previously downloaded response, use `--input /path/to/pieces.json`.
+Review and commit the resulting snapshot before deployment. The importer bounds
+response size, rejects invalid/duplicate identifiers and unknown authentication
+methods, discards credential-field definitions, and replaces output only after
+validation. Logos use only the known Activepieces CDN; other logos use initials.
+Browse availability does not install packages, register OAuth clients, create
+connections, or enable arbitrary actions. Adding executable integrations remains
+separate work on authentication, grants and the provider broker.
