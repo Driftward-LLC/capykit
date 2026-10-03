@@ -17,7 +17,8 @@ native sessions, and provisions through a restricted database function.
 This is operator work. Public signup remains unavailable until the dedicated
 Google Web client is registered and enabled in GoTrue; an installed connector
 package does not supply that registration. ENG-141 tracks that prerequisite.
-Use an External Google audience for customers outside the organization. Testing restricts Drive consent to registered test users. Google documents an
+Use an External Google audience for customers outside the organization. Testing
+restricts Drive consent to registered test users. Google documents an
 exception for identity-only login scopes; publish and complete applicable
 verification before offering Drive connections broadly. See
 [Google audience settings](https://support.google.com/cloud/answer/15549945).
@@ -58,8 +59,9 @@ verification before offering Drive connections broadly. See
 4. Validate Compose with the existing deployment arguments and both private env
    files. Recreate the auth service to enable the native Google provider, and
    start only `public-app` using `--profile public`. The public app reuses the
-   existing image and database. It does not inherit the private GitHub credentials
-   or provider volume, whose registered callback belongs to the private origin. Preserve the private app,
+   existing image and database. It does not inherit the private GitHub
+   credentials or provider volume, whose registered callback belongs to the
+   private origin. Preserve the private app,
    PostgreSQL and inbox. Public session/refresh cookies have distinct names,
    so private preview sessions do not silently bypass customer signup.
 5. Configure the HTTPS public route. Before changing Tailscale, capture the
@@ -71,6 +73,11 @@ verification before offering Drive connections broadly. See
    GoTrue settings; missing configuration shows a customer retry state.
 
 ## Acceptance
+
+After building, run `node scripts/test-public-compose.mjs` on a Docker host.
+It renders synthetic private bootstrap settings and checks compiled public API
+startup without starting or changing services. This catches private provider
+configuration accidentally inherited by the public profile.
 
 Verify the public URL from outside the tailnet, in a new browser. With a Google
 account not previously invited, select Continue with Google, authorize identity
