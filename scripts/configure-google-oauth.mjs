@@ -8,6 +8,8 @@ const env = process.env;
 let temporary;
 let lock;
 try {
+  // This Linux/Unix deployment helper relies on POSIX private-file permissions.
+  if (process.platform === "win32") throw new Error("unsupported platform");
   const origin = new URL(env.CAPYKIT_PUBLIC_BASE_URL ?? "");
   if (origin.protocol !== "https:" || origin.username || origin.password || origin.pathname !== "/" || origin.search || origin.hash) throw new Error("origin");
   const callbackUrl = `${origin.origin}/v1/connections/google/callback`;
@@ -58,7 +60,7 @@ try {
   temporary = undefined;
   console.log(JSON.stringify({ status: "configured", callbackUrl, restartRequired: true, encryptionKeyPreserved: old !== "" }));
 } catch {
-  console.error("Google OAuth import failed. Provide a dedicated Google Web client JSON with the exact HTTPS callback and a private destination. Existing clients and encryption keys cannot be replaced implicitly. No credential values were printed.");
+  console.error("Google OAuth import failed. Run on Linux/Unix and provide a dedicated Google Web client JSON with the exact HTTPS callback and a private destination. Existing clients and encryption keys cannot be replaced implicitly. No credential values were printed.");
   process.exitCode = 1;
 } finally {
   if (temporary) await rm(temporary, { force: true });

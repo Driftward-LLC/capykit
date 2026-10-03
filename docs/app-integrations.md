@@ -57,7 +57,7 @@ account chooser; they never enter client credentials in Capykit.
    substitute for this Google Web client. Never reuse another application's
    client or refresh tokens. See Google's
    [client registration instructions](https://support.google.com/cloud/answer/15549257).
-3. From a trusted repository checkout, import the downloaded file. Keep the
+3. From a trusted Linux/Unix repository checkout, import the file. Keep the
    source JSON outside the checkout, mode `0600`. The destination directory must
    exist. If configuration already exists, securely back it up first without
    printing its contents.

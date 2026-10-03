@@ -16,7 +16,7 @@ async function fixture(input: unknown = client) {
   const run = (changes: Record<string, string> = {}) => spawnSync(process.execPath, ["scripts/configure-google-oauth.mjs"], { encoding: "utf8", timeout: 5000, env: { ...process.env, CAPYKIT_PUBLIC_BASE_URL: origin, CAPYKIT_GOOGLE_CLIENT_FILE: source, CAPYKIT_GOOGLE_ENV_FILE: target, ...changes } });
   return { source, target, directory, run };
 }
-describe("operator Google OAuth import", () => {
+describe.skipIf(process.platform === "win32")("operator Google OAuth import", () => {
   it("imports Google's Web client, writes a private env file and generates a durable encryption key without printing credentials", async () => {
     const { target, run } = await fixture(); const result = run();
     expect(result.error).toBeUndefined();
@@ -69,4 +69,14 @@ describe("operator Google OAuth import", () => {
     await rm(target); const real = join(directory, "real.env"); await writeFile(real, valid, { mode: 0o600 }); await symlink(real, target);
     expect(run().status).toBe(1); expect(await readFile(real, "utf8")).toBe(valid);
   });
+});
+
+it.skipIf(process.platform !== "win32")("refuses importing credentials on Windows without POSIX permissions", async () => {
+  const { target, run } = await fixture();
+  const result = run();
+  expect(result.error).toBeUndefined();
+  expect(result.status).toBe(1);
+  expect(result.stdout).toBe("");
+  expect(result.stderr).not.toContain(client.web.client_secret);
+  await expect(stat(target)).rejects.toMatchObject({ code: "ENOENT" });
 });
