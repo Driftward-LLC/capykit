@@ -6,11 +6,12 @@ provision authorized access and execution when requested from the web app,
 API, CLI, or MCP. See the
 [hosted product direction](docs/adr/0004-hosted-capability-platform.md).
 
-The source checkout includes a Docker-hosted web app with invited-user sign-in
-and a [versioned skill and function library](docs/hosted-capabilities.md).
-[GitHub connections](docs/hosted-connections.md) add owner consent and selected
-repositories. Recipient grants and hosted function execution are the next
-milestones. The installable discovery catalog answers three questions:
+The source checkout includes a Docker-hosted web app, Google sign-in, a
+[versioned skill and function library](docs/hosted-capabilities.md), and
+[personal connected-app actions](docs/PERSONAL-CONNECTIONS.md) with explicit
+access grants. Capykit is a tooling gateway; callers own their agents and job
+orchestration. Whole-job and arbitrary uploaded-function execution remain
+future work. The installable discovery catalog answers three questions:
 
 - What tools are available?
 - What can each tool do?
@@ -36,6 +37,11 @@ Discovery-package v0.1 completion requirements are tracked in
 
 Canonical planning lives in the
 [Capykit Linear project](https://linear.app/driftward/project/capykit-72e4a9e54d52).
+
+Factory's execution agent should start with the
+[Factory integration README](docs/FACTORY-INTEGRATION.md). It documents the
+gateway boundary, current API/MCP setup, credential isolation and acceptance
+checks. The Factory integration itself is not yet configured or deployed.
 
 Portable environment profiles, task search, shared MCP source configuration,
 and expanded discovery details are unreleased changes in this checkout.
