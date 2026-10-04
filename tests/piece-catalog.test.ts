@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import snapshot from '../src/hosted/piece-catalog.json' with {type:'json'};
-import {appCatalog} from '../src/hosted/piece-catalog.js';
+import {appCatalog,personalAvailability} from '../src/hosted/piece-catalog.js';
 const execute=promisify(execFile);
 describe('full Activepieces metadata catalog',()=>{
  it('preserves every imported package and separates discovery from executable integrations',()=>{
@@ -25,3 +25,5 @@ describe('full Activepieces metadata catalog',()=>{
   }finally{await rm(root,{recursive:true,force:true});}
  });
 });
+
+it("distinguishes OAuth-only central setup from key-based and no-auth connections",()=>{const pending=personalAvailability(appCatalog(),new Set());const drive=pending.find(a=>a.id==='google-drive');expect(drive?.personalReady).toBe(false);expect(pending.find(a=>a.id==='text-helper')?.personalReady).toBe(true);expect(personalAvailability(appCatalog(),new Set(['@activepieces/piece-google-drive'])).find(a=>a.id==='google-drive')?.personalReady).toBe(true);expect(personalAvailability(appCatalog(),undefined).every(a=>!a.personalReady)).toBe(true);});

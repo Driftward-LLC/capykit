@@ -10,3 +10,5 @@ export function appCatalog(native:{id:string;name:string;connector:string;config
   return {...piece,supportedInCapykit,connector:`${piece.pieceName}@${piece.version}`,configured:false,connected:false,...current};
  }).sort((a,b)=>Number(b.connected)-Number(a.connected)||Number(b.supportedInCapykit)-Number(a.supportedInCapykit)||a.name.localeCompare(b.name,'en'));
 }
+
+export function personalAvailability(apps:CatalogApp[],centralClients:ReadonlySet<string>|undefined){return apps.map(a=>({...a,personalReady:centralClients!==undefined&&(a.authentication.length===0||a.authentication.some(type=>type!=='OAuth')||centralClients.has(a.pieceName))}));}

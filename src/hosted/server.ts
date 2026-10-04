@@ -21,7 +21,7 @@ import { createWebhookIngress } from "./webhook-ingress.js";
 import { GoogleConnections, GoogleProvider, loadGoogleConfig, type GoogleConfig } from "./google.js";
 import { ActionAccess } from "./action-access.js";
 import { runAction } from "./action-runner.js";
-import { appCatalog, catalogProvenance } from "./piece-catalog.js";
+import { appCatalog, catalogProvenance, personalAvailability } from "./piece-catalog.js";
 
 import { PieceEngine, loadPieceEngineConfig } from "./piece-engine.js";
 import { PersonalConnections } from "./personal-connections.js";
@@ -405,8 +405,8 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     if (!drive) throw new ConnectionError("CONFIGURATION_UNAVAILABLE", 503);
     return drive;
   }
-  function personalAvailability(apps:ReturnType<typeof appCatalog>){return apps.map(a=>({...a,personalReady:Boolean(pieceEngine)&&(a.authentication.length===0||a.authentication.some(type=>type!=='OAUTH2')||Boolean(pieceEngine?.config.oauthClients[a.pieceName]))}));}
-  app.get("/v1/apps/catalog", authenticated, () => ({apps:personalAvailability(appCatalog()),catalog:catalogProvenance,personalEnabled:Boolean(pieceEngine)}));
+
+  app.get("/v1/apps/catalog", authenticated, () => ({apps:personalAvailability(appCatalog(),pieceEngine?new Set(Object.keys(pieceEngine.config.oauthClients)):undefined),catalog:catalogProvenance,personalEnabled:Boolean(pieceEngine)}));
   app.get("/v1/apps", authenticated, async request => {
     const context = contextFor(request);
     const records = await connectionStore().list(context);
@@ -414,7 +414,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     return { apps: personalAvailability(appCatalog([
       { id: "github", name: "GitHub", configured: Boolean(github), connected: records.some(row => row.status === "active"), description: "Read issues from selected repositories", connector: "@activepieces/piece-github@0.9.0" },
       { id: "google-drive", name: "Google Drive", configured: googleState.configured, connected: googleState.connection?.status === "active", description: "Read file names and metadata", connector: "@activepieces/piece-google-drive@0.11.0" },
-    ])), catalog:catalogProvenance, github: records, google: googleState,personalEnabled:Boolean(pieceEngine) };
+    ]),pieceEngine?new Set(Object.keys(pieceEngine.config.oauthClients)):undefined), catalog:catalogProvenance, github: records, google: googleState,personalEnabled:Boolean(pieceEngine) };
   });
   function personalStore(): PersonalConnections { if(!personal)throw new ConnectionError("CONFIGURATION_UNAVAILABLE",503);return personal; }
   app.get("/v1/connections/personal",authenticated,async request=>({connections:await personalStore().list(contextFor(request)),enabled:Boolean(pieceEngine)}));
