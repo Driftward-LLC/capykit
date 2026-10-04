@@ -1,4 +1,4 @@
-name: Schema
+name: Schema and Docs
 
 on:
   pull_request:
@@ -28,5 +28,15 @@ jobs:
       - name: Validate security policy contract
         run: node scripts/test-security-policy.mjs
 
+  docs-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - name: Lint Markdown
-        run: npx --yes markdownlint-cli2@0.23.2 README.md "docs/**/*.md"
+        run: npm run check:docs
