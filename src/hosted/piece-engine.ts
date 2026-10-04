@@ -1,11 +1,9 @@
 import { readFileSync, lstatSync } from 'node:fs';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { z } from 'zod';
 import { ConnectionError } from './connections.js';
 import { appCatalog } from './piece-catalog.js';
 
-const oauthClient=z.object({clientId:z.string().min(1),clientSecret:z.string().min(1),callbackPath:z.enum(['/v1/connections/personal/callback','/v1/connections/google/callback']).optional()}).strict();
+const oauthClient=z.object({clientId:z.string().min(1),clientSecret:z.string().min(1),allowedProps:z.record(z.string(),z.array(z.union([z.string(),z.number(),z.boolean()])).min(1)).default({}),callbackPath:z.enum(['/v1/connections/personal/callback','/v1/connections/google/callback']).optional()}).strict();
 const configSchema=z.object({baseUrl:z.url(),email:z.email(),password:z.string().min(16),encryptionKey:z.string(),oauthClients:z.record(z.string(),oauthClient).default({})}).strict();
 export type PieceEngineConfig=z.infer<typeof configSchema>;
 export type PieceMetadata={name:string;version:string;auth:Record<string,unknown>|Record<string,unknown>[]|null;actions:Record<string,{name:string;displayName:string;description?:string;requireAuth?:boolean;props:Record<string,unknown>}>};
@@ -17,10 +15,10 @@ export function loadPieceEngineConfig(path:string|undefined):PieceEngineConfig|u
  const key=Buffer.from(config.encryptionKey,'base64');if(key.length!==32||key.toString('base64')!==config.encryptionKey)fail('CONFIGURATION_UNAVAILABLE',503);
  return config;
 }
-/** Only operator-selected internal endpoints, fixed REST paths and three fixed MCP tools.
+/** Only operator-selected internal endpoints, fixed REST paths and server-built disabled drafts.
  * Neither the service session nor upstream connection IDs leave the backend. */
 export class PieceEngine {
- private session?:{token:string;projectId:string;mcpToken:string;expires:number};private authenticating:Promise<void>|undefined;private running=0;
+ private session?:{token:string;projectId:string;expires:number};private authenticating:Promise<void>|undefined;private running=0;
  constructor(readonly config:PieceEngineConfig){}
  private async fetch(url:URL|string,init:RequestInit={}):Promise<Response>{
   let response:Response;try{response=await fetch(url,{...init,redirect:'error',signal:AbortSignal.timeout(45_000)});}catch{return fail('PROVIDER_UNAVAILABLE');}
@@ -36,13 +34,12 @@ export class PieceEngine {
  private async login():Promise<void>{
   const value=await this.raw('/api/v1/authentication/sign-in',{email:this.config.email,password:this.config.password});
   if(typeof value.token!=='string'||typeof value.projectId!=='string'||!value.token||!/^[A-Za-z0-9_-]{1,80}$/u.test(value.projectId))fail();
-  const mcp=await this.raw(`/api/v1/projects/${value.projectId}/mcp-server/token`,{},value.token);if(typeof mcp.mcpToken!=='string'||!mcp.mcpToken)fail();
-  this.session={token:value.token,projectId:value.projectId,mcpToken:mcp.mcpToken,expires:Date.now()+45*60_000};
+  this.session={token:value.token,projectId:value.projectId,expires:Date.now()+45*60_000};
  }
  private async ready(){if(!this.session||this.session.expires<Date.now()){this.authenticating??=this.login().finally(()=>{this.authenticating=undefined;});await this.authenticating;}return this.session??fail();}
  async metadata(id:string):Promise<PieceMetadata>{
   const app=appCatalog().find(p=>p.id===id);if(!app)fail('NOT_FOUND',404);const session=await this.ready();
-  const value=await this.raw(`/api/v1/pieces/${encodeURIComponent(app.pieceName)}`,undefined,session.token);
+  const value=await this.raw(`/api/v1/pieces/${encodeURIComponent(app.pieceName)}?version=${encodeURIComponent(app.version)}`,undefined,session.token);
   if(value.name!==app.pieceName||value.version!==app.version||!value.actions||typeof value.actions!=='object'||Array.isArray(value.actions))fail('CONNECTOR_VERSION_UNAVAILABLE',409);
   return value as PieceMetadata;
  }
@@ -58,10 +55,30 @@ export class PieceEngine {
   return {url,verifier:typeof value.codeVerifier==='string'?value.codeVerifier:undefined};
  }
  async disconnect(id:string){const session=await this.ready();const response=await this.fetch(new URL(`/api/v1/app-connections/${encodeURIComponent(id)}`,this.config.baseUrl),{method:'DELETE',headers:{authorization:`Bearer ${session.token}`}});if(!response.ok&&response.status!==404)fail('PROVIDER_REQUEST_FAILED');}
- async tool(name:'ap_run_action'|'ap_get_piece_props'|'ap_resolve_property_options',args:Record<string,unknown>){
-  const session=await this.ready();if(this.running>=2)fail('CONNECTOR_BUSY',429);this.running++;const client=new Client({name:'capykit-connectors',version:'0.1.0'});
-  try{await client.connect(new StreamableHTTPClientTransport(new URL('/mcp',this.config.baseUrl),{requestInit:{headers:{authorization:`Bearer ${session.mcpToken}`}},fetch:(url,init)=>this.fetch(String(url),init)}) as Parameters<Client['connect']>[0]);
-   const result=await client.callTool({name,arguments:args},undefined,{timeout:45_000});if(result.isError)fail('PROVIDER_REQUEST_FAILED');return result;
-  }catch(error){if(error instanceof ConnectionError)throw error;return fail();}finally{try{await client.close();}finally{this.running--;}}
+ private async temporaryFlow<T>(piece:PieceMetadata,name:string,input:Record<string,unknown>,externalId:string,fn:(session:{token:string;projectId:string},flow:Record<string,unknown>)=>Promise<T>):Promise<T>{
+  const session=await this.ready();if(this.running>=2)fail('CONNECTOR_BUSY',429);this.running++;let flowId:string|undefined;
+  try{const flow=await this.raw('/api/v1/flows',{projectId:session.projectId,displayName:'Capykit private action'},session.token);if(typeof flow.id!=='string'||!/^[A-Za-z0-9_-]{1,80}$/u.test(flow.id)||flow.status!=='DISABLED')fail();flowId=flow.id;
+   const version=flow.version as {trigger?:{name?:string}};if(typeof version.trigger?.name!=='string')fail();
+   const action={name:'capykit_action',displayName:'Capykit action',type:'PIECE',valid:true,settings:{pieceName:piece.name,pieceVersion:piece.version,actionName:name,input:{...input,auth:`{{connections['${externalId}']}}`},propertySettings:{},errorHandlingOptions:{continueOnFailure:{value:false},retryOnFailure:{value:false}}}};
+   const populated=await this.raw(`/api/v1/flows/${flowId}`,{type:'ADD_ACTION',request:{parentStep:version.trigger.name,stepLocationRelativeToParent:'AFTER',action}},session.token);
+   const saved=populated.version as {trigger?:{nextAction?:{settings?:{pieceVersion?:string}}}};
+   if(populated.status!=='DISABLED'||saved.trigger?.nextAction?.settings?.pieceVersion!==piece.version)fail('CONNECTOR_VERSION_UNAVAILABLE',409);
+   return await fn(session,populated);
+  }finally{try{if(flowId){const response=await this.fetch(new URL(`/api/v1/flows/${flowId}`,this.config.baseUrl),{method:'DELETE',headers:{authorization:`Bearer ${session.token}`}});if(!response.ok&&response.status!==404)fail('CONNECTOR_CLEANUP_FAILED');}}finally{this.running--;}}
+ }
+ async runAction(piece:PieceMetadata,name:string,input:Record<string,unknown>,externalId:string,authorize:()=>Promise<unknown>){return this.temporaryFlow(piece,name,input,externalId,async(session,flow)=>{
+  const version=flow.version as {id:string};await authorize();const started=await this.raw('/api/v1/sample-data/test-step',{projectId:session.projectId,flowVersionId:version.id,stepName:'capykit_action'},session.token);if(typeof started.id!=='string'||!/^[A-Za-z0-9_-]{1,80}$/u.test(started.id))fail();
+  const deadline=Date.now()+35_000;for(;;){const run=await this.raw(`/api/v1/flow-runs/${started.id}?projectId=${encodeURIComponent(session.projectId)}`,undefined,session.token);
+   if(run.status==='SUCCEEDED'){const steps=run.steps as Record<string,{output?:unknown}>;return {content:[{type:'text',text:JSON.stringify(steps.capykit_action?.output??null)}]};}
+   if(!['QUEUED','RUNNING'].includes(String(run.status))||Date.now()>deadline)fail('PROVIDER_REQUEST_FAILED');await new Promise(resolve=>setTimeout(resolve,500));
+  }
+ });}
+ async fields(piece:PieceMetadata,name:string,input:Record<string,unknown>,externalId:string,authorize:()=>Promise<unknown>){const props=piece.actions[name]?.props??{};if(!Object.values(props).some(p=>p&&typeof p==='object'&&['DROPDOWN','MULTI_SELECT_DROPDOWN','DYNAMIC'].includes(String((p as {type:unknown}).type))))return props;
+  return this.temporaryFlow(piece,name,input,externalId,async(session,flow)=>{const version=flow.version as {id:string};const resolved={...props};
+   for(const [propertyName,raw] of Object.entries(props)){const p=raw as {type?:string;refreshers?:string[]};if(!p.type||!['DROPDOWN','MULTI_SELECT_DROPDOWN','DYNAMIC'].includes(p.type)||(p.refreshers??[]).some(key=>key!=='auth'&&input[key]===undefined))continue;
+    await authorize();const data=await this.raw('/api/v1/pieces/options',{projectId:session.projectId,flowId:flow.id,flowVersionId:version.id,pieceName:piece.name,pieceVersion:piece.version,actionOrTriggerName:name,propertyName,input:{...input,auth:`{{connections['${externalId}']}}`}},session.token);
+    if(data.status==='OK')resolved[propertyName]={...(raw as Record<string,unknown>),...(p.type==='DYNAMIC'?{dynamicFields:data.result}:{options:data.result})};
+   }return resolved;
+  });
  }
 }
