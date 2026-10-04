@@ -2,7 +2,7 @@ import snapshot from './piece-catalog.json' with {type:'json'};
 export interface CatalogApp {
  id:string;pieceName:string;name:string;description:string;version:string;logoUrl:string|null;
  categories:string[];actionCount:number;triggerCount:number;authentication:string[];deprecated:boolean;
- connector:string;supportedInCapykit:boolean;configured:boolean;connected:boolean;
+ personalReady?:boolean;connector:string;supportedInCapykit:boolean;configured:boolean;connected:boolean;
 }
 export const catalogProvenance={source:snapshot.source,retrievedAt:snapshot.retrievedAt,count:snapshot.count};
 export function appCatalog(native:{id:string;name:string;connector:string;configured:boolean;connected:boolean;description:string}[]=[]):CatalogApp[]{

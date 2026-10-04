@@ -405,15 +405,16 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     if (!drive) throw new ConnectionError("CONFIGURATION_UNAVAILABLE", 503);
     return drive;
   }
-  app.get("/v1/apps/catalog", authenticated, () => ({apps:appCatalog(),catalog:catalogProvenance,personalEnabled:Boolean(pieceEngine)}));
+  function personalAvailability(apps:ReturnType<typeof appCatalog>){return apps.map(a=>({...a,personalReady:Boolean(pieceEngine)&&(a.authentication.length===0||a.authentication.some(type=>type!=='OAUTH2')||Boolean(pieceEngine?.config.oauthClients[a.pieceName]))}));}
+  app.get("/v1/apps/catalog", authenticated, () => ({apps:personalAvailability(appCatalog()),catalog:catalogProvenance,personalEnabled:Boolean(pieceEngine)}));
   app.get("/v1/apps", authenticated, async request => {
     const context = contextFor(request);
     const records = await connectionStore().list(context);
     const googleState = await driveStore().detail(context);
-    return { apps: appCatalog([
+    return { apps: personalAvailability(appCatalog([
       { id: "github", name: "GitHub", configured: Boolean(github), connected: records.some(row => row.status === "active"), description: "Read issues from selected repositories", connector: "@activepieces/piece-github@0.9.0" },
       { id: "google-drive", name: "Google Drive", configured: googleState.configured, connected: googleState.connection?.status === "active", description: "Read file names and metadata", connector: "@activepieces/piece-google-drive@0.11.0" },
-    ]), catalog:catalogProvenance, github: records, google: googleState,personalEnabled:Boolean(pieceEngine) };
+    ])), catalog:catalogProvenance, github: records, google: googleState,personalEnabled:Boolean(pieceEngine) };
   });
   function personalStore(): PersonalConnections { if(!personal)throw new ConnectionError("CONFIGURATION_UNAVAILABLE",503);return personal; }
   app.get("/v1/connections/personal",authenticated,async request=>({connections:await personalStore().list(contextFor(request)),enabled:Boolean(pieceEngine)}));
