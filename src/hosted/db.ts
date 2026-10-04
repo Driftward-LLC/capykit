@@ -52,6 +52,7 @@ export function createHostedDatabase(databaseUrl: string | undefined): HostedDat
                            left join agent_credentials k on k.workspace_id = g.workspace_id
                            left join connector_action_audit a on a.workspace_id = g.workspace_id
                           limit 0`);
+        await pool.query("select c.id,g.action_name from personal_app_connections c left join personal_action_grants g on g.workspace_id=c.workspace_id and g.connection_id=c.id limit 0");
         return { status: "ready", reason: "ok" };
       } catch {
         return { status: "unavailable", reason: "connection_failed" };

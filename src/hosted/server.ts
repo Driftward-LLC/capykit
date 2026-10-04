@@ -21,8 +21,10 @@ import { createWebhookIngress } from "./webhook-ingress.js";
 import { GoogleConnections, GoogleProvider, loadGoogleConfig, type GoogleConfig } from "./google.js";
 import { ActionAccess } from "./action-access.js";
 import { runAction } from "./action-runner.js";
-import { appCatalog, catalogProvenance } from "./piece-catalog.js";
+import { appCatalog, catalogProvenance, personalAvailability } from "./piece-catalog.js";
 
+import { PieceEngine, loadPieceEngineConfig } from "./piece-engine.js";
+import { PersonalConnections } from "./personal-connections.js";
 import { GrantError, GrantStore } from "./grants.js";
 export { verifyArtifact } from "./artifacts.js";
 export { ConnectionStore } from "./connections.js";
@@ -38,6 +40,7 @@ export function loadGithubConfig(env: NodeJS.ProcessEnv = process.env, publicBas
 }
 
 interface ServerDeps {
+  pieceEngine?: PieceEngine;
   googleSignIn?: GoogleSignIn;
   readonly config?: HostedConfig;
   readonly database?: HostedDatabase | undefined;
@@ -128,6 +131,9 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     requestTimeout: 120_000, connectionTimeout: 30_000, ajv: { customOptions: { removeAdditional: false } } });
   const grants = database === undefined ? undefined : new GrantStore(database.pool);
   const actionAccess = database ? new ActionAccess(database.pool) : undefined;
+  const pieceConfig = deps.pieceEngine?.config ?? loadPieceEngineConfig(process.env.CAPYKIT_PIECE_ENGINE_CONFIG_FILE);
+  const pieceEngine = deps.pieceEngine ?? (pieceConfig ? new PieceEngine(pieceConfig) : undefined);
+  const personal = database ? new PersonalConnections(database.pool, pieceEngine, config.publicBaseUrl) : undefined;
   const capabilities = database === undefined ? undefined : new CapabilityStore(database.pool);
   const contexts = new WeakMap<FastifyRequest, AuthenticatedContext>();
   // ponytail: one artifact transfer per API process bounds memory for 32 MiB bundles;
@@ -177,6 +183,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   // initial cross-site GET. The console immediately removes code/state from its URL.
   app.get("/v1/connections/github/callback", serveConsole);
   app.get("/v1/connections/google/callback", serveConsole);
+  app.get("/v1/connections/personal/callback", serveConsole);
   app.get("/v1/connections/github/setup", serveConsole);
   app.get("/v1/provider-setup/github/callback", serveConsole);
   app.get<{ Params: { file: string } }>("/assets/:file", async (request, reply) => {
@@ -398,16 +405,29 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     if (!drive) throw new ConnectionError("CONFIGURATION_UNAVAILABLE", 503);
     return drive;
   }
-  app.get("/v1/apps/catalog", authenticated, () => ({apps:appCatalog(),catalog:catalogProvenance}));
+
+  app.get("/v1/apps/catalog", authenticated, () => ({apps:personalAvailability(appCatalog(),pieceEngine?new Set(Object.keys(pieceEngine.config.oauthClients)):undefined),catalog:catalogProvenance,personalEnabled:Boolean(pieceEngine)}));
   app.get("/v1/apps", authenticated, async request => {
     const context = contextFor(request);
     const records = await connectionStore().list(context);
     const googleState = await driveStore().detail(context);
-    return { apps: appCatalog([
+    return { apps: personalAvailability(appCatalog([
       { id: "github", name: "GitHub", configured: Boolean(github), connected: records.some(row => row.status === "active"), description: "Read issues from selected repositories", connector: "@activepieces/piece-github@0.9.0" },
       { id: "google-drive", name: "Google Drive", configured: googleState.configured, connected: googleState.connection?.status === "active", description: "Read file names and metadata", connector: "@activepieces/piece-google-drive@0.11.0" },
-    ]), catalog:catalogProvenance, github: records, google: googleState };
+    ]),pieceEngine?new Set(Object.keys(pieceEngine.config.oauthClients)):undefined), catalog:catalogProvenance, github: records, google: googleState,personalEnabled:Boolean(pieceEngine) };
   });
+  function personalStore(): PersonalConnections { if(!personal)throw new ConnectionError("CONFIGURATION_UNAVAILABLE",503);return personal; }
+  app.get("/v1/connections/personal",authenticated,async request=>({connections:await personalStore().list(contextFor(request)),enabled:Boolean(pieceEngine)}));
+  app.get<{Params:{app:string}}>("/v1/apps/:app/connection-schema",authenticated,async request=>personalStore().describe(contextFor(request),request.params.app));
+  app.post<{Params:{app:string}}>("/v1/apps/:app/connect",authenticated,async request=>personalStore().start(contextFor(request),sessionFor(request),request.params.app,request.body));
+  app.post("/v1/connections/personal/callback",authenticated,async request=>personalStore().callback(contextFor(request),sessionFor(request),request.body));
+  app.delete<{Params:{id:string}}>("/v1/connections/personal/:id",authenticated,async(request,reply)=>{await personalStore().disconnect(contextFor(request),request.params.id);return reply.code(204).send();});
+  app.get<{Params:{id:string}}>("/v1/connections/personal/:id/actions",authenticated,async request=>personalStore().actions(contextFor(request),request.params.id));
+  app.post<{Params:{id:string;action:string};Body:{input:unknown}}>("/v1/connections/personal/:id/actions/:action/fields",{...authenticated,schema:{body:{type:"object",additionalProperties:false,required:["input"],properties:{input:{type:"object"}}}}},async request=>personalStore().fields(contextFor(request),request.params.id,request.params.action,request.body.input));
+  app.post<{Params:{id:string;action:string};Body:{input:unknown}}>("/v1/connections/personal/:id/actions/:action/run",{...authenticated,schema:{body:{type:"object",additionalProperties:false,required:["input"],properties:{input:{type:"object"}}}}},async request=>personalStore().run(contextFor(request),request.params.id,request.params.action,request.body.input));
+  app.get<{Params:{id:string}}>("/v1/connections/personal/:id/sharing",authenticated,async request=>personalStore().sharing(contextFor(request),request.params.id));
+  app.post<{Params:{id:string}}>("/v1/connections/personal/:id/grants",authenticated,async(request,reply)=>reply.code(201).send(await personalStore().grant(contextFor(request),request.params.id,request.body)));
+  app.delete<{Params:{id:string;grant:string}}>("/v1/connections/personal/:id/grants/:grant",authenticated,async(request,reply)=>{await personalStore().revoke(contextFor(request),request.params.id,request.params.grant);return reply.code(204).send();});
   app.post("/v1/connections/google/start", { ...authenticated, schema: { body: { type: "object", additionalProperties: false, required: ["consent"], properties: { consent: { const: true } } } } }, async request => driveStore().start(contextFor(request), sessionFor(request)));
   app.post<{ Body: { code: string; state: string } }>("/v1/connections/google/callback", { ...authenticated, schema: { body: { type: "object", additionalProperties: false, required: ["code","state"], properties: { code: { type:"string", minLength:1,maxLength:4096 }, state: { type:"string",pattern:"^[A-Za-z0-9_-]{43}$" } } } } }, async request => {
     await driveStore().callback(contextFor(request),sessionFor(request),request.body); return { status: "connected" };

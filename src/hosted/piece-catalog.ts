@@ -2,7 +2,7 @@ import snapshot from './piece-catalog.json' with {type:'json'};
 export interface CatalogApp {
  id:string;pieceName:string;name:string;description:string;version:string;logoUrl:string|null;
  categories:string[];actionCount:number;triggerCount:number;authentication:string[];deprecated:boolean;
- connector:string;supportedInCapykit:boolean;configured:boolean;connected:boolean;
+ personalReady?:boolean;connector:string;supportedInCapykit:boolean;configured:boolean;connected:boolean;
 }
 export const catalogProvenance={source:snapshot.source,retrievedAt:snapshot.retrievedAt,count:snapshot.count};
 export function appCatalog(native:{id:string;name:string;connector:string;configured:boolean;connected:boolean;description:string}[]=[]):CatalogApp[]{
@@ -10,3 +10,5 @@ export function appCatalog(native:{id:string;name:string;connector:string;config
   return {...piece,supportedInCapykit,connector:`${piece.pieceName}@${piece.version}`,configured:false,connected:false,...current};
  }).sort((a,b)=>Number(b.connected)-Number(a.connected)||Number(b.supportedInCapykit)-Number(a.supportedInCapykit)||a.name.localeCompare(b.name,'en'));
 }
+
+export function personalAvailability(apps:CatalogApp[],centralClients:ReadonlySet<string>|undefined){return apps.map(a=>({...a,personalReady:centralClients!==undefined&&(a.authentication.length===0||a.authentication.some(type=>type!=='OAuth')||centralClients.has(a.pieceName))}));}
