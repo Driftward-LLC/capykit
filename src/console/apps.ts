@@ -99,7 +99,7 @@ export function Apps({active,onSessionExpired,onCreateFunction,manage=true}:{act
       manage?h("button",{type:"button",className:"create-function",onClick:onCreateFunction},"＋ Create a function"):null,
       h("p",{className:"small muted catalog-note"},data?.personalEnabled?`${String(data.catalog?.count??0)} integrations. Personal accounts, centrally managed provider setup.`:`${String(data?.catalog?.count??0)} integrations from Activepieces. GitHub and Google Drive are enabled in Capykit; other integrations are available to explore.`,data?.catalog?h("span",null,` Catalog updated ${new Date(data.catalog.retrievedAt).toLocaleDateString()}.`):null)),
     selected&&data&&!selectedApp?h("p",{className:"empty-state"},"This app is not in the current catalog. Choose All apps to browse."):null,
-    selectedApp&&data?.personalEnabled?h(PersonalApp,{key:selectedApp.id,appId:selectedApp.id,appName:selectedApp.name,accounts:personalAccounts.filter(a=>a.appId===selectedApp.id),onSessionExpired,onChanged:()=>{void load();}}):null,
+    selectedApp&&data?.personalEnabled?h(PersonalApp,{key:selectedApp.id,appId:selectedApp.id,appName:selectedApp.name,active,accounts:personalAccounts.filter(a=>a.appId===selectedApp.id),onSessionExpired,onChanged:()=>{void load();}}):null,
     selectedApp&&!data?.personalEnabled&&!selectedApp.supportedInCapykit?h(PieceDetails,{app:selectedApp}):null,
     selectedApp?.supportedInCapykit&&data?.personalEnabled?h("h2",null,"Workspace connection"):null,
     !manage&&selectedApp?.supportedInCapykit?h(React.Fragment,null,h("p",{className:"message"},"Your workspace owner manages this connection. Actions granted to you appear below."),h(ActionConsole,{key:selected,app:selected==="github"?"github":"google-drive",onSessionExpired})):null,

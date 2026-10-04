@@ -230,6 +230,7 @@ services:
       AP_ALLOW_OPEN_SIGN_UP: ${CAPYKIT_CONNECTOR_BOOTSTRAP:-false}
       AP_EXECUTION_MODE: SANDBOX_CODE_ONLY
       AP_NETWORK_MODE: STRICT
+      AP_ENFORCE_CONNECTION_PIECE_BINDING: "true"
       AP_LOG_LEVEL: error
       AP_EXECUTION_DATA_RETENTION_DAYS: "1"
       AP_FLOW_TIMEOUT_SECONDS: "30"
@@ -246,7 +247,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 60s
-    logging: *logging
+    logging:
+      driver: none
 
   connector-postgres:
     profiles: [connectors]

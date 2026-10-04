@@ -11,10 +11,17 @@ function fail(code='INVALID_REQUEST',status=400):never{throw new ConnectionError
 const hash=(v:string)=>createHash('sha256').update(v).digest('hex');
 const uuid=z.uuid(), actionName=z.string().regex(/^[a-zA-Z0-9_-]{1,120}$/u);
 // Only independently reviewed actions can be delegated; arbitrary API calls can forward credentials.
-const shareable:Record<string,string[]>={'text-helper':['concat','reverse'],'google-drive':[],'github':[]};
+const shareable:Record<string,string[]>={'text-helper':['concat'],'google-drive':['get-file-or-folder-by-id'],'github':['getIssueInformation']};
 const reviewedVersions:Record<string,string>={'text-helper':'0.6.6','google-drive':'0.11.0','github':'0.9.0'};
 const canShare=(id:string,name:string,version:string)=>reviewedVersions[id]===version&&shareable[id]?.includes(name)===true;
 function parse<T>(schema:z.ZodType<T>,input:unknown):T{const result=schema.safeParse(input);return result.success?result.data:fail();}
+function delegatedInput(id:string,name:string,input:Record<string,unknown>,partial=false):Record<string,unknown>{
+ const schemas:Record<string,z.ZodObject>={
+  'google-drive/get-file-or-folder-by-id':z.object({id:z.string().regex(/^[A-Za-z0-9_-]{1,200}$/u),include_team_drives:z.boolean().optional()}).strict(),
+  'github/getIssueInformation':z.object({repository:z.object({owner:z.string().regex(/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/u),repo:z.string().regex(/^[A-Za-z0-9_.-]{1,100}$/u).refine(v=>v!=='.'&&v!=='..')}).strict(),issue_number:z.number().int().positive().max(Number.MAX_SAFE_INTEGER)}).strict(),
+  'text-helper/concat':z.object({texts:z.array(z.string().max(16000)).max(100),separator:z.string().max(1000).optional()}).strict()
+ };const schema=schemas[id+'/'+name];if(!schema)fail('FORBIDDEN',403);return parse(partial?schema.partial():schema,input);
+}
 interface Row {workspace_id:string;id:string;owner_principal_id:string;app_id:string;display_name:string;status:string;generation:number;connector_version:string;upstream_id:string|null;external_id:string;setup:unknown;state_hash:string|null;session_hash:string|null;expires_at:Date|null;}
 interface Bound {row:Row;grantId:string|null;actionName:string;}
 export class PersonalConnections {
@@ -70,10 +77,10 @@ export class PersonalConnections {
  async actions(context:AuthenticatedContext,id:string){const name=parse(uuid,id);const listed=await this.list(context),connection=listed.find(c=>c.id===name&&c.status==='active');if(!connection)fail('NOT_FOUND',404);
   const description=await this.describe(context,connection.appId);const allowed=connection.personal?description.actions:await this.tx(context,async client=>{const names=(await client.query<{action_name:string}>('select g.action_name from personal_action_grants g join personal_app_connections c on c.workspace_id=g.workspace_id and c.id=g.connection_id where g.workspace_id=$1 and g.connection_id=$2 and g.recipient_principal_id=$3 and g.generation=c.generation and g.connector_version=c.connector_version and g.revoked_at is null and g.expires_at>now()',[context.membership.workspaceId,id,context.membership.principalId])).rows.map(g=>g.action_name);return description.actions.filter(a=>names.includes(a.name));});return {connection,actions:allowed};
  }
- async fields(context:AuthenticatedContext,id:string,name:string,raw:unknown){parse(actionName,name);const input=literalInput(raw),bound=await this.bind(context,id,name);const engine=this.configured(),piece=await engine.metadata(bound.row.app_id);if(!Object.hasOwn(piece.actions,name)||piece.version!==bound.row.connector_version)fail('NOT_FOUND',404);await this.bind(context,id,name,bound);
+ async fields(context:AuthenticatedContext,id:string,name:string,raw:unknown){parse(actionName,name);let input=literalInput(raw);const bound=await this.bind(context,id,name);if(bound.grantId)input=delegatedInput(bound.row.app_id,name,input,true);const engine=this.configured(),piece=await engine.metadata(bound.row.app_id);if(!Object.hasOwn(piece.actions,name)||piece.version!==bound.row.connector_version)fail('NOT_FOUND',404);await this.bind(context,id,name,bound);
   const fields=await engine.fields(piece,name,input,bound.row.external_id,()=>this.bind(context,id,name,bound));await this.bind(context,id,name,bound);return {fields:pieceFields(fields)};
  }
- async run(context:AuthenticatedContext,id:string,name:string,raw:unknown){parse(actionName,name);const input=literalInput(raw),bound=await this.bind(context,id,name);const engine=this.configured(),piece=await engine.metadata(bound.row.app_id);if(!Object.hasOwn(piece.actions,name))fail('NOT_FOUND',404);if(piece.version!==bound.row.connector_version)fail('CONNECTOR_VERSION_UNAVAILABLE',409);
+ async run(context:AuthenticatedContext,id:string,name:string,raw:unknown){parse(actionName,name);let input=literalInput(raw);const bound=await this.bind(context,id,name);if(bound.grantId)input=delegatedInput(bound.row.app_id,name,input);const engine=this.configured(),piece=await engine.metadata(bound.row.app_id);if(!Object.hasOwn(piece.actions,name))fail('NOT_FOUND',404);if(piece.version!==bound.row.connector_version)fail('CONNECTOR_VERSION_UNAVAILABLE',409);
   await this.bind(context,id,name,bound);await this.tx(context,client=>this.audit(client,context,bound.row,'run_started',name,bound.grantId));
   try{const result=await engine.runAction(piece,name,input,bound.row.external_id,()=>this.bind(context,id,name,bound));await this.bind(context,id,name,bound);await this.tx(context,client=>this.audit(client,context,bound.row,'run_succeeded',name,bound.grantId));await this.bind(context,id,name,bound);return {result:{content:result.content,structuredContent:null}};}catch(error){await this.tx(context,client=>this.audit(client,context,bound.row,'run_failed',name,bound.grantId)).catch(()=>{});throw error;}
  }
