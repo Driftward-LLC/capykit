@@ -198,6 +198,9 @@ Agents that need a reusable discovery workflow can follow the
 [`capykit-agent-discovery` skill](docs/agent-discovery-skill.md). It separates
 catalog discoverability from access and authorization, then guides selection
 among CLI, MCP, API, service, and skill interfaces before building replacements.
+Codex operators should use the
+[`Codex onboarding guide`](docs/codex-onboarding.md) for the supported native
+MCP setup, approval boundary, credential/grant handling, and rollback steps.
 
 ## Approved registry sources
 
