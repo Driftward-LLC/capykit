@@ -26,7 +26,7 @@ describe('reviewed connector action surface',()=>{
   for(const base of ['http://example.test','https://user:pass@example.test','https://example.test/path'])expect(()=>createRemoteActionServer({CAPYKIT_API_KEY:key,CAPYKIT_BASE_URL:base})).toThrow('HTTPS origin');
   const request=vi.fn(()=>Promise.resolve(new Response(JSON.stringify({actions:[{id:'drive.get-file.v1',app:'google-drive'}]}))));vi.stubGlobal('fetch',request);
   const server=createRemoteActionServer({CAPYKIT_BASE_URL:'https://capykit.example.test',CAPYKIT_API_KEY:key});const client=new Client({name:'test',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();
-  try{await server.connect(b);await client.connect(a);expect((await client.listTools()).tools.map(t=>t.name)).toEqual(['list_actions','get_action','run_action']);
+  try{await server.connect(b);await client.connect(a);expect((await client.listTools()).tools.map(t=>t.name)).toEqual(['list_actions','get_action','run_action','list_connections','list_connection_actions','run_connection_action']);
    const catalog=await client.callTool({name:'list_actions',arguments:{}});expect(JSON.stringify(catalog)).not.toContain(key);expect(JSON.stringify(request.mock.calls[0])).toContain('redirect');expect(JSON.stringify(request.mock.calls[0])).toContain(key);
    request.mockRejectedValueOnce(new Error(`redirect to https://evil.test/?key=${key}`));expect(JSON.stringify(await client.callTool({name:'run_action',arguments:{id:'drive.get-file.v1',connectionId:'11111111-1111-4111-8111-111111111111',input:{fileId:'file_1'}}}))).not.toContain(key);
   }finally{await client.close();await server.close();}
