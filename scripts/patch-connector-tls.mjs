@@ -10,6 +10,7 @@ for(const relative of ['packages/server/api/dist/src/bootstrap.js','packages/ser
  const path=`${prefix}/${relative}`,body=readFileSync(path,'utf8');
  // Cache installation copies this engine bundle. The guard travels with it,
  // including child processes with intentionally filtered environments.
- writeFileSync(path,guard+'\n'+body);
+ const directive=body.match(/^(?:"use strict";|'use strict';)\s*/u)?.[0]??'';
+ writeFileSync(path,directive+guard+'\n'+body.slice(directive.length));
 }
 console.log('Verified connector TLS patch applied to API and engine bundles.');
