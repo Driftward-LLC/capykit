@@ -1,0 +1,3 @@
+FROM activepieces/activepieces:0.92.1@sha256:d22e3f36f78d70264a020d309aa4535c161ba9ee25eeb783759cde3308cd803a
+COPY scripts/connector-tls.cjs scripts/patch-connector-tls.mjs /opt/capykit/
+RUN node /opt/capykit/patch-connector-tls.mjs
