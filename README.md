@@ -151,10 +151,16 @@ npm run check
 node dist/cli.js --help
 ```
 
-CI runs lint, strict type checking, tests, builds, schema validation, and public
-repository safety checks. Tagged releases rerun the suite before publishing the
-npm package with provenance. npm installation, standalone executable artifacts,
-checksums, shell completions, upgrade, and uninstall workflows are documented in
+`npm run check:docs` lints README and `docs/**/*.md`. Both `npm run check` and
+`npm run factory:verify` run it before code checks, using the same pinned linter
+and configuration as CI's `docs-lint` job. Prose retains the 80-character limit;
+code blocks are exempt so command examples do not need artificial wrapping.
+
+CI runs Markdown lint, code lint, strict type checking, tests, builds, schema
+validation, and public repository safety checks. Tagged releases rerun the suite
+before publishing the npm package with provenance. npm installation, standalone
+executable artifacts, checksums, shell completions, upgrade, and uninstall
+workflows are documented in
 [`docs/publishing.md`](docs/publishing.md).
 
 ## Capability schema

@@ -48,9 +48,11 @@ function checkChangedFileScope() {
   const allowedExact = new Set([
     ".github/workflows/factory-verification.yml",
     ".github/workflows/release.yml",
+    ".github/workflows/schema.yml",
     ".gitignore",
     ".dockerignore",
     ".npmrc",
+    ".markdownlint.json",
     "LICENSE",
     "README.md",
     "eslint.config.mjs",
@@ -70,7 +72,7 @@ function checkChangedFileScope() {
     [/^registries\/private\//iu, "private-registry"],
     [/(^|\/)Dockerfile$/u, "dockerfile"],
     [/(^|\/)docker-compose\.ya?ml$/iu, "docker-compose"],
-    [/^\.github\/workflows\/(?!(?:factory-verification|release)\.yml$)/u, "workflow-mutation"],
+    [/^\.github\/workflows\/(?!(?:factory-verification|release|schema)\.yml$)/u, "workflow-mutation"],
   ];
 
   const failures = [];
@@ -147,6 +149,7 @@ function checkGeneratedArtifacts() {
 }
 
 checkChangedFileScope();
+run(npmCommand, ["run", "check:docs"]);
 run(npmCommand, ["run", "lint"]);
 run(npmCommand, ["run", "typecheck"]);
 run(npmCommand, ["test"]);
