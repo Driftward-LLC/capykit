@@ -134,6 +134,11 @@ function App(): React.ReactElement {
 
   const h = React.createElement;
   const disabled = pending !== null;
+  const githubSetupPending = h("section", { className: "panel", "aria-label": "Personal connections" },
+    h("h2", null, "Personal connections"),
+    h("p", { className: "muted" }, "GitHub sign-in uses a centrally managed Capykit app. It is waiting on platform-operator setup; you do not need to create OAuth developer credentials."),
+    h("p", { className: "muted small" }, "Operators should follow docs/hosted-github-connection.md to register the provider, deploy the protected client settings, and verify the live read-only canary."),
+  );
   return h("main", { className: "console", "aria-busy": disabled },
     h("header", { className: "app-header" },
       h("span", { className: "wordmark" }, "capykit", h("span", { className: "beta-label" }, "Preview")),
@@ -165,7 +170,7 @@ function App(): React.ReactElement {
       error === "" ? null : h("button", { type: "button", disabled, onClick: () => { void loadIdentity(); } }, "Retry session check"),
     ) : h(React.Fragment, null,
       currentUser.identity.principalKind === "human" && currentUser.workspace.role === "owner"
-        ? h(CapabilityLibrary, { key: currentUser.workspace.id, onSessionExpired: sessionExpired })
+        ? h(React.Fragment, null, githubSetupPending, h(CapabilityLibrary, { key: currentUser.workspace.id, onSessionExpired: sessionExpired }))
         : h("section", { className: "panel", "aria-label": "Capability access" }, h("h1", null, "Your workspace"), h("p", null, "Your account is active. Capability access is currently available to workspace owners. Member and agent access will become available through grants.")),
       h("details", { className: "workspace-details", "aria-label": "Current identity and workspace" }, h("summary", null, "Workspace and account details"),
       h("dl", null,
