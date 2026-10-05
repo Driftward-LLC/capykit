@@ -6,10 +6,11 @@ provision authorized access and execution when requested from the web app,
 API, CLI, or MCP. See the
 [hosted product direction](docs/adr/0004-hosted-capability-platform.md).
 
-The source checkout includes a Docker-hosted web app with invited-user sign-in
-and a [versioned skill and function library](docs/hosted-capabilities.md).
-GitHub connections, recipient grants, and hosted function execution are the next
-milestones. The installable discovery catalog answers three questions:
+The source checkout includes a Docker-hosted web app with invited-user sign-in,
+a [versioned skill and function library](docs/hosted-capabilities.md), and
+operator guidance for [centrally managed GitHub connections](docs/hosted-github-connection.md).
+Recipient grants and hosted function execution are the next milestones. The
+installable discovery catalog answers three questions:
 
 - What tools are available?
 - What can each tool do?
@@ -207,6 +208,9 @@ among CLI, MCP, API, service, and skill interfaces before building replacements.
 Codex operators should use the
 [`Codex onboarding guide`](docs/codex-onboarding.md) for the supported native
 MCP setup, approval boundary, credential/grant handling, and rollback steps.
+GitHub provider registration, setup-pending handling, and the live issue-read
+canary are covered by the
+[`hosted GitHub connection guide`](docs/hosted-github-connection.md).
 
 ## Approved registry sources
 
