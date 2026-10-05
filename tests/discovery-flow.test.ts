@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runAsync } from "../src/cli/index.js";
-import { loadConfiguredRegistryCatalog, searchRegistryTools, toolCapabilities, type DiscoveryAdapterBundle } from "../src/core/index.js";
+import { addRegistrySource, discoverHostRegistry, doctorRegistryFile, loadConfiguredRegistryCatalog, searchRegistryTools, toolCapabilities, type DiscoveryAdapterBundle } from "../src/core/index.js";
 
 const examples = fileURLToPath(new URL("../examples/", import.meta.url));
 const fixtures = fileURLToPath(new URL("./fixtures/registries/", import.meta.url));
@@ -114,5 +114,43 @@ describe("task discovery through configured sources", () => {
     expect(await runAsync(["adapters", "--config", join(directory, "absent.json")])).toBe(1);
     vi.stubEnv("XDG_CONFIG_HOME", join(directory, "absent"));
     await expect(loadConfiguredRegistryCatalog()).rejects.toThrow("No registry sources config found");
+  });
+
+  it("refreshes generated facts while preserving explicit operator records in CLI and adapters", async () => {
+    const bin = join(directory, "bin");
+    await mkdir(bin);
+    await writeFile(join(bin, "alpha-tool"), "#!/bin/sh\nexit 99\n", { mode: 0o755 });
+    const generated = await discoverHostRegistry({ path: bin, hostname: "fixture" });
+    const generatedPath = join(directory, "generated.json");
+    await writeFile(generatedPath, JSON.stringify(generated));
+    expect((await doctorRegistryFile(generatedPath)).ok).toBe(true);
+    await addRegistrySource({ configPath, source: { id: "generated", layer: "host", type: "file", root: directory, path: "generated.json" } });
+    await writeFile(join(directory, "operator.json"), JSON.stringify({
+      ...generated,
+      registry: { ...generated.registry, id: "operator" },
+      tools: [{ ...generated.tools[0], summary: "Reviewed operator description", safety: { risk: "read-only", approval: "never" } }],
+    }));
+    await addRegistrySource({ configPath, source: { id: "operator", layer: "user", type: "file", root: directory, path: "operator.json", overrides: ["alpha-tool-cli"] } });
+
+    // Refresh only the generated file. Local sources must see the new executable
+    // without replacing the operator's annotation or relying on a cached lock.
+    await writeFile(join(bin, "beta-tool"), "#!/bin/sh\nexit 99\n", { mode: 0o755 });
+    await writeFile(generatedPath, JSON.stringify(await discoverHostRegistry({ path: bin, hostname: "fixture" })));
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    expect(await runAsync(["tools", "list", "--json"])).toBe(0);
+    const list = JSON.parse(String(stdout.mock.calls.at(-1)?.[0])) as { tools: unknown };
+    expect(list.tools).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "beta-tool-cli", sourceId: "generated" }),
+      expect.objectContaining({ id: "alpha-tool-cli", sourceId: "operator", summary: "Reviewed operator description" }),
+    ]));
+    expect(await runAsync(["tools", "show", "alpha-tool-cli", "--json"])).toBe(0);
+    expect(JSON.parse(String(stdout.mock.calls.at(-1)?.[0]))).toMatchObject({ tool: { record: { safety: { risk: "read-only", approval: "never" } } } });
+    expect(await runAsync(["adapters"])).toBe(0);
+    const bundle = JSON.parse(String(stdout.mock.calls.at(-1)?.[0])) as DiscoveryAdapterBundle;
+    const exported = JSON.parse(bundle.files[1]?.content ?? "{}") as { tools: unknown };
+    expect(exported.tools).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "alpha-tool-cli", summary: "Reviewed operator description" }),
+      expect.objectContaining({ id: "beta-tool-cli" }),
+    ]));
   });
 });
