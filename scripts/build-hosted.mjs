@@ -1,4 +1,5 @@
 import { build } from "tsup";
+import { copyFile } from "node:fs/promises";
 
 await build({
   entry: { "hosted-api": "src/hosted/server.ts", "hosted-worker": "src/hosted/worker.ts" },
@@ -10,3 +11,5 @@ await build({
   splitting: false,
   banner: { js: "#!/usr/bin/env node" },
 });
+
+await copyFile("src/hosted/activepieces-worker.mjs", "dist/activepieces-worker.mjs");

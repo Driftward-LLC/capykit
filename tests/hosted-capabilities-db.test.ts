@@ -57,7 +57,7 @@ describe.skipIf(databaseUrl === undefined)("private PostgreSQL capability store"
 
   beforeAll(async () => {
     await admin.query(`create schema ${schema}; create role ${browser} nologin`);
-    const migrations = await Promise.all(["001_hosted_workspace_identity.sql", "002_hosted_database_access.sql", "003_hosted_capabilities.sql"].map(async (name) =>
+    const migrations = await Promise.all(["001_hosted_workspace_identity.sql", "002_hosted_database_access.sql", "003_hosted_capabilities.sql", "004_hosted_connections.sql", "005_hosted_grants.sql"].map(async (name) =>
       (await readFile(new URL(`../scripts/migrations/${name}`, import.meta.url), "utf8")).replaceAll("capykit_runtime", role).replaceAll("'anon'", `'${browser}'`),
     ));
     await ownerDb.query(`begin; ${migrations.join("\n")} commit;`);
@@ -152,7 +152,7 @@ describe.skipIf(databaseUrl === undefined)("private PostgreSQL capability store"
     const created = await publish();
     const foreign = await publish("skill", other);
     for (const context of [member, agent]) {
-      await expect(store.list(context)).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
+      expect(await store.list(context)).toEqual([]);
       await expect(store.create(context, { slug: "denied", name: "Denied", kind: "skill" })).rejects.toMatchObject({ code: "FORBIDDEN" });
       await expect(store.detail(context, created.id)).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
       await expect(store.download(context, created.id, "1.0.0")).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });

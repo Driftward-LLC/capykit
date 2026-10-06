@@ -1,0 +1,86 @@
+{
+  "github.get-issue.v1": {
+    "name": "Get Issue (Agent)",
+    "description": "Fetches the full details of a single issue by number.",
+    "props": {
+      "owner": {
+        "name": "Owner",
+        "description": "Repository owner login (user or org). Resolve via List My Repositories or Search Repositories."
+      },
+      "repo": {
+        "name": "Repository",
+        "description": "Repository name (without the owner prefix)."
+      },
+      "issue_number": {
+        "name": "Issue Number",
+        "description": "The issue (or pull request) number. Resolve via List Repository Issues or Search Issues and Pull Requests."
+      }
+    }
+  },
+  "drive.get-file.v1": {
+    "name": "Get File or Folder",
+    "description": "Get a file folder for files/sub-folders",
+    "props": {
+      "file_id": {
+        "name": "File / Folder ID",
+        "description": "The ID of the file/folder to fetch. Resolve it via `drive_search_files` or `drive_list_files`."
+      }
+    }
+  },
+  "drive.find-files.v1": {
+    "name": "Search Files and Folders",
+    "description": "Search a Google Drive folder for files/sub-folders",
+    "props": {
+      "query_term": {
+        "name": "Query Term",
+        "description": "The Query term or field of file/folder to search upon."
+      },
+      "operator": {
+        "name": "Operator",
+        "description": "The operator to create criteria."
+      },
+      "value": {
+        "name": "Value",
+        "description": "Value of the field of file/folder to search for."
+      },
+      "type": {
+        "name": "File Type",
+        "description": "(Optional) Choose between files and folders."
+      },
+      "parent_folder_id": {
+        "name": "Parent Folder ID",
+        "description": "(Optional) Restrict the search to files/folders inside this folder ID."
+      },
+      "include_team_drives": {
+        "name": "Include Team Drives",
+        "description": "Determines if folders from Team Drives should be included in the results."
+      }
+    }
+  },
+  "drive.list-folder.v1": {
+    "name": "List Folder Contents",
+    "description": "List files from a Google Drive folder",
+    "props": {
+      "folder_id": {
+        "name": "Folder ID",
+        "description": "The ID of the folder to list. Resolve it via `drive_search_files` (or any other source)."
+      },
+      "include_trashed": {
+        "name": "Include Trashed",
+        "description": "Include new files that have been trashed."
+      },
+      "depth_level": {
+        "name": "Depth Level",
+        "description": "How many levels deep to search for files. 1 = current folder only, 2 = current + next level, etc."
+      },
+      "download_files": {
+        "name": "Download Files",
+        "description": "Download all file contents in a list"
+      },
+      "include_team_drives": {
+        "name": "Include Team Drives",
+        "description": "Determines if folders from Team Drives should be included in the results."
+      }
+    }
+  }
+}
