@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { CapabilityLibrary, writeRequest } from "./library.js";
+import { CapabilityLibrary } from "./library.js";
+import { sessionFetch, writeRequest, setPublicSignupSession } from "./session.js";
+import { discardGitHubReturn, hasGitHubReturn } from "./connections.js";
+import { Apps, discardGoogleReturn } from "./apps.js";
+import { Access } from "./access.js";
 import "./style.css";
 
 interface CurrentUser {
@@ -12,19 +16,42 @@ async function post(path: string, body?: unknown): Promise<Response> {
   return writeRequest(path, "POST", body ?? {});
 }
 
+type SignInMethod = "email" | "tailscale" | "google";
+async function signInMethod(): Promise<{ method: SignInMethod; available: boolean }> {
+  const response = await sessionFetch("/v1/auth/method");
+  if (response.status === 404) { setPublicSignupSession(false); return { method: "email", available: true }; }
+  if (!response.ok) throw new Error("sign-in unavailable");
+  const result = await response.json() as { method?: unknown; available?: unknown };
+  if (result.method !== "email" && result.method !== "tailscale" && result.method !== "google") throw new Error("sign-in unavailable");
+  setPublicSignupSession(result.method === "google");
+  return { method: result.method, available: result.method === "google" ? result.available === true : true };
+}
+
 function callbackError(): string {
   const url = new URL(window.location.href);
+  const googleError = url.searchParams.get("auth");
+  if (googleError?.startsWith("google-")) {
+    window.history.replaceState(null, "", url.pathname);
+    return googleError === "google-cancelled" ? "Google sign-in was cancelled. You can try again." : googleError === "google-expired" ? "Your sign-in attempt expired. Continue with Google to start again." : "Google sign-in could not be completed. Please try again.";
+  }
   if (!url.searchParams.has("error") && !new URLSearchParams(url.hash.slice(1)).has("error")) return "";
   window.history.replaceState(null, "", url.pathname);
   return "That sign-in link expired or could not be verified. Request a new email code below.";
 }
 
 function App(): React.ReactElement {
+  const [tab, setTab] = useState(["capabilities", "connections", "access"].includes(new URL(window.location.href).searchParams.get("tab") ?? "") ? new URL(window.location.href).searchParams.get("tab") ?? "capabilities" : "connections");
+  const [createFunctionRequest, setCreateFunctionRequest] = useState(0);
+  const [githubNotice, setGitHubNotice] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [codeRequested, setCodeRequested] = useState(false);
+  const [authMethod, setAuthMethod] = useState<SignInMethod>("email");
+  const [googleAvailable, setGoogleAvailable] = useState(false);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-  const [pending, setPending] = useState<"session" | "otp" | "verify" | "logout" | null>("session");
+  const [identityResolved, setIdentityResolved] = useState(false);
+  const [returningFromGitHub] = useState(hasGitHubReturn);
+  const [pending, setPending] = useState<"session" | "otp" | "verify" | "logout" | "google" | null>("session");
   const [status, setStatus] = useState("Checking your session…");
   const [error, setError] = useState(callbackError);
 
@@ -33,14 +60,41 @@ function App(): React.ReactElement {
     setPending("session");
     if (initial) setStatus("Checking your session…");
     try {
-      const response = await fetch("/v1/me", { credentials: "same-origin", cache: "no-store" });
+      const method = initial ? await signInMethod() : undefined;
+      if (method !== undefined) { setAuthMethod(method.method); setGoogleAvailable(method.available); }
+      let response = await sessionFetch("/v1/me");
+      if (response.status === 401 && initial) {
+        if (method?.method === "tailscale") {
+          // A new session cannot resume an authorization bound to the previous browser session.
+          discardGoogleReturn(); discardGitHubReturn();
+          const connected = await post("/v1/auth/tailscale");
+          if (connected.status === 401) {
+            setCurrentUser(null); setIdentityResolved(true);
+            setStatus("Connect to Tailscale with your invited account to open this workspace.");
+            setError("This device’s Tailscale identity does not have access to this workspace.");
+            return;
+          }
+          if (!connected.ok) throw new Error("sign-in unavailable");
+          response = await sessionFetch("/v1/me");
+        }
+      }
       if (response.status === 401) {
+        discardGoogleReturn();
+        if (discardGitHubReturn()) setGitHubNotice("GitHub setup needs an existing signed-in session. Sign in below, then start a new GitHub authorization from Connections.");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("setup");
+        window.history.replaceState(null, "", `${url.pathname}${url.search}`);
         setCurrentUser(null);
-        setStatus(initial ? "Sign in with your invited email address." : "Your session expired or access is no longer available. Sign in again.");
+        setIdentityResolved(true);
+        setStatus(initial ? (method?.method === "google" ? "Sign up or sign in with your Google account." : "Sign in with your invited email address.") : "Your session expired or access is no longer available. Sign in again.");
       } else if (!response.ok) {
         throw new Error("session unavailable");
       } else {
-        setCurrentUser(await response.json() as CurrentUser);
+        const user = await response.json() as CurrentUser;
+        if ((user.identity.principalKind !== "human" || user.workspace.role !== "owner") && discardGitHubReturn()) setGitHubNotice("Only a workspace owner can manage GitHub connections. This authorization was discarded.");
+        if (user.identity.principalKind !== "human" || user.workspace.role !== "owner") discardGoogleReturn();
+        setCurrentUser(user);
+        setIdentityResolved(true);
         setStatus("You are signed in.");
         setError("");
       }
@@ -53,7 +107,12 @@ function App(): React.ReactElement {
   }, []);
 
   const sessionExpired = useCallback((): void => {
+    discardGitHubReturn(); discardGoogleReturn();
+    const url = new URL(window.location.href);
+    url.searchParams.delete("setup");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
     setCurrentUser(null);
+    setIdentityResolved(true);
     setStatus("Your session expired or access is no longer available. Sign in again.");
     setError("");
   }, []);
@@ -70,6 +129,18 @@ function App(): React.ReactElement {
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [currentUser, loadIdentity, pending]);
+
+  async function continueWithGoogle(): Promise<void> {
+    setPending("google"); setError("");
+    try {
+      const response = await post("/v1/auth/google/start");
+      if (!response.ok) throw new Error("Google unavailable");
+      const body = await response.json() as { authorizationUrl: string };
+      const url = new URL(body.authorizationUrl);
+      if (url.origin !== "https://accounts.google.com" || url.username || url.password) throw new Error("Google unavailable");
+      window.location.assign(url.href);
+    } catch { setError("Google sign-in is temporarily unavailable. Please try again."); setPending(null); }
+  }
 
   async function requestCode(event: React.SubmitEvent<HTMLElement>): Promise<void> {
     event.preventDefault();
@@ -121,7 +192,12 @@ function App(): React.ReactElement {
     try {
       const response = await post("/v1/auth/logout");
       if (!response.ok) throw new Error("logout failed");
+      discardGitHubReturn(); discardGoogleReturn();
+      const url = new URL(window.location.href);
+      url.searchParams.delete("setup");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
       setCurrentUser(null);
+      setIdentityResolved(true);
       setCodeRequested(false);
       setCode("");
       setStatus("You are signed out.");
@@ -140,10 +216,29 @@ function App(): React.ReactElement {
       currentUser === null ? null : h("div", { className: "account" }, h("span", null, currentUser.identity.email), h("button", { type: "button", className: "secondary", disabled, onClick: () => { void logout(); } }, pending === "logout" ? "Signing out…" : "Sign out")),
     ),
     error === "" ? null : h("p", { className: "message error", role: "alert" }, error),
-    currentUser === null ? h("section", { className: "panel sign-in", "aria-label": "Sign in" },
+    githubNotice === "" ? null : h("p", { className: "message", role: "status" }, githubNotice),
+    currentUser === null && !identityResolved ? h("section", { className: "panel sign-in", "aria-label": "Checking your session" },
+      h("p", { className: "eyebrow" }, returningFromGitHub ? "GitHub connection" : "Your workspace"),
+      h("h1", null, error !== "" ? "Let’s try that again" : returningFromGitHub ? "Returning from GitHub…" : "Opening your workspace…"),
+      h("p", { className: "muted", role: "status", "aria-live": "polite" }, error !== "" ? "Your session could not be checked. Retry to continue." : returningFromGitHub ? "Checking your session before continuing GitHub setup." : "Checking your session…"),
+      error === "" ? null : h("button", { type: "button", disabled, onClick: () => { setError(""); void loadIdentity(true); } }, pending === "session" ? "Checking…" : "Retry session check"),
+    ) : currentUser === null ? h("section", { className: "panel sign-in", "aria-label": "Sign in" },
       h("p", { className: "eyebrow" }, "Your capabilities, together"),
       h("h1", null, "Welcome to Capykit"),
       h("p", { className: "muted", role: "status", "aria-live": "polite" }, status),
+      authMethod === "google" ? h(React.Fragment, null,
+        h("p", { className: "muted" }, "Create your own workspace. No invitation needed."),
+        googleAvailable ? h("button", { type: "button", disabled, onClick: () => { void continueWithGoogle(); } }, pending === "google" ? "Opening Google…" : "Continue with Google") : h(React.Fragment, null,
+          h("p", { className: "message", role: "status" }, "Google sign-in is temporarily unavailable. Please try again shortly."),
+          h("button", { type: "button", disabled, onClick: () => { void loadIdentity(true); } }, "Try again"),
+        ),
+        h("p", { className: "small muted" }, "Sign-in uses your name and email. Connecting Google Drive is a separate step."),
+        h("p", { className: "small muted" }, "Stay signed in for 30 days between visits."),
+      ) : authMethod === "tailscale" ? h(React.Fragment, null,
+        h("p", { className: "small muted" }, "Use your connected Tailscale account. No email code needed."),
+        h("button", { type: "button", disabled, onClick: () => { setError(""); void loadIdentity(true); } }, pending === "session" ? "Opening workspace…" : "Continue with Tailscale"),
+      ) : h(React.Fragment, null,
+      h("p", { className: "small muted" }, "Stay signed in for 30 days between visits."),
       h("form", { onSubmit: (event) => { void requestCode(event); } },
         h("label", { htmlFor: "email" }, "Invited email address"),
         h("input", {
@@ -162,10 +257,18 @@ function App(): React.ReactElement {
         }),
         h("button", { type: "submit", disabled }, pending === "verify" ? "Verifying…" : "Sign in"),
       ) : null,
+      ),
       error === "" ? null : h("button", { type: "button", disabled, onClick: () => { void loadIdentity(); } }, "Retry session check"),
     ) : h(React.Fragment, null,
-      currentUser.identity.principalKind === "human" && currentUser.workspace.role === "owner"
-        ? h(CapabilityLibrary, { key: currentUser.workspace.id, onSessionExpired: sessionExpired })
+      currentUser.identity.principalKind === "human"
+        ? h(React.Fragment, { key: currentUser.workspace.id },
+          h("nav", { className: "workspace-nav", "aria-label": "Workspace" },
+            ...(currentUser.workspace.role === "owner" ? ["connections", "capabilities", "access"] : ["connections", "capabilities"]).map((name) => h("button", { key: name, type: "button", className: tab === name ? "active" : "", "aria-current": tab === name ? "page" : undefined, onClick: () => { setTab(name); setGitHubNotice(""); const url = new URL(window.location.href); url.searchParams.set("tab", name); if (name !== "connections") url.searchParams.delete("setup"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } }, name === "capabilities" ? "Functions" : name === "connections" ? "Apps" : "Access")),
+          ),
+          h("div", { hidden: tab !== "capabilities" }, h(CapabilityLibrary, { createFunctionRequest, onSessionExpired: sessionExpired, manage: currentUser.workspace.role === "owner" })),
+          h("div", { hidden: tab !== "connections" }, h(Apps, { manage:currentUser.workspace.role === "owner", onSessionExpired: sessionExpired, active: tab === "connections", onCreateFunction: () => { setCreateFunctionRequest(value => value + 1); setTab("capabilities"); const url = new URL(window.location.href); url.searchParams.set("tab","capabilities"); url.searchParams.delete("setup"); window.history.replaceState(null,"",`${url.pathname}${url.search}`); } })),
+          currentUser.workspace.role !== "owner" ? null : h("div", { hidden: tab !== "access" }, h(Access, { onSessionExpired: sessionExpired, active: tab === "access" })),
+        )
         : h("section", { className: "panel", "aria-label": "Capability access" }, h("h1", null, "Your workspace"), h("p", null, "Your account is active. Capability access is currently available to workspace owners. Member and agent access will become available through grants.")),
       h("details", { className: "workspace-details", "aria-label": "Current identity and workspace" }, h("summary", null, "Workspace and account details"),
       h("dl", null,
