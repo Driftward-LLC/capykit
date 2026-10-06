@@ -81,11 +81,12 @@ Digest ordering follows the portable bundle's `en-US` path order, with a raw
 string comparison breaking ties between distinct Unicode paths.
 
 `CapabilityStore.transaction` is the current authorization seam. It rechecks the
-verified identity binding, workspace, principal, membership, and owner role from
-PostgreSQL for every operation. A foreign workspace ID is hidden with 404;
-forbidden actions on an in-workspace ID return 403. Members and agents have no
-artifact access until ENG-124 explicitly adds exact-version grants. There is no
-anonymous storage route, signed URL, or browser database credential.
+verified identity binding, workspace, principal and membership from PostgreSQL
+for every operation, and the current owner role for mutations. A foreign
+workspace ID is hidden with 404; forbidden actions on an in-workspace ID return
+403. Members can retrieve only exact published skill versions with current
+[user grants](hosted-access.md). Agent credentials remain ENG-124 work. There is
+no anonymous storage route, signed URL, or browser database credential.
 
 Deletion marks the capability unavailable and removes file bytes atomically.
 Version/digest metadata and non-content audit records remain. Existing downloads
@@ -96,7 +97,7 @@ backup, reconcile deletions/revocations so the restore does not re-enable access
 
 ## Upgrade and verification
 
-Fresh Compose volumes apply all three migrations in one transaction. For an
+Fresh Compose volumes apply migrations 001–004 in one transaction. For an
 existing deployment, take and restore-test a protected PostgreSQL backup first,
 then apply **only migration 003** using the schema owner in a transaction with
 `ON_ERROR_STOP=1`. Roll out the new application image after the migration commits.
