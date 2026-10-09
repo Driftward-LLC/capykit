@@ -15,6 +15,7 @@ RUN npm ci --omit=dev --ignore-scripts \
 COPY --chown=node:node dist ./dist
 COPY --chown=node:node schemas ./schemas
 COPY --chown=node:node README.md LICENSE ./
+COPY --chown=node:node docs/LICENSE.activepieces ./docs/LICENSE.activepieces
 
 USER node
 VOLUME ["/registries"]
@@ -32,7 +33,7 @@ function metadata(version = "0.0.0") {
     registryMount,
     defaultRegistryMountMode: "read-only",
     healthCheck: "node -e import('./dist/mcp.js').then((m) => { m.createServer({ sources: [] }); })",
-    requiredBuildArtifacts: ["dist", "schemas", "package.json", "package-lock.json", "README.md", "LICENSE"],
+    requiredBuildArtifacts: ["dist", "schemas", "package.json", "package-lock.json", "README.md", "LICENSE", "docs/LICENSE.activepieces"],
   };
 }
 

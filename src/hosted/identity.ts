@@ -2,9 +2,11 @@ export type PrincipalKind = "human" | "agent";
 export type MembershipRole = "owner" | "member";
 
 export interface VerifiedIdentity {
-  readonly provider: "gotrue";
+  readonly provider: "gotrue" | "capykit-agent";
   readonly subject: string;
   readonly email: string;
+  readonly sessionId?: string;
+  readonly credentialId?: string;
 }
 
 export interface WorkspaceMembership {
@@ -23,6 +25,7 @@ export interface AuthenticatedContext {
 export type StableErrorCode =
   | "AUTHENTICATION_REQUIRED"
   | "AUTHENTICATION_INVALID"
+  | "AUTHENTICATION_UNAVAILABLE"
   | "CSRF_REQUIRED"
   | "MEMBERSHIP_INACTIVE"
   | "FORBIDDEN"
@@ -33,6 +36,23 @@ export type StableErrorCode =
   | "ARTIFACT_CORRUPT"
   | "CONFLICT"
   | "ARTIFACT_BUSY"
+  | "GITHUB_NOT_CONFIGURED"
+  | "GITHUB_UNAVAILABLE"
+  | "GITHUB_RATE_LIMITED"
+  | "GITHUB_AUTHORIZATION_FAILED"
+  | "GITHUB_ACCESS_REVOKED"
+  | "GITHUB_INSTALLATION_INVALID"
+  | "GITHUB_SELECTED_REPOSITORIES_REQUIRED"
+  | "GITHUB_PERMISSION_MISMATCH"
+  | "GITHUB_REPOSITORY_FORBIDDEN"
+  | "GITHUB_RESPONSE_INVALID"
+  | "GITHUB_RESPONSE_LIMIT"
+  | "GITHUB_RESULT_LIMIT"
+  | "GITHUB_TOKEN_SCOPE_INVALID"
+  | "CONNECT_STATE_INVALID"
+  | "CONNECT_SETUP_EXPIRED"
+  | "CONNECTION_INACTIVE"
+  | "WEBHOOK_INVALID"
   | "INTERNAL_ERROR"
   | "CONFIGURATION_UNAVAILABLE";
 

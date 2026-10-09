@@ -305,8 +305,7 @@ export async function removeRegistrySource(configPath: string, id: string): Prom
   const config = await readConfig(configPath);
   const source = config.sources.find((entry) => entry.id === id);
   const nextConfig = { format: config.format, sources: config.sources.filter((entry) => entry.id !== id), locks: config.locks.filter((entry) => entry.sourceId !== id) } as const;
-  const catalog = await loadCatalogForConfig(configPath, nextConfig);
-  void catalog;
+  await loadCatalogForConfig(configPath, nextConfig);
   await atomicWriteJson(configPath, nextConfig);
   if (source?.type === "http") await rm(cachePath(configPath, id), { force: true });
   return nextConfig;

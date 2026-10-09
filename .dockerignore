@@ -9,7 +9,11 @@
 !scripts/build-hosted.mjs
 !scripts/bootstrap-hosted-owner.mjs
 !scripts/provision-hosted-owner.mjs
+!scripts/cleanup-hosted-connections.mjs
 !scripts/migrations/
 !scripts/migrations/**
 !schemas/
 !schemas/**
+
+!docs/
+!docs/LICENSE.activepieces

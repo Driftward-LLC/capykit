@@ -1,4 +1,4 @@
 {
-  "compilerOptions": { "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true, "noUncheckedIndexedAccess": true, "exactOptionalPropertyTypes": true, "declaration": true, "declarationMap": true, "sourceMap": true, "skipLibCheck": true, "types": ["node"] },
+  "compilerOptions": { "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext", "resolveJsonModule": true, "strict": true, "noUncheckedIndexedAccess": true, "exactOptionalPropertyTypes": true, "declaration": true, "declarationMap": true, "sourceMap": true, "skipLibCheck": true, "types": ["node"] },
   "include": ["src/**/*.ts", "tests/**/*.ts", "tsup.config.ts", "vitest.config.ts"]
 }
