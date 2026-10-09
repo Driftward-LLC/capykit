@@ -103,7 +103,8 @@ function githubLink(url: string | null): string | undefined {
   if (url === null) return undefined;
   try {
     const parsed = new URL(url);
-    return parsed.protocol === "https:" && parsed.hostname === "github.com" && parsed.username === "" && parsed.password === "" ? parsed.href : undefined;
+    const simulated = parsed.origin === window.location.origin && parsed.pathname === "/v1/preview/simulated/github/consent";
+    return ((parsed.protocol === "https:" && parsed.hostname === "github.com") || simulated) && parsed.username === "" && parsed.password === "" ? parsed.href : undefined;
   } catch { return undefined; }
 }
 
@@ -303,7 +304,7 @@ export function Connections({ onSessionExpired, active, onConnectionsChanged }: 
   const continueSetup = (connectionId?: string): React.ReactElement => h("button", { type: "button", disabled, onClick: () => { void start(connectionId); } }, pending ? "Opening GitHub…" : "Continue with GitHub");
   return h("section", { className: "connections", "aria-label": "GitHub connections", "aria-busy": disabled },
     h("div", { className: "section-heading" },
-      h("div", null, h("p", { className: "eyebrow" }, "Workspace connections"), h("h1", null, "Connect GitHub"), h("p", { className: "muted" }, "Choose which repositories Capykit can read for this workspace.")),
+      h("div", null, h("p", { className: "eyebrow" }, "Workspace connections"), h("h1", null, "Connect GitHub"), h("p", { className: "muted" }, installationUrl?.includes("/v1/preview/simulated/") ? "Choose deterministic simulated repositories for this isolated preview. No GitHub account is contacted." : "Choose which repositories Capykit can read for this workspace.")),
       setup !== null || selectedUnfinished || resumable !== undefined || loading ? null : h("button", { type: "button", className: "text-button", disabled, onClick: () => { void run(refresh); } }, "Refresh connections"),
     ),
     error === "" ? null : h("p", { className: "message error", role: "alert" }, error),
@@ -318,7 +319,7 @@ export function Connections({ onSessionExpired, active, onConnectionsChanged }: 
         h("p", { className: "muted" }, "Open your GitHub App settings, choose Only select repositories, and save your selection. Then return here to continue."),
         h("div", { className: "actions" }, manageAccess, unfinished.length > 1 ? null : continueSetup()),
       ) : h(React.Fragment, null,
-        h("p", { className: "muted" }, unfinished.length > 1 ? "Choose an unfinished setup under Your connections to continue where you left off." : "GitHub will ask you to authorize Capykit. You’ll return here to choose repositories and approve access for this workspace."),
+        h("p", { className: "muted" }, installationUrl?.includes("/v1/preview/simulated/") ? "A simulated consent page will return deterministic repository fixtures. It is not GitHub login and asks for no credentials." : unfinished.length > 1 ? "Choose an unfinished setup under Your connections to continue where you left off." : "GitHub will ask you to authorize Capykit. You’ll return here to choose repositories and approve access for this workspace."),
         unfinished.length > 1 ? null : continueSetup(),
         h("p", { className: "small muted connection-permissions" }, "Read access to issues and repository metadata. Nothing is connected until you confirm."),
         installationHelp,

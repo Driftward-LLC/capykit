@@ -22,6 +22,7 @@ import { GoogleConnections, GoogleProvider, loadGoogleConfig, type GoogleConfig 
 import { ActionAccess } from "./action-access.js";
 import { runAction } from "./action-runner.js";
 import { appCatalog, catalogProvenance, personalAvailability } from "./piece-catalog.js";
+import { loadPreviewSimulation, previewSimulationConsentPage } from "./preview-simulation.js";
 
 import { PieceEngine, loadPieceEngineConfig } from "./piece-engine.js";
 import { PersonalConnections } from "./personal-connections.js";
@@ -119,11 +120,14 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   const consoleDirectory = deps.consoleDirectory ?? fileURLToPath(new URL("./console/", import.meta.url));
   const publicOrigin = new URL(config.publicBaseUrl).origin;
   let githubConfig = deps.githubConfig ?? loadGithubConfig(process.env, config.publicBaseUrl);
-  let github = deps.githubProvider ?? (githubConfig === undefined ? undefined : new GithubProvider(githubConfig));
-  let connections = database === undefined ? undefined : new ConnectionStore(database.pool, github, githubConfig);
   const googleConfig = deps.googleConfig ?? loadGoogleConfig(process.env, config.publicBaseUrl);
-  const google = deps.googleProvider ?? (googleConfig ? new GoogleProvider(googleConfig) : undefined);
-  const drive = database ? new GoogleConnections(database.pool, google, googleConfig) : undefined;
+  const simulation = loadPreviewSimulation(process.env, config.publicBaseUrl, { github: githubConfig, google: googleConfig });
+  githubConfig = simulation?.githubConfig ?? githubConfig;
+  let github = deps.githubProvider ?? simulation?.githubProvider ?? (githubConfig === undefined ? undefined : new GithubProvider(githubConfig));
+  let connections = database === undefined ? undefined : new ConnectionStore(database.pool, github, githubConfig);
+  const activeGoogleConfig = simulation?.googleConfig ?? googleConfig;
+  const google = deps.googleProvider ?? simulation?.googleProvider ?? (activeGoogleConfig ? new GoogleProvider(activeGoogleConfig) : undefined);
+  const drive = database ? new GoogleConnections(database.pool, google, activeGoogleConfig) : undefined;
   const setupOptions = deps.githubSetup === undefined ? loadGithubSetupOptions() : undefined;
   const githubSetup = deps.githubSetup ?? (setupOptions === undefined ? undefined : new GithubSetup(setupOptions, config.publicBaseUrl));
   const googleSignIn = deps.googleSignIn ?? (config.publicSignup && config.authUrl ? createGoogleSignIn(config.authUrl, publicOrigin) : undefined);
@@ -186,6 +190,14 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   app.get("/v1/connections/personal/callback", serveConsole);
   app.get("/v1/connections/github/setup", serveConsole);
   app.get("/v1/provider-setup/github/callback", serveConsole);
+  app.get<{ Querystring: { state?: string } }>("/v1/preview/simulated/github/consent", async (request, reply) => {
+    if (simulation === undefined) return reply.code(404).send(stableError("NOT_FOUND", request.id));
+    return reply.type("text/html").send(previewSimulationConsentPage("github", request.query.state));
+  });
+  app.get<{ Querystring: { state?: string } }>("/v1/preview/simulated/google-drive/consent", async (request, reply) => {
+    if (simulation === undefined) return reply.code(404).send(stableError("NOT_FOUND", request.id));
+    return reply.type("text/html").send(previewSimulationConsentPage("google-drive", request.query.state));
+  });
   app.get<{ Params: { file: string } }>("/assets/:file", async (request, reply) => {
     const { file } = request.params;
     if (!/^[a-zA-Z0-9_-]+\.(?:js|css)$/u.test(file)) return reply.code(404).send(stableError("NOT_FOUND", request.id));
@@ -414,7 +426,7 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
     return { apps: personalAvailability(appCatalog([
       { id: "github", name: "GitHub", configured: Boolean(github), connected: records.some(row => row.status === "active"), description: "Read issues from selected repositories", connector: "@activepieces/piece-github@0.9.0" },
       { id: "google-drive", name: "Google Drive", configured: googleState.configured, connected: googleState.connection?.status === "active", description: "Read file names and metadata", connector: "@activepieces/piece-google-drive@0.11.0" },
-    ]),pieceEngine?new Set(Object.keys(pieceEngine.config.oauthClients)):undefined), catalog:catalogProvenance, github: records, google: googleState,personalEnabled:Boolean(pieceEngine) };
+    ]),pieceEngine?new Set(Object.keys(pieceEngine.config.oauthClients)):undefined), catalog:catalogProvenance, github: records, google: googleState,personalEnabled:Boolean(pieceEngine), previewSimulation: simulation !== undefined };
   });
   function personalStore(): PersonalConnections { if(!personal)throw new ConnectionError("CONFIGURATION_UNAVAILABLE",503);return personal; }
   app.get("/v1/connections/personal",authenticated,async request=>({connections:await personalStore().list(contextFor(request)),enabled:Boolean(pieceEngine)}));
