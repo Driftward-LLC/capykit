@@ -1,7 +1,10 @@
 import { ConnectionError } from "./connections.js";
+import { simulatedProviderJson } from "./preview-simulation.js";
 
 /** Fixed provider URLs only. Never forward redirects, cookies or raw errors. */
 export async function providerJson(url: string, init: RequestInit = {}, signal?: AbortSignal): Promise<Record<string, unknown>> {
+  const simulated = simulatedProviderJson(url, init);
+  if (simulated !== undefined) return simulated;
   const deadline = AbortSignal.timeout(10_000);
   let response: Response;
   try { response = await fetch(url, { ...init, redirect: "error", signal: signal ? AbortSignal.any([signal, deadline]) : deadline }); }

@@ -1,5 +1,28 @@
 # Hosted GitHub connections
 
+## Isolated preview simulation
+
+Set `CAPYKIT_PREVIEW_SIMULATED_PROVIDERS=true` only in an isolated preview
+deployment to review the connection and action-access journey without live
+Google or GitHub provider setup. Leave the normal Google and GitHub provider
+configuration variables unset; startup fails closed if simulation is mixed with
+live provider configuration. The console shows a persistent simulated-provider
+indicator, and the consent pages are same-origin pages labelled as simulated.
+
+Fixture accounts expose `capykit-simulated/preview-repo`,
+`capykit-simulated/empty-repo`, `file_preview`, `file_unavailable`,
+`file_expired`, and empty Drive search results for names containing `Empty`.
+Use the normal email-code sign-in, connect the simulated app, create an agent
+key in Access, grant one listed action, then invoke through the existing remote
+MCP/API client. The real database, workspace membership, agent key, grant,
+revocation and run-audit checks stay in force; only the external provider
+boundary is replaced with deterministic fixture responses.
+
+This mode does not verify real OAuth consent, real redirects, token refresh,
+provider permissions, executor readiness, physical devices, or live provider
+behavior. Keep outbound-network isolation for the preview and do not use this
+flag in production.
+
 The Connections tab lets an active human workspace owner authorize a dedicated
 GitHub App, select repositories, and explicitly consent to future delegated use.
 Publishing a capability or connecting a repository creates no execution grant.
