@@ -1,4 +1,6 @@
-import {randomBytes,randomUUID} from 'node:crypto';
+import {createHash,randomBytes,randomUUID} from 'node:crypto';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {readFile} from 'node:fs/promises';
 import {Pool} from 'pg';
 import {afterAll,beforeAll,describe,expect,it,vi} from 'vitest';
@@ -23,7 +25,7 @@ describe.skipIf(!databaseUrl)('connector actions with real PostgreSQL authority'
  const expiresAt=()=>new Date(Date.now()+86400000).toISOString();
  let owner:AuthenticatedContext,member:AuthenticatedContext,other:AuthenticatedContext;
  const identities=new Map<string,AuthenticatedContext>();
- const app=createHostedServer({database:createHostedDatabase(runtimeUrl.toString()),config:loadHostedConfig({DATABASE_URL:runtimeUrl.toString(),CAPYKIT_PUBLIC_BASE_URL:'https://capykit.example.test',CAPYKIT_AUTH_URL:'http://auth:9999'}),googleConfig,googleProvider:provider as never,auth:{verifyBearer:token=>Promise.resolve(identities.get(token)?.identity),requestOtp:async()=>{},verifyOtp:()=>Promise.resolve(undefined),refresh:()=>Promise.resolve(undefined),signOut:async()=>{}}});
+ const app=createHostedServer({consoleDirectory:new URL('../dist/console/',import.meta.url).pathname,database:createHostedDatabase(runtimeUrl.toString()),config:loadHostedConfig({DATABASE_URL:runtimeUrl.toString(),CAPYKIT_PUBLIC_BASE_URL:'https://capykit.example.test',CAPYKIT_AUTH_URL:'http://auth:9999'}),googleConfig,googleProvider:provider as never,auth:{verifyBearer:token=>Promise.resolve(identities.get(token)?.identity),requestOtp:async()=>{},verifyOtp:()=>Promise.resolve(undefined),refresh:()=>Promise.resolve(undefined),signOut:async()=>{}}});
  async function actor(workspaceId:string=randomUUID(),roleName:'owner'|'member'='owner'):Promise<AuthenticatedContext>{await db.query("insert into workspaces(id,slug,name) values($1,$2,'Fixture') on conflict do nothing",[workspaceId,workspaceId]);const id=randomUUID(),subject=randomUUID();await db.query("insert into principals(id,workspace_id,kind,display_name) values($1,$2,'human','Fixture')",[id,workspaceId]);await db.query('insert into workspace_memberships(workspace_id,principal_id,role) values($1,$2,$3)',[workspaceId,id,roleName]);await db.query("insert into identity_bindings(principal_id,provider,provider_subject,email,verified_at) values($1,'gotrue',$2,'fixture@example.test',now())",[id,subject]);return {identity:{provider:'gotrue',subject,email:'fixture@example.test'},membership:{workspaceId,principalId:id,principalKind:'human',role:roleName,active:true}};}
  async function connect(context:AuthenticatedContext){const start=await drive.start(context,'session');await drive.callback(context,'session',{state:new URL(start.authorizationUrl).searchParams.get('state')??'',code:'fixture'});}
  async function agent(){const issued=await access.issueKey(owner,{name:'Assistant',expiresAt:expiresAt()});const context=await access.authenticate(issued.key);if(!context)throw new Error('Missing fixture agent');return {issued,context};}
@@ -63,4 +65,47 @@ describe.skipIf(!databaseUrl)('connector actions with real PostgreSQL authority'
   await grant(member);const memberBound=await access.bind(member,'drive.get-file.v1',owner.membership.workspaceId);await drive.disconnect(owner);await connect(owner);await expect(access.check(member,memberBound)).rejects.toMatchObject({code:'NOT_FOUND'});expect((await access.catalog(member)).actions).toEqual([]);
   const fresh=await agent();await grant(fresh.context);const freshBound=await access.bind(fresh.context,'drive.get-file.v1',owner.membership.workspaceId);await db.query('update workspace_memberships set active=false where principal_id=$1',[fresh.context.membership.principalId]);await expect(access.check(fresh.context,freshBound)).rejects.toMatchObject({code:'MEMBERSHIP_INACTIVE'});
  });
+ it('reuses only a current same-workspace agent, serializes issuance and requires exact replacement',async()=>{
+  const {issued,context}=await agent();await grant(context);
+  const before=(await db.query('select id from principals where workspace_id=$1',[owner.membership.workspaceId])).rows;
+  await expect(access.issueKey(owner,{principalId:issued.principalId,expiresAt:expiresAt()})).rejects.toMatchObject({code:'KEY_REPLACEMENT_REQUIRED'});
+  await expect(access.issueKey(owner,{name:'Duplicate',principalId:issued.principalId,expiresAt:expiresAt()})).rejects.toMatchObject({code:'INVALID_REQUEST'});
+  await expect(access.issueKey(other,{principalId:issued.principalId,expiresAt:expiresAt()})).rejects.toMatchObject({code:'NOT_FOUND'});
+  await expect(access.issueKey(owner,{principalId:owner.membership.principalId,expiresAt:expiresAt()})).rejects.toMatchObject({code:'NOT_FOUND'});
+  await expect(access.issueKey(member,{principalId:issued.principalId,expiresAt:expiresAt()})).rejects.toMatchObject({code:'FORBIDDEN'});
+  await access.revokeKey(owner,issued.id??'');
+  const attempts=await Promise.allSettled([1,2].map(()=>access.issueKey(owner,{principalId:issued.principalId,expiresAt:expiresAt()})));
+  expect(attempts.filter(a=>a.status==='fulfilled')).toHaveLength(1);
+  expect(attempts.filter(a=>a.status==='rejected').map(a=>(a.reason as {code:string}).code)).toEqual(['KEY_REPLACEMENT_REQUIRED']);
+  const result=attempts.find(a=>a.status==='fulfilled');if(result?.status!=='fulfilled')throw new Error('Missing isolated issuance');
+  const current=await access.authenticate(result.value.key);if(!current)throw new Error('Missing isolated agent context');
+  expect(result.value.principalId).toBe(issued.principalId);expect((await access.catalog(current)).actions).toHaveLength(1);
+  expect((await db.query('select id from principals where workspace_id=$1',[owner.membership.workspaceId])).rows).toEqual(before);
+  expect(JSON.stringify(await access.options(owner)).includes(result.value.key)).toBe(false);
+  expect(JSON.stringify((await db.query('select * from agent_credentials')).rows).includes(result.value.key)).toBe(false);
+ });
+ it('delivers a one-time key through the cookie/CSRF API and preserves exact identity/grants on rotation',async()=>{
+  const headers={origin:'https://capykit.example.test',cookie:'capykit_session=owner; capykit_csrf=safe','x-csrf-token':'safe'};
+  const created=await app.inject({method:'POST',url:'/v1/agents/keys',headers,payload:{name:'API isolated agent',expiresAt:expiresAt()}});
+  expect(created.statusCode).toBe(201);const first=created.json<{id:string;principalId:string;key:string}>();expect(typeof first.key==='string'&&/^ck_agent_[A-Za-z0-9_-]{43}$/u.test(first.key)).toBe(true);
+  const context=await access.authenticate(first.key);if(!context)throw new Error('Missing isolated API context');await grant(context);
+  const sibling=`ck_agent_${randomBytes(32).toString('base64url')}`;
+  await db.query('insert into agent_credentials(workspace_id,principal_id,key_hash,expires_at) values($1,$2,$3,$4)',[owner.membership.workspaceId,first.principalId,createHash('sha256').update(sibling).digest('hex'),expiresAt()]);
+  const before=(await access.options(owner)).grants;
+  const rotated=await app.inject({method:'POST',url:'/v1/agents/keys',headers,payload:{rotateKeyId:first.id,expiresAt:expiresAt()}});
+  expect(rotated.statusCode).toBe(201);const next=rotated.json<{id:string;principalId:string;key:string}>();expect(next.principalId).toBe(first.principalId);expect(next.id).not.toBe(first.id);expect(await access.authenticate(first.key)).toBeUndefined();expect(await access.authenticate(next.key)).toBeDefined();expect((await access.options(owner)).grants).toEqual(before);
+  expect(await access.authenticate(sibling)).toBeDefined();
+  const expired=`ck_agent_${randomBytes(32).toString('base64url')}`;
+  await db.query("insert into agent_credentials(workspace_id,principal_id,key_hash,created_at,expires_at) values($1,$2,$3,now()-interval '2 days',now()-interval '1 day')",[owner.membership.workspaceId,first.principalId,createHash('sha256').update(expired).digest('hex')]);
+  expect(await access.authenticate(expired)).toBeUndefined();
+  expect((await app.inject({method:'POST',url:'/v1/agents/keys',headers:{...headers,'x-csrf-token':'wrong'},payload:{rotateKeyId:next.id,expiresAt:expiresAt()}})).statusCode).toBe(403);
+  expect((await app.inject({method:'POST',url:'/v1/agents/keys',headers:{...headers,cookie:'capykit_session=member; capykit_csrf=safe'},payload:{principalId:first.principalId,expiresAt:expiresAt()}})).statusCode).toBe(403);
+  expect(JSON.stringify((await app.inject({url:'/v1/action-access',headers})).json()).includes(next.key)).toBe(false);
+ });
+ it.skipIf(!process.env.CAPYKIT_PLAYWRIGHT_MODULE)('exercises real API key delivery, missing-key recovery and exact rotation in Chromium',async()=>{
+  const isolated=await access.issueKey(owner,{name:'Browser isolated agent',expiresAt:expiresAt()});await access.revokeKey(owner,isolated.id??'');
+  const url=await app.listen({host:'127.0.0.1',port:0});
+  const result=await promisify(execFile)(process.execPath,['scripts/test-agent-api.mjs'],{env:{...process.env,CAPYKIT_AGENT_TEST_SERVER:url,CAPYKIT_AGENT_TEST_PRINCIPAL:isolated.principalId},timeout:90000});
+  expect(result.stdout.trim()).toBe('PASS isolated real API/browser: issuance, one-time delivery, missing response, same-identity rotation, no stored plaintext');
+ },100000);
 });

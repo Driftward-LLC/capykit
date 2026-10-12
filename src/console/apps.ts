@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActionConsole } from "./actions.js";
+import { ActionAccess } from "./action-access.js";
 import { Connections, hasGitHubReturn } from "./connections.js";
 import { sessionFetch, writeRequest } from "./session.js";
 import type {CatalogApp} from "../hosted/piece-catalog.js";
@@ -55,12 +56,14 @@ function AppIcon({id,logoUrl,name}:{id:AppId;logoUrl?:string|null;name?:string})
   if(id!=="github"&&id!=="google-drive")return h("span",{className:"app-icon catalog-icon","aria-hidden":true},name?.charAt(0)??"A",logoUrl?h("img",{src:logoUrl,alt:"",loading:"lazy",decoding:"async",referrerPolicy:"no-referrer",onError:event=>{event.currentTarget.hidden=true;}}):null);
   return h("span",{className:`app-icon ${id}`,"aria-hidden":true},id==="github" ? h("svg",{viewBox:"0 0 24 24",fill:"currentColor"},h("path",{d:"M12 .8a11.4 11.4 0 0 0-3.6 22.2c.6.1.8-.2.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.8-1.3-1.8-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6a4.7 4.7 0 0 1 1.2-3.2c-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2a4.7 4.7 0 0 1 1.2 3.2c0 4.7-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.4c0 .4.2.7.8.6A11.4 11.4 0 0 0 12 .8Z"})) : h("svg",{viewBox:"0 0 48 48"},h("path",{fill:"#0F9D58",d:"M17 5 2 31l8 13 15-26Z"}),h("path",{fill:"#F4B400",d:"M17 5h15l15 26H32Z"}),h("path",{fill:"#4285F4",d:"M10 44h30l7-13H17Z"})));
 }
-export function Apps({active,onSessionExpired,onCreateFunction,manage=true}:{active:boolean;onSessionExpired:()=>void;onCreateFunction:()=>void;manage?:boolean}):React.ReactElement {
+export function Apps({active,onSessionExpired,onCreateFunction,onManageAgents,manage=true}:{active:boolean;onSessionExpired:()=>void;onCreateFunction:()=>void;onManageAgents?:()=>void;manage?:boolean}):React.ReactElement {
   const [selected,setSelected]=useState<AppId|null>(()=>{
     const url=new URL(window.location.href), app=url.searchParams.get("app");
     return personalReturn?.appId?personalReturn.appId:googleReturn?"google-drive":hasGitHubReturn()?"github":app&&/^[a-z0-9-]{1,120}$/u.test(app)?app:url.searchParams.has("setup")?"github":null;
   });
   const [personalAccounts,setPersonalAccounts]=useState<PersonalAccount[]>([]);
+  const [accessOpen,setAccessOpen]=useState(false);
+  useEffect(()=>{setAccessOpen(false);},[selected,active]);
   const [data,setData]=useState<Catalog|null>(null),[error,setError]=useState(""),[notice,setNotice]=useState("");
   const [noticeSuccess,setNoticeSuccess]=useState(false);
   const [category,setCategory]=useState(""),[limit,setLimit]=useState(40);
@@ -102,6 +105,7 @@ export function Apps({active,onSessionExpired,onCreateFunction,manage=true}:{act
     selectedApp&&data?.personalEnabled?h(PersonalApp,{key:selectedApp.id,appId:selectedApp.id,appName:selectedApp.name,active,accounts:personalAccounts.filter(a=>a.appId===selectedApp.id),onSessionExpired,onChanged:()=>{void load();}}):null,
     selectedApp&&!data?.personalEnabled&&!selectedApp.supportedInCapykit?h(PieceDetails,{app:selectedApp}):null,
     selectedApp?.supportedInCapykit&&data?.personalEnabled?h("h2",null,"Workspace connection"):null,
+    manage&&selectedApp?.supportedInCapykit&&(selected==="github"||selected==="google-drive")?h("details",{key:`access-${selected}`,open:accessOpen,onToggle:(event:React.ToggleEvent<HTMLDetailsElement>)=>{setAccessOpen(event.currentTarget.open);}},h("summary",null,"Who can use this app?"),h("p",{className:"small muted"},"Workspace action access shares the same identity and grant records as Agents. Personal-account sharing stays in the account above."),onManageAgents?h("button",{type:"button",className:"secondary",onClick:onManageAgents},"Manage identities in Agents"):null,h(ActionAccess,{key:selected,app:selected,onSessionExpired,active:active&&accessOpen})):null,
     !manage&&selectedApp?.supportedInCapykit?h(React.Fragment,null,h("p",{className:"message"},"Your workspace owner manages this connection. Actions granted to you appear below."),h(ActionConsole,{key:selected,app:selected==="github"?"github":"google-drive",onSessionExpired})):null,
     manage?h("div",{hidden:selected!=="github"},selected==="github"&&data?.github.some(c=>c.status==="active")?h(ActionConsole,{key:JSON.stringify(data.github),app:"github",onSessionExpired}):null,h("details",{open:!data?.github.some(c=>c.status==="active"),className:"connection-management"},h("summary",null,"Manage GitHub connection"),h(Connections,{onSessionExpired,active:active&&selected==="github",onConnectionsChanged:()=>{void load();}}))):null,
     !manage||selected!=="google-drive"||!data?null:h(React.Fragment,null,

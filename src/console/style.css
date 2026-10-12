@@ -158,7 +158,7 @@ button.danger { color: #fff; }
 .wordmark { color: #94ecc6; }
 .console { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .workspace-nav { position: fixed; top: auto; bottom: 0; left: 0; right: 0; margin: 0; padding: 10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid #2b3631; border-bottom: none; background: #141d18; z-index: 20; }
-.workspace-nav button { flex: 1; min-height: 52px; color: #b4bdc6; }
+.workspace-nav button { flex: 1; min-width: 0; min-height: 52px; color: #b4bdc6; }
 .workspace-nav button.active { color: #94ecc6; }
 .apps { max-width: 920px; margin: 0 auto; }
 .apps h1 { font-size: clamp(2rem, 5vw, 2.8rem); }
@@ -203,6 +203,10 @@ button.app-row:hover:enabled { background: #18271f; }
 .connector-actions .connection-back {margin-bottom:16px;}
 .connection-management summary {min-height:44px;cursor:pointer;padding:12px 0;}
 .agent-key {display:block;padding:16px;border:1px solid var(--border,#294038);border-radius:12px;overflow-wrap:anywhere;user-select:all;font-size:14px;}
+.action-access {max-width:920px;margin:0 auto;}
+.action-access dd {margin-left:0;overflow-wrap:anywhere;}
+.action-access pre {white-space:pre-wrap;overflow-wrap:anywhere;}
+.action-access .connection-permissions {margin:16px 0;}
 .app-category { display: block; max-width: 32rem; margin: 16px 0; }
 .catalog-icon { position: relative; border-radius: 12px; background: #1d3027; font-size: 24px; font-weight: 700; }
 .catalog-icon img { position: absolute; width: 40px; height: 40px; object-fit: contain; background: #101913; }

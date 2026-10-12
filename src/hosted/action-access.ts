@@ -95,7 +95,7 @@ export class ActionAccess {
   },true);
  }
  async issueKey(context:AuthenticatedContext,input:unknown) {
-  const body=parse(z.object({name:z.string().trim().min(1).max(80).optional(),rotateKeyId:uuid.optional(),expiresAt:expiry}).strict().refine(v=>(v.name!==undefined)!==(v.rotateKeyId!==undefined)),input);
+  const body=parse(z.object({name:z.string().trim().min(1).max(80).optional(),principalId:uuid.optional(),rotateKeyId:uuid.optional(),expiresAt:expiry}).strict().refine(v=>[v.name,v.principalId,v.rotateKeyId].filter(value=>value!==undefined).length===1),input);
   const key=`ck_agent_${randomBytes(32).toString('base64url')}`;
   return this.transaction(context,async client=>{
    const workspace=context.membership.workspaceId;
@@ -103,6 +103,11 @@ export class ActionAccess {
    if(body.rotateKeyId) {
     const old=(await client.query<{principal_id:string}>('select principal_id from agent_credentials where workspace_id=$1 and id=$2 and revoked_at is null for update',[workspace,body.rotateKeyId])).rows[0];if(!old)return fail('NOT_FOUND',404);principalId=old.principal_id;
     await client.query('update agent_credentials set revoked_at=now() where workspace_id=$1 and id=$2',[workspace,body.rotateKeyId]);await this.audit(client,context,'key_revoked');
+   } else if(body.principalId) {
+    principalId=body.principalId;
+    await client.query('select pg_advisory_xact_lock(hashtextextended($1,147))',[`${workspace}:${principalId}`]);
+    if(!(await client.query("select p.id from principals p join workspace_memberships m on m.workspace_id=p.workspace_id and m.principal_id=p.id where p.workspace_id=$1 and p.id=$2 and p.kind='agent' and p.active and m.active and m.role='member'",[workspace,principalId])).rowCount)fail('NOT_FOUND',404);
+    if((await client.query('select id from agent_credentials where workspace_id=$1 and principal_id=$2 and revoked_at is null limit 1',[workspace,principalId])).rowCount)fail('KEY_REPLACEMENT_REQUIRED',409);
    } else {principalId=(await client.query<{id:string}>('select create_connector_agent($1) as id',[body.name])).rows[0]?.id??fail('INTERNAL_ERROR',500);}
    const row=(await client.query<{id:string}>('insert into agent_credentials(workspace_id,principal_id,key_hash,expires_at) values($1,$2,$3,$4) returning id',[workspace,principalId,createHash('sha256').update(key).digest('hex'),body.expiresAt])).rows[0];
    await this.audit(client,context,'key_issued');return {id:row?.id,principalId,key,expiresAt:body.expiresAt};
