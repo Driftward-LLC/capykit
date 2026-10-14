@@ -5,6 +5,8 @@ import { sessionFetch, writeRequest, setPublicSignupSession } from "./session.js
 import { discardGitHubReturn, hasGitHubReturn } from "./connections.js";
 import { Apps, discardGoogleReturn } from "./apps.js";
 import { Access } from "./access.js";
+import { ActionAccess } from "./action-access.js";
+import { ActionConsole } from "./actions.js";
 import "./style.css";
 
 interface CurrentUser {
@@ -40,7 +42,7 @@ function callbackError(): string {
 }
 
 function App(): React.ReactElement {
-  const [tab, setTab] = useState(["capabilities", "connections", "access"].includes(new URL(window.location.href).searchParams.get("tab") ?? "") ? new URL(window.location.href).searchParams.get("tab") ?? "capabilities" : "connections");
+  const [tab, setTab] = useState(["capabilities", "connections", "agents", "actions", "access"].includes(new URL(window.location.href).searchParams.get("tab") ?? "") ? new URL(window.location.href).searchParams.get("tab") ?? "capabilities" : "connections");
   const [createFunctionRequest, setCreateFunctionRequest] = useState(0);
   const [githubNotice, setGitHubNotice] = useState("");
   const [email, setEmail] = useState("");
@@ -210,6 +212,11 @@ function App(): React.ReactElement {
 
   const h = React.createElement;
   const disabled = pending !== null;
+  function navigationButton(name: string): React.ReactElement {
+    const label = name === "capabilities" ? "Functions" : name === "connections" ? "Apps" : name === "agents" ? "Agents" : name === "actions" ? "Actions" : "People access";
+    const icon = name === "connections" ? "M3 3h6v6H3z M15 3h6v6h-6z M3 15h6v6H3z M15 15h6v6h-6z" : name === "agents" ? "M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M4 21v-3a5 5 0 0 1 5-5h6a5 5 0 0 1 5 5v3Z" : name === "actions" ? "m13 2-9 12h7l-1 8 10-13h-7Z" : undefined;
+    return h("button", { key: name, type: "button", className: tab === name ? "active" : "", "aria-current": tab === name ? "page" : undefined, onClick: () => { setTab(name); setGitHubNotice(""); const url = new URL(window.location.href); url.searchParams.set("tab", name); if (name !== "connections") url.searchParams.delete("setup"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } }, icon ? h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinejoin: "round", "aria-hidden": true }, h("path", { d: icon })) : null, h("span", null, label));
+  }
   return h("main", { className: "console", "aria-busy": disabled },
     h("header", { className: "app-header" },
       h("span", { className: "wordmark" }, "capykit", h("span", { className: "beta-label" }, "Preview")),
@@ -261,12 +268,15 @@ function App(): React.ReactElement {
       error === "" ? null : h("button", { type: "button", disabled, onClick: () => { void loadIdentity(); } }, "Retry session check"),
     ) : h(React.Fragment, null,
       currentUser.identity.principalKind === "human"
-        ? h(React.Fragment, { key: currentUser.workspace.id },
+        ? h(React.Fragment, { key: `${currentUser.workspace.id}:${currentUser.identity.email}` },
           h("nav", { className: "workspace-nav", "aria-label": "Workspace" },
-            ...(currentUser.workspace.role === "owner" ? ["connections", "capabilities", "access"] : ["connections", "capabilities"]).map((name) => h("button", { key: name, type: "button", className: tab === name ? "active" : "", "aria-current": tab === name ? "page" : undefined, onClick: () => { setTab(name); setGitHubNotice(""); const url = new URL(window.location.href); url.searchParams.set("tab", name); if (name !== "connections") url.searchParams.delete("setup"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } }, name === "capabilities" ? "Functions" : name === "connections" ? "Apps" : "Access")),
+            ...(currentUser.workspace.role === "owner" ? ["connections", "agents", "actions"] : ["connections", "actions"]).map(navigationButton),
           ),
+          h("details", { className: "workspace-tools", open: tab === "capabilities" || tab === "access" }, h("summary", null, currentUser.workspace.role === "owner" ? "Functions & people access" : "Functions"), h("nav", { className: "secondary-nav", "aria-label": "Workspace tools" }, ...(currentUser.workspace.role === "owner" ? ["capabilities", "access"] : ["capabilities"]).map(navigationButton))),
           h("div", { hidden: tab !== "capabilities" }, h(CapabilityLibrary, { createFunctionRequest, onSessionExpired: sessionExpired, manage: currentUser.workspace.role === "owner" })),
-          h("div", { hidden: tab !== "connections" }, h(Apps, { manage:currentUser.workspace.role === "owner", onSessionExpired: sessionExpired, active: tab === "connections", onCreateFunction: () => { setCreateFunctionRequest(value => value + 1); setTab("capabilities"); const url = new URL(window.location.href); url.searchParams.set("tab","capabilities"); url.searchParams.delete("setup"); window.history.replaceState(null,"",`${url.pathname}${url.search}`); } })),
+          h("div", { hidden: tab !== "connections" }, h(Apps, { manage:currentUser.workspace.role === "owner", onSessionExpired: sessionExpired, active: tab === "connections", onManageAgents: () => { setTab("agents"); const url = new URL(window.location.href); url.searchParams.set("tab", "agents"); url.searchParams.delete("setup"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); }, onCreateFunction: () => { setCreateFunctionRequest(value => value + 1); setTab("capabilities"); const url = new URL(window.location.href); url.searchParams.set("tab","capabilities"); url.searchParams.delete("setup"); window.history.replaceState(null,"",`${url.pathname}${url.search}`); } })),
+          currentUser.workspace.role !== "owner" ? null : h("div", { hidden: tab !== "agents" }, h(ActionAccess, { onSessionExpired: sessionExpired, active: tab === "agents", onOpenApps: () => { setTab("connections"); const url = new URL(window.location.href); url.searchParams.set("tab", "connections"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } })),
+          tab === "actions" ? h(ActionConsole, { onSessionExpired: sessionExpired }) : null,
           currentUser.workspace.role !== "owner" ? null : h("div", { hidden: tab !== "access" }, h(Access, { onSessionExpired: sessionExpired, active: tab === "access" })),
         )
         : h("section", { className: "panel", "aria-label": "Capability access" }, h("h1", null, "Your workspace"), h("p", null, "Your account is active. Capability access is currently available to workspace owners. Member and agent access will become available through grants.")),

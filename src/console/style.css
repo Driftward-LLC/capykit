@@ -158,7 +158,8 @@ button.danger { color: #fff; }
 .wordmark { color: #94ecc6; }
 .console { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .workspace-nav { position: fixed; top: auto; bottom: 0; left: 0; right: 0; margin: 0; padding: 10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid #2b3631; border-bottom: none; background: #141d18; z-index: 20; }
-.workspace-nav button { flex: 1; min-height: 52px; color: #b4bdc6; }
+.workspace-nav button { flex: 1; min-width: 0; min-height: 52px; color: #b4bdc6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+.workspace-nav button svg { width: 24px; height: 24px; flex-shrink: 0; }
 .workspace-nav button.active { color: #94ecc6; }
 .apps { max-width: 920px; margin: 0 auto; }
 .apps h1 { font-size: clamp(2rem, 5vw, 2.8rem); }
@@ -203,6 +204,10 @@ button.app-row:hover:enabled { background: #18271f; }
 .connector-actions .connection-back {margin-bottom:16px;}
 .connection-management summary {min-height:44px;cursor:pointer;padding:12px 0;}
 .agent-key {display:block;padding:16px;border:1px solid var(--border,#294038);border-radius:12px;overflow-wrap:anywhere;user-select:all;font-size:14px;}
+.action-access {max-width:920px;margin:0 auto;}
+.action-access dd {margin-left:0;overflow-wrap:anywhere;}
+.action-access pre {white-space:pre-wrap;overflow-wrap:anywhere;}
+.action-access .connection-permissions {margin:16px 0;}
 .app-category { display: block; max-width: 32rem; margin: 16px 0; }
 .catalog-icon { position: relative; border-radius: 12px; background: #1d3027; font-size: 24px; font-weight: 700; }
 .catalog-icon img { position: absolute; width: 40px; height: 40px; object-fit: contain; background: #101913; }
@@ -221,3 +226,56 @@ button.app-row:hover:enabled { background: #18271f; }
 .personal-app hr {border:0;border-top:1px solid #2b3631;margin:24px 0;}
 .personal-app button {min-height:44px;}
 .personal-sharing {margin-top:24px;}
+
+/* Keep the three primary destinations intact; publishing and people are secondary. */
+.workspace-tools { margin: 0 0 24px; border-top: 0; padding: 0; }
+.workspace-tools > summary { width: fit-content; color: #94ecc6; }
+.secondary-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.secondary-nav button { background: #18211e; color: #b4bdc6; border-color: #35463e; overflow-wrap: normal; word-break: normal; white-space: nowrap; }
+.secondary-nav button.active { background: #22362c; color: #94ecc6; }
+
+/* Selected agent follows the approved name → readiness → setup → keys → access hierarchy. */
+.agent-heading h1 { font-size: clamp(2rem, 6vw, 3rem); margin-bottom: 8px; overflow-wrap: anywhere; }
+.agent-heading .connection-back { margin-bottom: 16px; font-size: 1rem; }
+.agent-heading .agent-metadata { margin-bottom: 8px; }
+.agent-verification { display: flex; gap: 14px; align-items: flex-start; margin: 24px 0 16px; padding: 16px; background: #292719; border: 1px solid #504529; border-radius: 14px; }
+.agent-verification p { margin-bottom: 4px; }
+.agent-verification strong, .verification-icon { color: #ffc24c; }
+.verification-icon { flex-shrink: 0; font-size: 1.8rem; line-height: 1.2; }
+.agent-setup { margin-bottom: 24px; padding: 0 16px; border: 1px solid #2d4037; border-radius: 14px; background: #131e19; }
+.agent-setup > summary, .agent-access-card > summary { display: flex; align-items: center; gap: 14px; list-style: none; padding: 16px 0; font-size: 1rem; color: #f5f7f6; }
+.agent-setup > summary::-webkit-details-marker, .agent-access-card > summary::-webkit-details-marker { display: none; }
+.agent-setup > summary > span:not(.setup-icon):not(.disclosure-chevron) { flex: 1; min-width: 0; }
+.agent-setup > summary strong { font-size: 1.15rem; }
+.setup-description { display: block; margin-top: 4px; font-size: .875rem; font-weight: 400; }
+.setup-icon { flex: 0 0 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: #203c30; color: #94ecc6; font-size: 1.5rem; }
+.disclosure-chevron { flex-shrink: 0; margin-left: auto; font-size: 1.8rem; line-height: 1; }
+.agent-setup[open] > summary .disclosure-chevron, .agent-access-card[open] > summary .disclosure-chevron { transform: rotate(90deg); }
+.agent-setup[open] { padding-bottom: 16px; }
+.agent-setup > label { margin: 16px 0; }
+.agent-setup > section { margin-top: 24px; }
+.agent-section { border-top: 1px solid #2d4037; margin-top: 24px; padding-top: 24px; }
+.agent-section > h2 { font-size: 1.5rem; }
+.agent-key-card { padding: 16px; margin-bottom: 12px; border: 1px solid #2d4037; border-radius: 14px; background: #131e19; overflow-wrap: anywhere; }
+.agent-key-heading { display: flex; align-items: center; gap: 12px; padding: 0; list-style: none; }
+.agent-key-heading strong { margin-right: auto; }
+.agent-key-heading::-webkit-details-marker { display: none; }
+.agent-key-heading strong { font-size: 1rem; font-weight: 500; }
+.agent-key-heading .status-badge { flex-shrink: 0; font-size: .8rem; border-radius: 8px; padding: 6px 10px; }
+.agent-key-card > details { border-top: 0; padding: 0; }
+.agent-key-card > .replace-key { width: 100%; margin-top: 8px; }
+.key-help { margin: 16px 0 8px; }
+.agent-access-card { border: 1px solid #2d4037; border-radius: 14px; background: #131e19; padding: 0 16px; margin: 12px 0; }
+.agent-access-copy { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; font-weight: 400; }
+.agent-access-copy strong { font-size: 1.15rem; }
+.agent-access-card[open] { padding-bottom: 16px; }
+.agent-access-card ul { margin: 0; padding-left: 20px; }
+.agent-history { margin-top: 24px; border-top-color: #2d4037; }
+.agent-history > summary { font-size: 1.1rem; color: #f5f7f6; }
+.agent-metadata-note { margin-top: 24px; }
+.action-access .connection-confirm { padding: 16px; border: 1px solid #504529; border-radius: 14px; background: #292719; overflow-wrap: anywhere; }
+@media (min-width: 641px) {
+ .workspace-nav button { flex-direction: row; gap: 10px; }
+ .agent-setup, .agent-key-card, .agent-access-card { padding-left: 20px; padding-right: 20px; }
+ .agent-section { margin-top: 32px; padding-top: 28px; }
+}
