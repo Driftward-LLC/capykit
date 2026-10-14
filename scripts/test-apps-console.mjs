@@ -45,7 +45,7 @@ for(const width of [320,390,430,1440]){
  await page.getByLabel('Issue number').fill('12');await page.getByRole('button',{name:'Test connection',exact:true}).click();await page.getByText('Mobile connection check',{exact:true}).waitFor();
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  await page.screenshot({path:`${evidence}/github-test-${width}.png`,fullPage:true});
- await page.getByRole('button',{name:'← All apps',exact:true}).click();await page.getByRole('button',{name:'＋ Create a function',exact:true}).click();
+ await page.getByRole('button',{name:'← All apps',exact:true}).click();await page.getByRole('button',{name:'Create a function',exact:true}).click();
  await page.getByRole('heading',{name:'Create a capability',exact:true}).waitFor();assert.equal(await page.getByRole('combobox',{name:/^Kind/}).inputValue(),'function');
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  const small=await page.locator('input:not([type="checkbox"]),select,button').evaluateAll(nodes=>nodes.filter(n=>n.getClientRects().length&&getComputedStyle(n).visibility!=='hidden').filter(n=>n.getBoundingClientRect().height<44).map(n=>n.textContent));assert.deepEqual(small,[]);

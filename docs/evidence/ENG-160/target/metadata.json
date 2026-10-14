@@ -1,0 +1,13 @@
+{
+  "fixtureOnly": true,
+  "approvedByHuman": false,
+  "description": "Implementation representative using installed Astryx Neutral 0.7.0; not a human-approved mock",
+  "source": "@astryxdesign/core@0.7.0 README Vite setup and component source; official Neutral theme",
+  "viewports": [
+    375,
+    1440
+  ],
+  "theme": "light",
+  "route": "/",
+  "sha256": "c49142781f4c0a9bd25d72d0d7641b1e4b398fcece210f73ce2eea5c954a42f7"
+}

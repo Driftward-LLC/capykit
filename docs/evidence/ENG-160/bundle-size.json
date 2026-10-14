@@ -1,0 +1,62 @@
+{
+  "baselineRevision": "71b392fd43b10d8ba6a8f4244fd1b628abda6ae7",
+  "method": "Vite 7.3.7 production build; gzip via Python gzip level 9; includes all JS (lazy Tooltip and bootstrap), CSS and WOFF2",
+  "before": {
+    "files": {
+      "index-Dd25H5Ms.js": {
+        "bytes": 351489,
+        "gzipBytes": 104911
+      },
+      "index-W1sPc8lp.css": {
+        "bytes": 18748,
+        "gzipBytes": 4575
+      }
+    },
+    "javascriptBytes": 351489,
+    "javascriptGzipBytes": 104911,
+    "cssBytes": 18748,
+    "cssGzipBytes": 4575,
+    "fontBytes": 0
+  },
+  "after": {
+    "files": {
+      "Tooltip-DBD8EzUS.js": {
+        "bytes": 1778,
+        "gzipBytes": 786
+      },
+      "figtree-latin-ext-wght-normal-DCwSJGxG.woff2": {
+        "bytes": 10280,
+        "gzipBytes": 10303
+      },
+      "figtree-latin-wght-normal-D_ZTVpCC.woff2": {
+        "bytes": 20156,
+        "gzipBytes": 20127
+      },
+      "index-C1ZULxXC.js": {
+        "bytes": 553946,
+        "gzipBytes": 167999
+      },
+      "index-D0s23OUF.css": {
+        "bytes": 232685,
+        "gzipBytes": 39780
+      },
+      "theme-bootstrap.js": {
+        "bytes": 348,
+        "gzipBytes": 259
+      }
+    },
+    "javascriptBytes": 556072,
+    "javascriptGzipBytes": 169044,
+    "cssBytes": 232685,
+    "cssGzipBytes": 39780,
+    "fontBytes": 30436
+  },
+  "delta": {
+    "javascriptBytes": 204583,
+    "javascriptGzipBytes": 64133,
+    "cssBytes": 213937,
+    "cssGzipBytes": 35205,
+    "fontBytes": 30436
+  },
+  "reviewRisk": "Full supplied Astryx CSS adds cost; retain maintained Neutral outputs in this slice, evaluate supported pruning/splitting before ready-for-review."
+}

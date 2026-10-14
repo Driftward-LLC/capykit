@@ -1,0 +1,2 @@
+npm notice run @driftward/capykit@0.1.1 typecheck
+npm notice run tsc --noEmit && tsc -p src/console/tsconfig.json

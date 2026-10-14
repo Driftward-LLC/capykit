@@ -37,6 +37,9 @@ try {
   );
 
   const binRoot = join(installRoot, "node_modules", ".bin");
+  for (const name of ["astryx", "figtree", "lucide"]) {
+    assert.ok((await readFile(join(installRoot, "node_modules/@driftward/capykit/docs", `LICENSE.${name}`), "utf8")).includes("Copyright"), "packaged UI retains upstream license notices");
+  }
   const cliOutput = execFileSync(join(binRoot, `capykit${binSuffix}`), ["--help"], {
     encoding: "utf8",
     shell: process.platform === "win32",
@@ -70,11 +73,28 @@ try {
     try {
       const root = await app.inject({ url: "/" });
       assert.equal(root.statusCode, 200);
-      const assetPath = root.body.match(/src="([^"]+)"/)?.[1];
+      const assetPath = root.body.match(/<script[^>]*type="module"[^>]*src="([^"]+)"/)?.[1];
       assert.ok(assetPath?.startsWith("/assets/"), "installed console must load its built script");
       const asset = await app.inject({ url: assetPath });
       assert.equal(asset.statusCode, 200);
       assert.match(asset.headers["content-type"], /javascript/);
+      const bootstrap = await app.inject({ url: "/assets/theme-bootstrap.js" });
+      assert.equal(bootstrap.statusCode, 200, "packaged console serves its CSP-safe appearance bootstrap");
+      assert.match(bootstrap.headers["content-type"], /javascript/);
+      assert.match(bootstrap.body, /capykit\\.appearance/);
+      assert.match(root.headers["content-security-policy"], /script-src 'self'/);
+      const cssPath = root.body.match(/href="([^\"]+\\.css)"/)?.[1];
+      assert.ok(cssPath, "packaged console includes component and font CSS");
+      const css = await app.inject({ url: cssPath });
+      assert.equal(css.statusCode, 200);
+      const fontPaths = [...new Set(css.body.match(/\\/assets\\/[A-Za-z0-9_-]+\\.woff2/g))];
+      assert.ok(fontPaths.length > 0, "packaged console references self-hosted Figtree");
+      for (const url of fontPaths) {
+        const font = await app.inject({ url });
+        assert.equal(font.statusCode, 200);
+        assert.match(font.headers["content-type"], /font\\/woff2/);
+        assert.equal(font.rawPayload.subarray(0, 4).toString(), "wOF2");
+      }
       assert.equal((await app.inject({ url: "/health/ready" })).statusCode, 503);
     } finally { await app.close(); }
   `, "utf8");

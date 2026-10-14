@@ -7,6 +7,20 @@ import { Apps, discardGoogleReturn } from "./apps.js";
 import { Access } from "./access.js";
 import { ActionAccess } from "./action-access.js";
 import { ActionConsole } from "./actions.js";
+import { Theme } from "@astryxdesign/core/theme";
+import { neutralTheme } from "@astryxdesign/theme-neutral/built";
+import { Button } from "@astryxdesign/core/Button";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Card } from "@astryxdesign/core/Card";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Grid2X2, Users, Zap, CodeXml, ShieldCheck } from "lucide-react";
+import { readAppearance, saveAppearance } from "./theme.js";
+import "./shell.css";
+import "@astryxdesign/core/reset.css";
+import "@astryxdesign/core/astryx.css";
+import "@astryxdesign/theme-neutral/theme.css";
+import "./fonts.css";
 import "./style.css";
 
 interface CurrentUser {
@@ -42,6 +56,7 @@ function callbackError(): string {
 }
 
 function App(): React.ReactElement {
+  const [appearance, setAppearance] = useState(readAppearance);
   const [tab, setTab] = useState(["capabilities", "connections", "agents", "actions", "access"].includes(new URL(window.location.href).searchParams.get("tab") ?? "") ? new URL(window.location.href).searchParams.get("tab") ?? "capabilities" : "connections");
   const [createFunctionRequest, setCreateFunctionRequest] = useState(0);
   const [githubNotice, setGitHubNotice] = useState("");
@@ -214,36 +229,39 @@ function App(): React.ReactElement {
   const disabled = pending !== null;
   function navigationButton(name: string): React.ReactElement {
     const label = name === "capabilities" ? "Functions" : name === "connections" ? "Apps" : name === "agents" ? "Agents" : name === "actions" ? "Actions" : "People access";
-    const icon = name === "connections" ? "M3 3h6v6H3z M15 3h6v6h-6z M3 15h6v6H3z M15 15h6v6h-6z" : name === "agents" ? "M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M4 21v-3a5 5 0 0 1 5-5h6a5 5 0 0 1 5 5v3Z" : name === "actions" ? "m13 2-9 12h7l-1 8 10-13h-7Z" : undefined;
-    return h("button", { key: name, type: "button", className: tab === name ? "active" : "", "aria-current": tab === name ? "page" : undefined, onClick: () => { setTab(name); setGitHubNotice(""); const url = new URL(window.location.href); url.searchParams.set("tab", name); if (name !== "connections") url.searchParams.delete("setup"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } }, icon ? h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinejoin: "round", "aria-hidden": true }, h("path", { d: icon })) : null, h("span", null, label));
+    const icon = name === "connections" ? Grid2X2 : name === "agents" ? Users : name === "actions" ? Zap : name === "capabilities" ? CodeXml : ShieldCheck;
+    return h(Button, { key: name, type: "button", label, variant: tab === name ? "secondary" : "ghost", icon: h(Icon, { icon }), "aria-current": tab === name ? "page" : undefined, onClick: () => { setTab(name); setGitHubNotice(""); const url = new URL(window.location.href); url.searchParams.set("tab", name); if (name !== "connections") url.searchParams.delete("setup"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } });
   }
-  return h("main", { className: "console", "aria-busy": disabled },
+  return h(Theme, { theme: neutralTheme, mode: appearance, children: h("main", { className: "console", "aria-busy": disabled },
     h("header", { className: "app-header" },
-      h("span", { className: "wordmark" }, "capykit", h("span", { className: "beta-label" }, "Preview")),
-      currentUser === null ? null : h("div", { className: "account" }, h("span", null, currentUser.identity.email), h("button", { type: "button", className: "secondary", disabled, onClick: () => { void logout(); } }, pending === "logout" ? "Signing out…" : "Sign out")),
+      h("span", { className: "wordmark" }, "Capykit", h(Badge, { label: "Preview" })),
+      h("div", { className: "header-controls" },
+        h("label", { className: "appearance", htmlFor: "appearance" }, "Appearance", h("select", { id: "appearance", value: appearance, onChange: (event: React.ChangeEvent<HTMLSelectElement>) => { const value = event.currentTarget.value; if (value !== "light" && value !== "dark" && value !== "system") return; setAppearance(value); saveAppearance(value); } }, h("option", { value: "system" }, "System"), h("option", { value: "light" }, "Light"), h("option", { value: "dark" }, "Dark"))),
+        currentUser === null ? null : h("div", { className: "account" }, h("span", null, currentUser.identity.email), h(Button, { type: "button", label: pending === "logout" ? "Signing out…" : "Sign out", isDisabled: disabled, onClick: () => { void logout(); } })),
+      ),
     ),
-    error === "" ? null : h("p", { className: "message error", role: "alert" }, error),
-    githubNotice === "" ? null : h("p", { className: "message", role: "status" }, githubNotice),
-    currentUser === null && !identityResolved ? h("section", { className: "panel sign-in", "aria-label": "Checking your session" },
+    error === "" ? null : h(Banner, { className: "shell-notice", status: "error", role: "alert", title: error }),
+    githubNotice === "" ? null : h(Banner, { className: "shell-notice", status: "info", role: "status", title: githubNotice }),
+    currentUser === null && !identityResolved ? h(Card, { className: "sign-in", role: "region", "aria-label": "Checking your session" },
       h("p", { className: "eyebrow" }, returningFromGitHub ? "GitHub connection" : "Your workspace"),
       h("h1", null, error !== "" ? "Let’s try that again" : returningFromGitHub ? "Returning from GitHub…" : "Opening your workspace…"),
       h("p", { className: "muted", role: "status", "aria-live": "polite" }, error !== "" ? "Your session could not be checked. Retry to continue." : returningFromGitHub ? "Checking your session before continuing GitHub setup." : "Checking your session…"),
-      error === "" ? null : h("button", { type: "button", disabled, onClick: () => { setError(""); void loadIdentity(true); } }, pending === "session" ? "Checking…" : "Retry session check"),
-    ) : currentUser === null ? h("section", { className: "panel sign-in", "aria-label": "Sign in" },
+      error === "" ? null : h(Button, { type: "button", isDisabled: disabled, label: pending === "session" ? "Checking…" : "Retry session check", onClick: () => { setError(""); void loadIdentity(true); } }),
+    ) : currentUser === null ? h(Card, { className: "sign-in", role: "region", "aria-label": "Sign in" },
       h("p", { className: "eyebrow" }, "Your capabilities, together"),
       h("h1", null, "Welcome to Capykit"),
       h("p", { className: "muted", role: "status", "aria-live": "polite" }, status),
       authMethod === "google" ? h(React.Fragment, null,
         h("p", { className: "muted" }, "Create your own workspace. No invitation needed."),
-        googleAvailable ? h("button", { type: "button", disabled, onClick: () => { void continueWithGoogle(); } }, pending === "google" ? "Opening Google…" : "Continue with Google") : h(React.Fragment, null,
-          h("p", { className: "message", role: "status" }, "Google sign-in is temporarily unavailable. Please try again shortly."),
-          h("button", { type: "button", disabled, onClick: () => { void loadIdentity(true); } }, "Try again"),
+        googleAvailable ? h(Button, { type: "button", isDisabled: disabled, variant: "primary", label: pending === "google" ? "Opening Google…" : "Continue with Google", onClick: () => { void continueWithGoogle(); } }) : h(React.Fragment, null,
+          h(Banner, { status: "info", role: "status", title: "Google sign-in is temporarily unavailable. Please try again shortly." }),
+          h(Button, { type: "button", isDisabled: disabled, label: "Try again", onClick: () => { void loadIdentity(true); } }),
         ),
         h("p", { className: "small muted" }, "Sign-in uses your name and email. Connecting Google Drive is a separate step."),
         h("p", { className: "small muted" }, "Stay signed in for 30 days between visits."),
       ) : authMethod === "tailscale" ? h(React.Fragment, null,
         h("p", { className: "small muted" }, "Use your connected Tailscale account. No email code needed."),
-        h("button", { type: "button", disabled, onClick: () => { setError(""); void loadIdentity(true); } }, pending === "session" ? "Opening workspace…" : "Continue with Tailscale"),
+        h(Button, { type: "button", isDisabled: disabled, variant: "primary", label: pending === "session" ? "Opening workspace…" : "Continue with Tailscale", onClick: () => { setError(""); void loadIdentity(true); } }),
       ) : h(React.Fragment, null,
       h("p", { className: "small muted" }, "Stay signed in for 30 days between visits."),
       h("form", { onSubmit: (event) => { void requestCode(event); } },
@@ -253,7 +271,7 @@ function App(): React.ReactElement {
           value: email, disabled,
           onChange: (event) => { setEmail(event.currentTarget.value); setCodeRequested(false); setCode(""); },
         }),
-        h("button", { type: "submit", disabled }, pending === "otp" ? "Sending…" : codeRequested ? "Send a new code" : "Send sign-in code"),
+        h(Button, { type: "submit", isDisabled: disabled, variant: codeRequested ? "secondary" : "primary", label: pending === "otp" ? "Sending…" : codeRequested ? "Send a new code" : "Send sign-in code" }),
       ),
       codeRequested ? h("form", { onSubmit: (event) => { void verifyCode(event); } },
         h("label", { htmlFor: "code" }, "Six-digit sign-in code"),
@@ -262,10 +280,10 @@ function App(): React.ReactElement {
           pattern: "[0-9]{6}", maxLength: 6, minLength: 6, required: true,
           value: code, disabled, onChange: (event) => { setCode(event.currentTarget.value); },
         }),
-        h("button", { type: "submit", disabled }, pending === "verify" ? "Verifying…" : "Sign in"),
+        h(Button, { type: "submit", isDisabled: disabled, variant: "primary", label: pending === "verify" ? "Verifying…" : "Sign in" }),
       ) : null,
       ),
-      error === "" ? null : h("button", { type: "button", disabled, onClick: () => { void loadIdentity(); } }, "Retry session check"),
+      error === "" ? null : h(Button, { type: "button", isDisabled: disabled, label: "Retry session check", onClick: () => { void loadIdentity(); } }),
     ) : h(React.Fragment, null,
       currentUser.identity.principalKind === "human"
         ? h(React.Fragment, { key: `${currentUser.workspace.id}:${currentUser.identity.email}` },
@@ -273,13 +291,13 @@ function App(): React.ReactElement {
             ...(currentUser.workspace.role === "owner" ? ["connections", "agents", "actions"] : ["connections", "actions"]).map(navigationButton),
           ),
           h("details", { className: "workspace-tools", open: tab === "capabilities" || tab === "access" }, h("summary", null, currentUser.workspace.role === "owner" ? "Functions & people access" : "Functions"), h("nav", { className: "secondary-nav", "aria-label": "Workspace tools" }, ...(currentUser.workspace.role === "owner" ? ["capabilities", "access"] : ["capabilities"]).map(navigationButton))),
-          h("div", { hidden: tab !== "capabilities" }, h(CapabilityLibrary, { createFunctionRequest, onSessionExpired: sessionExpired, manage: currentUser.workspace.role === "owner" })),
-          h("div", { hidden: tab !== "connections" }, h(Apps, { manage:currentUser.workspace.role === "owner", onSessionExpired: sessionExpired, active: tab === "connections", onManageAgents: () => { setTab("agents"); const url = new URL(window.location.href); url.searchParams.set("tab", "agents"); url.searchParams.delete("setup"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); }, onCreateFunction: () => { setCreateFunctionRequest(value => value + 1); setTab("capabilities"); const url = new URL(window.location.href); url.searchParams.set("tab","capabilities"); url.searchParams.delete("setup"); window.history.replaceState(null,"",`${url.pathname}${url.search}`); } })),
-          currentUser.workspace.role !== "owner" ? null : h("div", { hidden: tab !== "agents" }, h(ActionAccess, { onSessionExpired: sessionExpired, active: tab === "agents", onOpenApps: () => { setTab("connections"); const url = new URL(window.location.href); url.searchParams.set("tab", "connections"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } })),
-          tab === "actions" ? h(ActionConsole, { onSessionExpired: sessionExpired }) : null,
-          currentUser.workspace.role !== "owner" ? null : h("div", { hidden: tab !== "access" }, h(Access, { onSessionExpired: sessionExpired, active: tab === "access" })),
+          h("div", { className: "legacy-route", hidden: tab !== "capabilities" }, h(CapabilityLibrary, { createFunctionRequest, onSessionExpired: sessionExpired, manage: currentUser.workspace.role === "owner" })),
+          h("div", { className: "legacy-route", hidden: tab !== "connections" }, h(Apps, { manage:currentUser.workspace.role === "owner", onSessionExpired: sessionExpired, active: tab === "connections", onManageAgents: () => { setTab("agents"); const url = new URL(window.location.href); url.searchParams.set("tab", "agents"); url.searchParams.delete("setup"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); }, onCreateFunction: () => { setCreateFunctionRequest(value => value + 1); setTab("capabilities"); const url = new URL(window.location.href); url.searchParams.set("tab","capabilities"); url.searchParams.delete("setup"); window.history.replaceState(null,"",`${url.pathname}${url.search}`); } })),
+          currentUser.workspace.role !== "owner" ? null : h("div", { className: "legacy-route", hidden: tab !== "agents" }, h(ActionAccess, { onSessionExpired: sessionExpired, active: tab === "agents", onOpenApps: () => { setTab("connections"); const url = new URL(window.location.href); url.searchParams.set("tab", "connections"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } })),
+          tab === "actions" ? h("div", { className: "legacy-route" }, h(ActionConsole, { onSessionExpired: sessionExpired })) : null,
+          currentUser.workspace.role !== "owner" ? null : h("div", { className: "legacy-route", hidden: tab !== "access" }, h(Access, { onSessionExpired: sessionExpired, active: tab === "access" })),
         )
-        : h("section", { className: "panel", "aria-label": "Capability access" }, h("h1", null, "Your workspace"), h("p", null, "Your account is active. Capability access is currently available to workspace owners. Member and agent access will become available through grants.")),
+        : h("section", { className: "legacy-route panel", "aria-label": "Capability access" }, h("h1", null, "Your workspace"), h("p", null, "Your account is active. Capability access is currently available to workspace owners. Member and agent access will become available through grants.")),
       h("details", { className: "workspace-details", "aria-label": "Current identity and workspace" }, h("summary", null, "Workspace and account details"),
       h("dl", null,
         h("dt", null, "Signed in as"), h("dd", null, currentUser.identity.email),
@@ -289,7 +307,7 @@ function App(): React.ReactElement {
       ),
       ),
     ),
-  );
+  ) });
 }
 
 createRoot(document.getElementById("root") as HTMLElement).render(React.createElement(App));

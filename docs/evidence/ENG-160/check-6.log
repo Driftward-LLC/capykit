@@ -1,0 +1,4 @@
+npm notice run @driftward/capykit@0.1.1 check:schema
+npm notice run node scripts/test-schema.mjs && node scripts/test-security-policy.mjs
+Schema contract passed: 2 valid fixtures, 8 schema-invalid cases, 6 semantic-invalid cases.
+Security policy contract passed: 93 positive and negative cases.

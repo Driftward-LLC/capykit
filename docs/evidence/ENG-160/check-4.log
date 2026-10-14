@@ -1,0 +1,104 @@
+npm notice run @driftward/capykit@0.1.1 build
+npm notice run tsup && node scripts/build-hosted.mjs && vite build src/console --outDir ../../dist/console --emptyOutDir false
+CLI Building entry: {"core":"src/core/index.ts","cli":"src/cli/index.ts","mcp":"src/mcp/index.ts","schemas":"src/schemas/index.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /opt/data/cache/scratch/capykit-981f6e56315000c9/tsup.config.ts
+CLI Target: node22
+CLI Cleaning output folder
+ESM Build start
+ESM dist/core.js        92.40 KB
+ESM dist/cli.js         112.03 KB
+ESM dist/mcp.js         47.64 KB
+ESM dist/schemas.js     313.00 B
+ESM dist/core.js.map    175.20 KB
+ESM dist/cli.js.map     214.20 KB
+ESM dist/mcp.js.map     162.40 KB
+ESM dist/schemas.js.map 400.00 B
+ESM ⚡️ Build success in 145ms
+DTS Build start
+DTS ⚡️ Build success in 8769ms
+DTS dist/cli.d.ts               270.00 B
+DTS dist/core.d.ts              13.14 KB
+DTS dist/mcp.d.ts               2.01 KB
+DTS dist/schemas.d.ts           181.00 B
+DTS dist/registry-C6FSUSpM.d.ts 5.70 KB
+CLI Building entry: {"hosted-api":"src/hosted/server.ts","hosted-worker":"src/hosted/worker.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /opt/data/cache/scratch/capykit-981f6e56315000c9/tsup.config.ts
+CLI Target: node22
+ESM Build start
+ESM dist/hosted-worker.js     9.45 KB
+ESM dist/hosted-api.js        581.16 KB
+ESM dist/hosted-worker.js.map 16.22 KB
+ESM dist/hosted-api.js.map    1022.76 KB
+ESM ⚡️ Build success in 336ms
+DTS Build start
+DTS ⚡️ Build success in 9880ms
+DTS dist/hosted-api.d.ts    14.34 KB
+DTS dist/hosted-worker.d.ts 291.00 B
+vite v7.3.7 building client environment for production...
+transforming...
+node_modules/@astryxdesign/core/dist/theme/index.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/theme/index.js" was ignored.
+node_modules/@astryxdesign/core/dist/Button/index.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Button/index.js" was ignored.
+node_modules/@astryxdesign/core/dist/Banner/index.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Banner/index.js" was ignored.
+node_modules/@astryxdesign/core/dist/Icon/index.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Icon/index.js" was ignored.
+node_modules/@astryxdesign/core/dist/theme/Theme.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/theme/Theme.js" was ignored.
+node_modules/@astryxdesign/core/dist/theme/MediaTheme.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/theme/MediaTheme.js" was ignored.
+node_modules/@astryxdesign/core/dist/theme/useTheme.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/theme/useTheme.js" was ignored.
+node_modules/@astryxdesign/core/dist/Banner/Banner.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Banner/Banner.js" was ignored.
+node_modules/@astryxdesign/core/dist/Icon/Icon.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Icon/Icon.js" was ignored.
+node_modules/@astryxdesign/core/dist/Icon/useIcon.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Icon/useIcon.js" was ignored.
+node_modules/@astryxdesign/core/dist/Button/Button.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Button/Button.js" was ignored.
+node_modules/lucide-react/dist/esm/context.mjs (2:0): Module level directives cause errors when bundled, "use client" in "node_modules/lucide-react/dist/esm/context.mjs" was ignored.
+node_modules/lucide-react/dist/esm/Icon.mjs (2:0): Module level directives cause errors when bundled, "use client" in "node_modules/lucide-react/dist/esm/Icon.mjs" was ignored.
+node_modules/@astryxdesign/core/dist/hooks/useIsomorphicLayoutEffect.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/hooks/useIsomorphicLayoutEffect.js" was ignored.
+node_modules/@astryxdesign/core/dist/hooks/useAutoMediaMode.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/hooks/useAutoMediaMode.js" was ignored.
+node_modules/@astryxdesign/core/dist/theme/syntax/SyntaxTheme.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/theme/syntax/SyntaxTheme.js" was ignored.
+node_modules/@astryxdesign/core/dist/hooks/useMediaQuery.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/hooks/useMediaQuery.js" was ignored.
+node_modules/@astryxdesign/core/dist/Collapsible/useCollapsible.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Collapsible/useCollapsible.js" was ignored.
+node_modules/@astryxdesign/core/dist/Icon/IconDefaultSizeContext.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Icon/IconDefaultSizeContext.js" was ignored.
+node_modules/@astryxdesign/core/dist/Spinner/index.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Spinner/index.js" was ignored.
+node_modules/@astryxdesign/core/dist/SizeContext/SizeContext.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/SizeContext/SizeContext.js" was ignored.
+node_modules/@astryxdesign/core/dist/ButtonGroup/ButtonGroupContext.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/ButtonGroup/ButtonGroupContext.js" was ignored.
+node_modules/@astryxdesign/core/dist/Tooltip/useTooltip.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Tooltip/useTooltip.js" was ignored.
+node_modules/@astryxdesign/core/dist/hooks/useMergedRefs.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/hooks/useMergedRefs.js" was ignored.
+node_modules/@astryxdesign/core/dist/Link/useLinkComponent.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Link/useLinkComponent.js" was ignored.
+node_modules/@astryxdesign/core/dist/hooks/usePressFeedback.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/hooks/usePressFeedback.js" was ignored.
+node_modules/@astryxdesign/core/dist/Collapsible/CollapsibleGroupContext.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Collapsible/CollapsibleGroupContext.js" was ignored.
+node_modules/@astryxdesign/core/dist/utils/sharedResizeObserver.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/utils/sharedResizeObserver.js" was ignored.
+node_modules/@astryxdesign/core/dist/i18n/InternationalizationProvider.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/i18n/InternationalizationProvider.js" was ignored.
+node_modules/@astryxdesign/core/dist/i18n/useTranslator.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/i18n/useTranslator.js" was ignored.
+node_modules/@astryxdesign/core/dist/i18n/useLocale.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/i18n/useLocale.js" was ignored.
+node_modules/@astryxdesign/core/dist/i18n/useDirection.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/i18n/useDirection.js" was ignored.
+node_modules/@astryxdesign/core/dist/i18n/InternationalizationContext.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/i18n/InternationalizationContext.js" was ignored.
+node_modules/@astryxdesign/core/dist/i18n/useCollator.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/i18n/useCollator.js" was ignored.
+node_modules/@astryxdesign/core/dist/Layer/layerScopedContext.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Layer/layerScopedContext.js" was ignored.
+node_modules/@astryxdesign/core/dist/Layer/useTouchTrigger.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Layer/useTouchTrigger.js" was ignored.
+node_modules/@astryxdesign/core/dist/Layer/useLayerDismissal.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Layer/useLayerDismissal.js" was ignored.
+node_modules/@astryxdesign/core/dist/Layer/useLayer.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Layer/useLayer.js" was ignored.
+node_modules/@astryxdesign/core/dist/Link/LinkContext.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Link/LinkContext.js" was ignored.
+node_modules/@astryxdesign/core/dist/Spinner/Spinner.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Spinner/Spinner.js" was ignored.
+node_modules/@astryxdesign/core/dist/utils/interactionModality.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/utils/interactionModality.js" was ignored.
+node_modules/@astryxdesign/core/dist/Layer/LayerDepthContext.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Layer/LayerDepthContext.js" was ignored.
+node_modules/@astryxdesign/core/dist/Layer/layerStack.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Layer/layerStack.js" was ignored.
+node_modules/@astryxdesign/core/dist/Layer/gestureCounter.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Layer/gestureCounter.js" was ignored.
+node_modules/@astryxdesign/core/dist/Layer/LayerContext.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Layer/LayerContext.js" was ignored.
+node_modules/@astryxdesign/core/dist/Text/useTruncation.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Text/useTruncation.js" was ignored.
+node_modules/@astryxdesign/core/dist/Tooltip/Tooltip.js (3:0): Module level directives cause errors when bundled, "use client" in "node_modules/@astryxdesign/core/dist/Tooltip/Tooltip.js" was ignored.
+✓ 2077 modules transformed.
+rendering chunks...
+computing gzip size...
+../../dist/console/index.html                                             0.51 kB │ gzip:   0.31 kB
+../../dist/console/assets/figtree-latin-ext-wght-normal-DCwSJGxG.woff2   10.28 kB
+../../dist/console/assets/figtree-latin-wght-normal-D_ZTVpCC.woff2       20.16 kB
+../../dist/console/assets/index-D0s23OUF.css                            232.69 kB │ gzip:  41.57 kB
+../../dist/console/assets/Tooltip-DBD8EzUS.js                             1.78 kB │ gzip:   0.79 kB
+../../dist/console/assets/index-C1ZULxXC.js                             553.95 kB │ gzip: 169.20 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.76s
