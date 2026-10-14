@@ -1,0 +1,3 @@
+npm notice run @driftward/capykit@0.1.1 test:package
+npm notice run node scripts/test-package.mjs
+Packed package smoke test passed: CLI, completions, imports, schema asset, installed validator, portable profile, MCP server, hosted console/worker, and standalone artifacts.

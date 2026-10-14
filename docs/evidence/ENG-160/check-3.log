@@ -1,0 +1,66 @@
+npm notice run @driftward/capykit@0.1.1 test
+npm notice run vitest run
+
+ RUN  v3.2.7 /opt/data/cache/scratch/capykit-981f6e56315000c9
+
+ ✓ tests/profiles.test.ts (21 tests) 13499ms
+   ✓ portable environment profiles > inspects without writing, then applies the same portable bundle in two independent environments  938ms
+   ✓ portable environment profiles > reapplies a 512-file bundle and stops before reading a later skill beyond the shared limit  7796ms
+   ✓ portable environment profiles > reapplies a 32 MiB bundle including generated snapshot metadata and rejects one extra byte  2400ms
+   ✓ portable environment profiles > reapplies skills at the accepted nesting limit after adding snapshot parent directories  1105ms
+ ✓ tests/hosted-server.test.ts (31 tests) 1773ms
+ ✓ tests/hosted-artifacts.test.ts (46 tests) 1236ms
+   ✓ hosted artifact size boundaries > accepts exactly 32 MiB per bundle and rejects one extra byte  850ms
+ ✓ tests/hosted-app-connectors.test.ts (6 tests) 1159ms
+   ✓ pinned Activepieces connector transport > executes the real Drive action and rejects mismatched resource data  596ms
+ ✓ tests/connector-actions.test.ts (3 tests) 1032ms
+   ✓ reviewed connector action surface > runs the actual Drive search action for one bounded page, projects metadata and exposes continuation  647ms
+   ✓ reviewed connector action surface > rejects query injection, unknown actions, extra token/URL props and oversized provider pages  339ms
+ ✓ tests/docs-validation.test.ts (3 tests) 961ms
+   ✓ shared Markdown validation > accepts the long command that blocked ENG-149  305ms
+   ✓ shared Markdown validation > still rejects long prose and invalid heading structure  643ms
+ ✓ tests/google-oauth-provisioning.test.ts (10 tests | 1 skipped) 1008ms
+ ✓ tests/piece-catalog.test.ts (3 tests) 626ms
+   ✓ full Activepieces metadata catalog > refreshes reproducibly from metadata without importing executable code and keeps old output after rejection  561ms
+ ✓ tests/registry-sources.test.ts (12 tests) 478ms
+ ✓ tests/hosted-webhook-ingress.test.ts (7 tests) 430ms
+ ✓ tests/profile-cli.test.ts (6 tests) 486ms
+ ✓ tests/registry-loading.test.ts (13 tests) 436ms
+ ✓ tests/mcp.test.ts (22 tests) 398ms
+ ✓ tests/adapters.test.ts (6 tests) 217ms
+ ✓ tests/discovery-flow.test.ts (5 tests) 321ms
+ ✓ tests/registry-doctor.test.ts (3 tests) 232ms
+ ✓ tests/host-discovery.test.ts (3 tests) 285ms
+ ✓ tests/hosted-github.test.ts (21 tests) 178ms
+ ✓ tests/connector-tls.test.ts (1 test) 209ms
+ ✓ tests/container-image.test.ts (3 tests) 106ms
+ ✓ tests/google-sign-in.test.ts (6 tests) 96ms
+ ✓ tests/hosted-github-setup.test.ts (14 tests) 112ms
+ ✓ tests/profile-install.test.ts (11 tests) 94ms
+ ✓ tests/profile-schema.test.ts (84 tests) 77ms
+ ✓ tests/console-session.test.ts (14 tests) 65ms
+ ✓ tests/agent-access-ui.test.ts (3 tests) 44ms
+ ✓ tests/command-availability.test.ts (4 tests) 33ms
+ ✓ tests/hosted-auth.test.ts (12 tests) 53ms
+ ✓ tests/agent-setup.test.ts (9 tests) 18ms
+ ✓ tests/piece-engine.test.ts (3 tests) 17ms
+ ✓ tests/cli.test.ts (11 tests) 10ms
+ ✓ tests/console-theme.test.ts (2 tests) 9ms
+ ✓ tests/personal-connections.test.ts (9 tests | 8 skipped) 6ms
+ ✓ tests/core.test.ts (2 tests) 4ms
+ ✓ tests/hosted-identity.test.ts (3 tests) 10ms
+ ✓ tests/schemas.test.ts (1 test) 4ms
+ ↓ tests/connector-actions-db.test.ts (10 tests | 10 skipped)
+ ↓ tests/hosted-capabilities-api.test.ts (4 tests | 4 skipped)
+ ↓ tests/hosted-capabilities-db.test.ts (8 tests | 8 skipped)
+ ↓ tests/hosted-connections-api.test.ts (16 tests | 16 skipped)
+ ↓ tests/hosted-connections-db.test.ts (14 tests | 14 skipped)
+ ↓ tests/hosted-database.test.ts (6 tests | 6 skipped)
+ ↓ tests/hosted-google-db.test.ts (6 tests | 6 skipped)
+ ↓ tests/hosted-grants.test.ts (7 tests | 7 skipped)
+ ↓ tests/public-signup-db.test.ts (5 tests | 5 skipped)
+
+ Test Files  36 passed | 9 skipped (45)
+      Tests  404 passed | 85 skipped (489)
+   Start at  01:51:53
+   Duration  46.66s (transform 1.75s, setup 0ms, collect 9.23s, tests 25.72s, environment 9ms, prepare 3.58s)

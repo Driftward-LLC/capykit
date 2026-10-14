@@ -1,0 +1,31 @@
+{
+  "local_commands": [
+    {
+      "command": "npm run lint",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run typecheck",
+      "exit_code": 0
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run test:package",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run check:schema",
+      "exit_code": 0
+    }
+  ],
+  "source_head": "5c7dec703422b6d22e0ad28cd095ddadce36b869",
+  "source_head_meaning": "Starting remote HEAD; tested application includes the uncommitted one-line CSS repair.",
+  "buildSha256": "8ec0f421bb2eb2fcc50bf77cc05df2fd2fa5d02d143a089a1f849c17b1b41a4e"
+}

@@ -400,6 +400,7 @@ describe("hosted HTTP boundaries", () => {
     await mkdir(join(directory, "assets"));
     await writeFile(join(directory, "index.html"), '<script type="module" src="/assets/index-test.js"></script>');
     await writeFile(join(directory, "assets/index-test.js"), "document.title = 'Console';");
+    await writeFile(join(directory, "assets/font-test.woff2"), "fixture-font-bytes");
     await writeFile(join(directory, "private.txt"), "SENTINEL_PRIVATE_FILE");
     const { app } = fixture({ consoleDirectory: directory });
     const template = await app.inject({ url: "/auth/email-template" });
@@ -416,7 +417,11 @@ describe("hosted HTTP boundaries", () => {
     const asset = await app.inject({ url: "/assets/index-test.js" });
     expect(asset.statusCode).toBe(200);
     expect(asset.headers["content-type"]).toContain("text/javascript");
-    for (const url of ["/assets/missing.js", "/assets/..%2Fprivate.txt", "/assets/index-test.js.map", "/private.txt"]) {
+    const font = await app.inject({ url: "/assets/font-test.woff2" });
+    expect(font.statusCode).toBe(200);
+    expect(font.headers["content-type"]).toContain("font/woff2");
+    expect(font.body).toBe("fixture-font-bytes");
+    for (const url of ["/assets/missing.js", "/assets/missing.woff2", "/assets/..%2Fprivate.txt", "/assets/..%2Ffont-test.woff2", "/assets/index-test.js.map", "/private.txt"]) {
       const response = await app.inject({ url });
       expect(response.statusCode, url).toBe(404);
       expect(response.body).not.toContain("SENTINEL");

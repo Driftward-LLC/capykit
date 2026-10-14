@@ -188,10 +188,10 @@ export function createHostedServer(deps: ServerDeps = {}): FastifyInstance {
   app.get("/v1/provider-setup/github/callback", serveConsole);
   app.get<{ Params: { file: string } }>("/assets/:file", async (request, reply) => {
     const { file } = request.params;
-    if (!/^[a-zA-Z0-9_-]+\.(?:js|css)$/u.test(file)) return reply.code(404).send(stableError("NOT_FOUND", request.id));
+    if (!/^[a-zA-Z0-9_-]+\.(?:js|css|woff2)$/u.test(file)) return reply.code(404).send(stableError("NOT_FOUND", request.id));
     try {
       const content = await readFile(join(consoleDirectory, "assets", file));
-      return await reply.type(file.endsWith(".js") ? "text/javascript" : "text/css").send(content);
+      return await reply.type(file.endsWith(".js") ? "text/javascript" : file.endsWith(".woff2") ? "font/woff2" : "text/css").send(content);
     } catch (error) {
       if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") return reply.code(404).send(stableError("NOT_FOUND", request.id));
       throw error;

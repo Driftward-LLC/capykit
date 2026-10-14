@@ -1,0 +1,31 @@
+{
+  "local_commands": [
+    {
+      "command": "npm run lint",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run typecheck",
+      "exit_code": 0
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run test:package",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run check:schema",
+      "exit_code": 0
+    }
+  ],
+  "environment": "Node v26.7.0; isolated checkout; no production API or provider accounts",
+  "testLimit": "404 passed, 85 existing environment-gated skipped; database/provider infrastructure not provisioned",
+  "independentReview": false
+}
