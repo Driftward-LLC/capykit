@@ -13,7 +13,7 @@ const origin = 'https://capykit.example.test';
 const baseline = process.env.CAPYKIT_SHELL_BASELINE === '1';
 const contrastOnly = process.env.CAPYKIT_SHELL_CONTRAST_ONLY === '1';
 const phase = baseline ? 'before' : contrastOnly ? 'contrast-repair' : 'after';
-const evidence = resolve(process.env.CAPYKIT_SHELL_EVIDENCE_DIR ?? join(root, 'docs/evidence/ENG-160', phase));
+const evidence = resolve(process.env.CAPYKIT_SHELL_EVIDENCE_DIR ?? join(root, baseline||contrastOnly?'docs/evidence/ENG-160':'docs/evidence/ENG-161/shell', phase));
 const directory = resolve(process.env.CAPYKIT_CONSOLE_DIR ?? join(root, 'dist/console'));
 const privateCsrf = 'fixture-private-csrf-sentinel', publicCsrf = 'fixture-public-csrf-sentinel';
 const results = [], screenshots = [];
@@ -176,18 +176,22 @@ async function destructiveContrastChecks() {
     await activate(page, button(page, 'Disconnect'));
     const confirm = button(page, 'Confirm disconnect');
     await confirm.waitFor(); assert.ok(await confirm.isEnabled());
-    assert.ok(await confirm.evaluate(node => node.matches('.legacy-route button.danger')));
+    await astryxButton(confirm);
+    assert.equal(await confirm.evaluate(node => node.closest('.legacy-route') !== null), false, 'Migrated confirmation must not use legacy control styling.');
     state.contrast = await confirm.evaluate(node => {
       const style = getComputedStyle(node), canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
-      const luminance = color => {
-        ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = color; ctx.fillRect(0, 0, 1, 1);
-        const [r, g, b, alpha] = ctx.getImageData(0, 0, 1, 1).data;
-        if (alpha !== 255) throw new Error('Contrast check requires opaque foreground/background.');
-        const linear = [r, g, b].map(value => { const channel = value / 255; return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4; });
+      const rgba = color => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = color; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data]; };
+      const over = (front, back) => front.slice(0,3).map((value,index)=>value*front[3]/255+back[index]*(1-front[3]/255));
+      // Neutral destructive surfaces can be translucent. Measure their rendered composite,
+      // including the opaque dialog surface, rather than pretending alpha is always 1.
+      const ancestors=[];for(let element=node;element;element=element.parentElement)ancestors.unshift(element);
+      let backgroundRgb=[255,255,255];for(const element of ancestors)backgroundRgb=over(rgba(getComputedStyle(element).backgroundColor),backgroundRgb);
+      const luminance = rgb => {
+        const linear = rgb.map(value => { const channel = value / 255; return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4; });
         return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
       };
-      const foreground = luminance(style.color), background = luminance(style.backgroundColor);
-      return { foreground: style.color, background: style.backgroundColor, fontSize: style.fontSize, opacity: style.opacity, ratio: (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05) };
+      const foreground = luminance(over(rgba(style.color),backgroundRgb)), background = luminance(backgroundRgb);
+      return { foreground: style.color, background: style.backgroundColor, compositedBackgroundRgb:backgroundRgb, fontSize: style.fontSize, opacity: style.opacity, ratio: (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05) };
     });
     assert.equal(state.contrast.opacity, '1');
     assert.ok(state.contrast.ratio >= 4.5, `Enabled destructive text contrast must be >=4.5:1; measured ${state.contrast.ratio}:1 in ${theme}.`);
@@ -362,11 +366,11 @@ async function functionalChecks() {
     test.state.meGate.release(); await appsReady(test.page);
   });
   await check('Apps loading evidence and release', { appsGate: gate(), width: 375 }, async test => {
-    await test.page.getByText('Loading apps…', { exact: true }).filter({ visible: true }).waitFor(); await screenshot(test, 'apps-loading');
+    await (baseline?test.page.getByText('Loading apps…',{exact:true}):test.page.getByRole('status', { name: 'Loading apps…', exact: true })).filter({visible:true}).waitFor(); await screenshot(test, 'apps-loading');
     test.state.appsGate.release(); await appsReady(test.page);
   });
   await check('Apps empty state evidence', { empty: true, width: 375 }, async test => {
-    await appsReady(test.page); await test.page.getByText('No connected apps yet. Choose All apps to explore integrations.', { exact: true }).waitFor(); await screenshot(test, 'apps-empty');
+    await appsReady(test.page); await test.page.getByText(baseline?'No connected apps yet. Choose All apps to explore integrations.':'No connected apps yet', { exact: true }).waitFor(); await screenshot(test, 'apps-empty');
   });
   await check('Apps error evidence and refresh recovery', { appsStatus: 503, width: 375 }, async test => {
     await test.page.locator('.apps').getByRole('alert').waitFor(); await screenshot(test, 'apps-error');

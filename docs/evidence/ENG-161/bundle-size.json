@@ -1,0 +1,72 @@
+{
+  "baselineRevision": "40af07ed2491c0193a47b4b940df3a9e4cc5dd89",
+  "sameInstalledDependencies": true,
+  "viteVersion": "7.3.7",
+  "before": {
+    "js": {
+      "rawBytes": 556072,
+      "gzipBytes": 169039,
+      "files": [
+        "Tooltip-CeDketcm.js",
+        "index-DN61QrSu.js",
+        "theme-bootstrap.js"
+      ]
+    },
+    "css": {
+      "rawBytes": 232702,
+      "gzipBytes": 39778,
+      "files": [
+        "index-Cxa15b12.css"
+      ]
+    },
+    "woff2": {
+      "rawBytes": 30436,
+      "gzipBytes": 30430,
+      "files": [
+        "figtree-latin-ext-wght-normal-DCwSJGxG.woff2",
+        "figtree-latin-wght-normal-D_ZTVpCC.woff2"
+      ]
+    }
+  },
+  "after": {
+    "js": {
+      "rawBytes": 618888,
+      "gzipBytes": 190108,
+      "files": [
+        "ItemSwipeLayer-Bdj6tITB.js",
+        "index-B9eusLQX.js",
+        "theme-bootstrap.js"
+      ]
+    },
+    "css": {
+      "rawBytes": 229114,
+      "gzipBytes": 39095,
+      "files": [
+        "index-D6OUGR-Y.css"
+      ]
+    },
+    "woff2": {
+      "rawBytes": 30436,
+      "gzipBytes": 30430,
+      "files": [
+        "figtree-latin-ext-wght-normal-DCwSJGxG.woff2",
+        "figtree-latin-wght-normal-D_ZTVpCC.woff2"
+      ]
+    }
+  },
+  "delta": {
+    "js": {
+      "rawBytes": 62816,
+      "gzipBytes": 21069
+    },
+    "css": {
+      "rawBytes": -3588,
+      "gzipBytes": -683
+    },
+    "woff2": {
+      "rawBytes": 0,
+      "gzipBytes": 0
+    }
+  },
+  "limits": "Fixture builds only. Existing >500kB chunk warning remains; no production performance claim."
+}

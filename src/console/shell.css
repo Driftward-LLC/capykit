@@ -36,6 +36,52 @@
   .workspace-details dl { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 8px 16px; font-size: .85rem; }
   .workspace-details dt { color: var(--color-text-secondary); }
   .workspace-details dd { margin: 0; overflow-wrap: anywhere; }
+  /* ENG-161: composition only; installed Neutral components own presentation. */
+  .astryx-route { min-width: 0; overflow-wrap: anywhere; }
+  .astryx-route .apps, .astryx-route .action-access { max-width: 920px; margin-inline: auto; }
+  .astryx-route h1 { font-size: clamp(1.8rem, 5vw, 2.5rem); line-height: 1.2; margin-bottom: 12px; }
+  .astryx-route h2 { font-size: 1.4rem; margin-block: 16px 12px; }
+  .astryx-route h3 { font-size: 1.1rem; margin-block: 16px 12px; }
+  .astryx-route p { margin-block: 12px; }
+  .astryx-route .muted { color: var(--color-text-secondary); }
+  .astryx-route .small { font-size: .875rem; }
+  .astryx-route .section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-block: 16px; }
+  .astryx-route .section-heading > div { min-width: 0; }
+  .astryx-route .section-heading > .astryx-button { flex-shrink: 0; }
+  .astryx-route form, .astryx-route .app-row-copy { display: grid; gap: 12px; min-width: 0; }
+  .astryx-route .app-row-copy > .astryx-badge { justify-self: start; }
+  .astryx-route .app-filters { display: flex; flex-wrap: wrap; gap: 12px; margin-block: 16px; }
+  .astryx-route .app-category { max-width: 32rem; margin-block: 16px; }
+  .astryx-route .astryx-card, .astryx-route .astryx-banner { margin-block: 16px; }
+  .astryx-route .astryx-list-item { min-height: 44px; min-width: 0; }
+  .astryx-route .astryx-list button { min-height: 44px; }
+  .astryx-route .astryx-list-item-label, .astryx-route .astryx-list-item-description { white-space: normal; overflow-wrap: anywhere; }
+  .astryx-route .app-icon { width: 40px; height: 40px; flex: 0 0 40px; display: inline-flex; align-items: center; justify-content: center; }
+  .astryx-route .app-icon svg, .astryx-route .app-icon img { width: 32px; height: 32px; object-fit: contain; }
+  .astryx-route .catalog-icon { position: relative; }
+  .astryx-route .catalog-icon img { position: absolute; }
+  .astryx-route .create-function, .astryx-route .catalog-more { width: 100%; margin-block: 24px; }
+  .astryx-route dl { display: grid; grid-template-columns: minmax(0, 100px) minmax(0, 1fr); gap: 8px 16px; margin-block: 16px; font-size: .875rem; }
+  .astryx-route dt { color: var(--color-text-secondary); }
+  .astryx-route dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .astryx-route pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; font-size: .875rem; }
+  .astryx-route summary { min-height: 44px; padding-block: 12px; cursor: pointer; }
+  .astryx-route details { margin-block: 12px; }
+  .astryx-route .agent-key-heading, .astryx-route .agent-setup > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .astryx-route .setup-description { display: block; }
+  .astryx-route .agent-section { margin-block: 24px; }
+  .astryx-route .repository-picker { min-width: 0; max-height: 360px; overflow: auto; margin-block: 16px; }
+  .astryx-route .astryx-checkbox-input, .astryx-route .astryx-checkbox-label { min-height: 44px; }
+  .astryx-route .library-layout { display: grid; gap: 16px; }
+  .astryx-route .connection-progress { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 0; list-style: none; }
+  .astryx-route .actions, .astryx-dialog .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-block: 16px; }
+  .astryx-dialog { overflow-wrap: anywhere; }
+  .astryx-dialog .astryx-button { min-height: 44px; min-width: 44px; }
+  /* Native selects/date/credential constraints stay native inside the documented Field slot. */
+  .astryx-route .astryx-field { min-width: 0; }
+  .astryx-route .capykit-native-control { width: 100%; min-width: 0; min-height: 44px; font: inherit; font-size: 1rem; padding: 10px; }
+  .astryx-route .astryx-field input[type="datetime-local"] { max-width: 100%; }
+  .astryx-route .astryx-text-input input { min-height: 44px; }
   @media (min-width: 641px) {
     .console { padding-inline: 32px; padding-bottom: 48px; }
     .app-header { flex-wrap: nowrap; }

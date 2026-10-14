@@ -6,8 +6,9 @@
 // No traces, HAR, DOM dumps, credentials, or raw request bodies are written/logged.
 // Optional CAPYKIT_AGENT_VISUAL_DIR captures only explicitly credential-free metadata scenarios.
 import assert from 'node:assert/strict';
-import { randomBytes, randomUUID } from 'node:crypto';
-import { access, readFile, readdir, mkdir } from 'node:fs/promises';
+import { randomBytes, randomUUID, createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { access, readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -31,6 +32,10 @@ const labels = {
   test: /^(Test connection|Run owner test|Test as owner|Try in Apps|Open Apps|Open app|Test read-only action)$/i,
 };
 const results = [];
+const screenshots = [];
+const visualOnly = process.env.CAPYKIT_AGENT_VISUAL_ONLY === '1';
+const baseline = process.env.CAPYKIT_AGENT_BASELINE === '1';
+let evidenceMetadata;
 let step = 'startup', browser;
 
 async function exists(path) { return access(path).then(() => true, () => false); }
@@ -66,10 +71,11 @@ async function assets() {
   if (process.env.CAPYKIT_AGENT_SOURCE === '1') {
     const { build } = await import('esbuild');
     const built = await build({ entryPoints: [join(root, 'src/console/main.ts')], bundle: true, write: false,
-      outdir: 'fixture', format: 'esm', platform: 'browser', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent' });
+      loader: { '.woff2': 'file' }, outdir: 'fixture', format: 'esm', platform: 'browser', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent' });
     const html = await readFile(join(root, 'src/console/index.html'), 'utf8');
     const files = new Map(built.outputFiles.map(file => [`/assets/${file.path.split('/').at(-1)}`, Buffer.from(file.contents)]));
-    files.set('/', html.replace(/<script\b[^>]*src=["'][^"']+["'][^>]*><\/script>/u,
+    files.set('/assets/theme-bootstrap.js', await readFile(join(root, 'src/console/public/assets/theme-bootstrap.js')));
+    files.set('/', html.replace(/<script\b[^>]*type="module"[^>]*src=["'][^"']+["'][^>]*><\/script>/u,
       '<link rel="stylesheet" href="/assets/main.css"><script type="module" src="/assets/main.js"></script>'));
     return async path => files.get(path);
   }
@@ -117,7 +123,8 @@ async function check(name, settings, run) {
   const state = fixture(settings);
   const context = await browser.newContext({ viewport: { width: settings.width ?? 1440, height: 900 },
     timezoneId: settings.timezone ?? 'America/Los_Angeles', hasTouch: (settings.width ?? 1440) < 600,
-    serviceWorkers: 'block', acceptDownloads: false });
+    colorScheme: settings.media ?? 'light', reducedMotion: 'reduce', serviceWorkers: 'block', acceptDownloads: false });
+  if(settings.theme) await context.addInitScript(theme=>{localStorage.setItem('capykit.appearance',theme);},settings.theme);
   await context.addCookies([{ name: 'capykit_csrf', value: csrf, url: origin }]);
   await context.addInitScript(() => {
     window.__fixtureClipboard = { fail: false, calls: 0 };
@@ -142,7 +149,7 @@ async function check(name, settings, run) {
       if (path === '/' || path.startsWith('/assets/')) {
         const content = await getAsset(path);
         assert.ok(content, 'Fixture asset missing.');
-        return route.fulfill({ contentType: path === '/' ? 'text/html' : path.endsWith('.css') ? 'text/css' : 'text/javascript', body: content });
+        return route.fulfill({ contentType: path === '/' ? 'text/html' : path.endsWith('.css') ? 'text/css' : path.endsWith('.woff2') ? 'font/woff2' : 'text/javascript', body: content });
       }
       if (path === '/v1/auth/method') return json({ method: 'email', available: true });
       if (path === '/v1/me') return json({ identity: { email: 'owner@example.test', principalKind: 'human' }, workspace: { id: state.id.workspace, role: 'owner' } });
@@ -151,7 +158,9 @@ async function check(name, settings, run) {
       if (path === '/v1/grants' && request.method() === 'GET') return json({ grants: [], nextCursor: null });
       if (path === '/v1/actions') return json({ actions: state.actions });
       if (path === '/v1/action-access') {
+        if(state.accessGate) await state.accessGate.promise;
         if (state.failRefresh) return json({ error: { code: 'FIXTURE_UNAVAILABLE' } }, 503);
+        if(state.emptyAgents) return json({ recipients: [], keys: [], grants: [], actions: [] });
         return json({ recipients: state.recipients, keys: state.keys, grants: state.grants, actions: state.actions });
       }
       if (path === '/v1/agents/keys' && request.method() === 'POST') {
@@ -194,8 +203,13 @@ async function check(name, settings, run) {
         assert.ok(item); item.status = 'revoked'; return route.fulfill({ status: 204 });
       }
       const connection = { id: state.id.connection, status: 'active', account: { login: 'Fixture GitHub', id: '1', type: 'Organization' }, installationId: '1', repositories: [{ id: '101', fullName: 'fixture/first', url: 'https://github.com/fixture/first' }, { id: '102', fullName: 'fixture/second', url: 'https://github.com/fixture/second' }], permissions: { issues: 'read', metadata: 'read' }, consentAt: fixedNow.toISOString(), updatedAt: fixedNow.toISOString(), createdAt: fixedNow.toISOString() };
-      if (path === '/v1/apps') return json({ apps: [{ id: 'github', name: 'GitHub', configured: true, connected: true, supportedInCapykit: true, categories: [], actionCount: 1, triggerCount: 0, description: 'Read-only issue metadata.' }, { id: 'google-drive', name: 'Google Drive', configured: true, connected: true, supportedInCapykit: true, categories: [], actionCount: 1, triggerCount: 0, description: 'Read-only file metadata.' }], github: [connection], google: { configured: true, connection: { status: 'active', email: 'fixture@example.test' } }, personalEnabled: state.personal === true });
+      if (path === '/v1/apps') {
+        if(state.appsGate) await state.appsGate.promise;
+        if(state.appsError) return json({error:{code:'UNAVAILABLE'}},503);
+        return json({ apps: state.emptyApps?[]:[{ id: 'github', name: 'GitHub', configured: true, connected: true, supportedInCapykit: true, categories: [], actionCount: 1, triggerCount: 0, description: 'Read-only issue metadata.' }, { id: 'google-drive', name: 'Google Drive', configured: !state.unconfiguredDrive, connected: !state.reconnectDrive&&!state.unconfiguredDrive, supportedInCapykit: true, categories: [], actionCount: 1, triggerCount: 0, description: 'Read-only file metadata.' }], github: [connection], google: { configured: !state.unconfiguredDrive, connection: state.unconfiguredDrive?null:{ status: state.reconnectDrive?'reconnect_required':'active', email: 'fixture@example.test' } }, personalEnabled: state.personal === true });
+      }
       if (path === '/v1/connections') return json({ configured: true, setup: null, connections: [connection], installationUrl: 'https://github.com/apps/fixture/installations/new' });
+      if(path===`/v1/connections/${state.id.connection}`&&request.method()==='GET') return json(connection);
       if (path === '/v1/connections/personal') return json({ connections: [state.id.personal,...(state.multiplePersonal?[state.id.otherPersonal]:[])].map(id=>({id,appId:'github',name:`Fixture personal ${id.slice(0,8)}`,personal:true,status:'active',version:'fixture'})) });
       if (path === '/v1/apps/github/connection-schema') return json({ methods: [{ index: 0, type: 'NO_AUTH', name: 'Fixture', description: '', fields: [], ready: true }] });
       if ([state.id.personal,state.id.otherPersonal].some(id=>path===`/v1/connections/personal/${id}/actions`)) return json({ actions: [{ name: 'getIssueInformation', displayName: 'Get issue information', description: 'Reviewed read-only fixture action', shareable: true, fields: [] }] });
@@ -223,20 +237,20 @@ async function check(name, settings, run) {
     }
   });
   try {
-    await page.goto(origin + '/?tab=' + (settings.app ? `connections&app=${settings.app}` : 'agents'));
+    await page.goto(origin + (settings.route ?? '/?tab=' + (settings.app ? `connections&app=${settings.app}` : 'agents')));
     const nav = page.getByRole('navigation', { name: 'Workspace', exact: true });
     step = 'wait Agents navigation';
     await button(nav, /^Agents$/).waitFor();
-    assert.equal(new URL(page.url()).searchParams.get('tab'), settings.app ? 'connections' : 'agents');
+    if(!settings.raw) assert.equal(new URL(page.url()).searchParams.get('tab'), settings.app ? 'connections' : 'agents');
     if (settings.app) await page.locator('summary').filter({ hasText: /^Who can use this app\?$/ }).click();
     const panel = visible(page.locator('.action-access'));
     step = 'wait agent management panel';
-    await panel.waitFor();
+    if(!settings.raw) await panel.waitFor();
     step = 'wait existing agent choices';
-    await panel.getByRole('combobox', { name: labels.agent }).waitFor();
+    if(!settings.raw) await panel.getByRole('combobox', { name: labels.agent }).waitFor();
     step = 'wait agent metadata idle';
-    await page.waitForFunction(() => document.querySelector('.action-access')?.getAttribute('aria-busy') === 'false');
-    await run({ page, panel, state, context });
+    if(!settings.raw) await page.waitForFunction(() => document.querySelector('.action-access')?.getAttribute('aria-busy') === 'false');
+    await run({ page, panel, state, context, settings });
     verifyWrites(state);
     results.push({ name, passed: true, fixtureOnly: true });
   } catch (error) {
@@ -245,7 +259,7 @@ async function check(name, settings, run) {
     const assertion = error instanceof assert.AssertionError || (settings.personal && state.sentinels.length === 0) ? error.message.split('\n')[0].replace(/ck_agent_[A-Za-z0-9_-]{43}/gu, '[redacted]') : undefined;
     results.push({ name, passed: false, fixtureOnly: true, step, violations: state.violations, requestPaths: state.requests.map(r => `${r.method} ${r.path}`), error: error instanceof assert.AssertionError ? 'assertion' : error.name === 'TimeoutError' ? 'timeout' : 'fixture-error', ...(assertion ? { assertion } : {}) });
   } finally {
-    state.keyGate?.resolve(); state.grantGate?.resolve(); await context.close();
+    state.keyGate?.resolve(); state.grantGate?.resolve(); state.accessGate?.resolve(); state.appsGate?.resolve(); await context.close();
   }
 }
 let getAsset;
@@ -364,11 +378,117 @@ async function reconcile(test) {
   assert.ok(test.state.requests.filter(request => request.path === '/v1/action-access').length > reads);
   assert.equal(keyPosts(test.state).length + grantPosts(test.state).length, before, 'Reconciliation must never replay a mutation.');
 }
+async function visualGeometry(page) {
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal document overflow.');
+  const invalid=await page.locator('button,[role="button"],input,select,summary').filter({visible:true}).evaluateAll(nodes=>nodes.filter(node=>{
+    const box=node.getBoundingClientRect(),label=node.labels?.[0],target=node.matches('input[type="checkbox"],input[type="radio"]')&&label?label.getBoundingClientRect():box;
+    return target.height<44||target.width<44||box.left < -1||box.right>innerWidth+1;
+  }).length);
+  assert.equal(invalid,0,'Interactive targets must be >=44px and in bounds.');
+}
+async function capture(test,name) {
+  const {page,state,settings}=test,dir=process.env.CAPYKIT_AGENT_VISUAL_DIR;
+  assert.ok(dir,'Set CAPYKIT_AGENT_VISUAL_DIR for retained evidence.');
+  // A reveal uses sentinel keys only. Never retain their bytes, even in screenshots.
+  assert.equal(await page.evaluate(values=>values.some(value=>document.documentElement.textContent.includes(value)),state.sentinels),false);
+  await page.evaluate(()=>document.fonts.ready);
+  await mkdir(dir,{recursive:true});
+  const file=`${name}-${settings.width??375}-${settings.theme??'system'}.png`;
+  const fields=page.locator('input,textarea');
+  // Full-page pixel masks can drift when focused inputs scroll. Redact the fixture
+  // DOM values for capture only; never rely on a rectangle hiding the secret.
+  const originals=state.sentinels.length?await fields.evaluateAll(nodes=>nodes.map(node=>node.value)):null;
+  if(originals)await fields.evaluateAll(nodes=>{for(const node of nodes){node.value='[REDACTED FIXTURE VALUE]';if(node instanceof HTMLInputElement&&['text','password','search'].includes(node.type))node.setSelectionRange(0,0);}});
+  try{await page.screenshot({path:join(dir,file),fullPage:true});}
+  finally{if(originals)await fields.evaluateAll((nodes,values)=>{nodes.forEach((node,index)=>{node.value=values[index];});},originals);}
+  if(state.sentinels.length)await secretPresent(page,state,true);
+  screenshots.push({file,route:new URL(page.url()).pathname+new URL(page.url()).search,viewport:page.viewportSize(),theme:settings.theme??'system',mediaPreference:settings.media??'light',fixtureOnly:true,credentialValuesRedacted:state.sentinels.length>0,redactionMethod:state.sentinels.length?'DOM input values replaced for capture only; restored after screenshot':null,buildSha256:evidenceMetadata.buildSha256});
+}
+async function visualChecks() {
+  assert.notEqual(process.env.CAPYKIT_AGENT_SOURCE,'1','Visual proof must use built Vite assets.');
+  await mkdir(process.env.CAPYKIT_AGENT_VISUAL_DIR,{recursive:true});
+  const directory=resolve(process.env.CAPYKIT_CONSOLE_DIR??join(root,'dist/console'));
+  const files=['index.html',...(await readdir(join(directory,'assets'))).sort().map(name=>`assets/${name}`)];
+  const hash=createHash('sha256'),assetHashes={};
+  for(const file of files){const bytes=await readFile(join(directory,file));hash.update(file);hash.update(bytes);assetHashes[file]=createHash('sha256').update(bytes).digest('hex');}
+  evidenceMetadata={phase:baseline?'before':'after',revision:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),revisionMeaning:'HEAD identifies repository revision; buildSha256 identifies exact served Vite bytes including any uncommitted implementation.',buildSha256:hash.digest('hex'),assetHashes,browserVersion:browser.version(),nodeVersion:process.version,astryxVersion:'0.7.0',fixtureOnly:true,liveBackendVerified:false,providerVerified:false,physicalDeviceVerified:false,independentReview:false,implementationModel:'gpt-6.1-sol',pluginRevision:'08359024b405bf92afc3b4624675415384b67e5a',screenshots};
+  for(const width of baseline?[375,1440]:[320,375,430,1440]) for(const theme of ['light','dark']) {
+    await check(`Visual Agents list/detail ${width} ${theme}`,{width,theme},async test=>{
+      if(!baseline){await visualGeometry(test.page);assert.ok(await test.panel.locator('.astryx-list').count());}
+      await capture(test,'agents-list');await chooseAgent(test,'b');await unknownReadiness(test.panel);
+      await visualGeometry(test.page);await capture(test,'agents-detail');
+      await openSetup(test.panel);await visualGeometry(test.page);
+      if(!baseline&&width===375){await capture(test,'agents-setup');
+        const rotate=button(test.panel,/^Replace this key$/).first();await rotate.focus();await test.page.keyboard.press('Enter');
+        const dialog=test.page.getByRole('dialog',{name:'Replace this exact key?'});await dialog.waitFor();
+        const cancel=button(dialog,/^Cancel$/);await cancel.focus();await test.page.keyboard.press('Escape');
+        await dialog.waitFor({state:'hidden'});assert.ok(await rotate.evaluate(node=>document.activeElement===node),'Escape restores the exact trigger.');
+        await test.page.keyboard.press('Enter');await visualGeometry(test.page);await capture(test,'exact-key-dialog');
+        await button(dialog,/^Confirm exact key replacement$/).click();await button(test.panel,labels.saved).waitFor();
+        await secretPresent(test.page,test.state,true);await visualGeometry(test.page);await capture(test,'one-time-key-masked');
+        await acknowledge(test);await unknownReadiness(test.panel);assert.equal(keyPosts(test.state).length,1);
+      }
+    });
+    await check(`Visual Apps list/search/account ${width} ${theme}`,{width,theme,raw:true,route:'/?tab=connections'},async test=>{
+      const {page}=test;await page.getByRole('status').filter({hasText:'matching integrations'}).waitFor();await visualGeometry(page);await capture(test,'apps-list');
+      const search=page.getByLabel('Search apps',{exact:true});await search.fill('Google');
+      await page.getByRole('status').filter({hasText:'1 matching integrations'}).waitFor();await button(page,/^Google Drive.*Connected/s).click();
+      await page.getByRole('heading',{name:'Connected account',exact:true}).waitFor();await visualGeometry(page);await capture(test,'drive-account');
+      if(!baseline){const disconnect=button(page,/^Disconnect$/);await disconnect.focus();await page.keyboard.press('Enter');const dialog=page.getByRole('dialog',{name:'Disconnect Google Drive',exact:true});await dialog.waitFor();
+        await button(dialog,/^Keep connected$/).focus();await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});assert.ok(await disconnect.evaluate(node=>document.activeElement===node));}
+      assert.ok(test.state.requests.every(r=>['GET','HEAD'].includes(r.method)),'Search/open/cancel must not mutate.');
+    });
+  }
+  if(baseline)return;
+  for(const theme of ['light','dark']) {
+    await check(`Visual GitHub confirmation focus restore ${theme}`,{width:375,theme,raw:true,route:'/?tab=connections&app=github'},async test=>{
+      const {page}=test;await page.locator('.connection-management > summary').click();
+      await page.getByRole('navigation',{name:'Connections',exact:true}).getByRole('button',{name:/Fixture GitHub/}).click();
+      const detail=page.getByRole('region',{name:'Connection details',exact:true});await detail.waitFor();
+      for(const [label,name,cancel]of [['Disconnect','Disconnect GitHub','Cancel'],['Review and reconnect','Review and reconnect GitHub','Keep current connection']]){
+        const trigger=button(detail,new RegExp(`^${label}$`));await trigger.focus();await page.keyboard.press('Enter');
+        const dialog=page.getByRole('dialog',{name,exact:true});await dialog.waitFor();await visualGeometry(page);await capture(test,`github-${label==='Disconnect'?'disconnect':'reconnect'}-dialog`);
+        await button(dialog,new RegExp(`^${cancel}$`)).focus();await page.keyboard.press('Space');await dialog.waitFor({state:'hidden'});
+        assert.ok(await trigger.evaluate(node=>document.activeElement===node),'Cancelling restores the original GitHub trigger.');
+      }
+      assert.ok(test.state.requests.every(r=>['GET','HEAD'].includes(r.method)));
+    });
+    await check(`Visual personal confirmation focus and exact sharing ${theme}`,{width:375,theme,raw:true,route:'/?tab=connections&app=github',personal:true},async test=>{
+      const {page}=test,personal=page.getByRole('region',{name:'GitHub personal connections',exact:true});await personal.waitFor();
+      const trigger=button(personal,/^Disconnect$/);await trigger.focus();await page.keyboard.press('Enter');const dialog=page.getByRole('dialog',{name:'Disconnect personal account',exact:true});await dialog.waitFor();
+      await capture(test,'personal-disconnect-dialog');await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});assert.ok(await trigger.evaluate(node=>document.activeElement===node));
+      await personalReview(test);await visualGeometry(page);await capture(test,'personal-exact-sharing');
+      assert.ok(test.state.requests.every(r=>['GET','HEAD'].includes(r.method)));
+    });
+    for(const route of ['agents','connections']) for(const state of ['empty','error','loading']) {
+      const settings={width:375,theme,raw:true,route:`/?tab=${route}`,...route==='agents'?state==='empty'?{emptyAgents:true}:state==='error'?{failRefresh:true}:{accessGate:deferred()}:state==='empty'?{emptyApps:true}:state==='error'?{appsError:true}:{appsGate:deferred()}};
+      await check(`Visual ${route} ${state} ${theme}`,settings,async test=>{
+        const scope=route==='agents'?test.panel:test.page.locator('.apps');
+        if(state==='loading')await scope.getByRole('status',{name:route==='agents'?'Loading agent metadata…':'Loading apps…',exact:true}).waitFor();
+        else if(state==='error')await scope.getByRole('alert').waitFor();
+        else await scope.getByText(route==='agents'?'No agent identities in the current metadata.':'No connected apps yet',{exact:true}).waitFor();
+        await visualGeometry(test.page);await capture(test,`${route}-${state}`);
+        if(state==='loading'){test.state.accessGate?.resolve();test.state.appsGate?.resolve();}
+        if(state==='error'){test.state.failRefresh=false;test.state.appsError=false;await button(test.page,route==='agents'?labels.refresh:/^Refresh apps$/).click();}
+      });
+    }
+    for(const unavailable of [false,true])await check(`Visual Drive ${unavailable?'not configured':'reconnect'} ${theme}`,{width:375,theme,raw:true,route:'/?tab=connections&app=google-drive',unconfiguredDrive:unavailable,reconnectDrive:!unavailable},async test=>{
+      const heading=test.page.getByRole('heading',{name:unavailable?'Google Drive isn’t available yet':'Reconnect Google Drive',exact:true});await heading.waitFor();
+      await visualGeometry(test.page);await capture(test,unavailable?'drive-unavailable':'drive-reconnect');assert.equal(keyPosts(test.state).length,0);
+    });
+  }
+  for(const media of ['light','dark'])await check(`Visual system appearance follows ${media}`,{width:375,theme:'system',media},async test=>{
+    await visualGeometry(test.page);assert.equal(await test.page.locator('html').getAttribute('data-theme'),null);
+    await capture(test,`system-${media}`);await test.page.emulateMedia({colorScheme:media==='light'?'dark':'light'});
+    await unknownReadiness(test.panel);
+  });
+}
 async function main() {
   const { chromium } = await loadPlaywright();
   getAsset = await assets();
   const executablePath = await chromiumPath();
   browser = await chromium.launch({ ...(executablePath ? { executablePath } : {}), headless: true, args: ['--no-sandbox'] });
+  if(visualOnly){await visualChecks();return;}
   await check('Agents route and owner entry point', {}, async ({ page }) => {
     step = 'Agents navigation is current';
     assert.equal(await page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', { name: 'Agents', exact: true }).getAttribute('aria-current'), 'page');
@@ -663,13 +783,13 @@ async function main() {
       assert.equal(test.state.personalGrants.length,0);
       const reads=test.state.requests.filter(r=>r.path===readPath).length;
       const personal=await reopenPersonal(test);
-      await personal.getByRole('status').filter({hasText:'Sharing request pending'}).waitFor();
+      await personal.getByRole('status',{name:/Sharing request pending/}).waitFor();
       await button(personal,/^Share an action$/).click();
       assert.equal(test.state.requests.filter(r=>r.path===readPath).length,reads,'A pre-commit read must not unlock a pending write.');
       assert.equal(await button(personal,/^Share action$/).count(),0);
       assert.equal(mutations(test.state,path).length,1);
       test.state.grantGate.resolve();
-      await personal.getByRole('status').filter({hasText:'Sharing request pending'}).waitFor({state:'hidden'});
+      await personal.getByRole('status',{name:/Sharing request pending/}).waitFor({state:'hidden'});
       await button(personal,/^Share an action$/).click();
       await personal.getByLabel('User or agent',{exact:true}).waitFor();
       assert.equal(mutations(test.state,path).length,1);
@@ -694,12 +814,12 @@ async function main() {
     await personal.getByLabel('Account',{exact:true}).selectOption(test.state.id.otherPersonal);
     const other=await personalReview(test);assert.ok(await other.submit.isEnabled(),'Unrelated accounts must not inherit the pending grant.');
     await personal.getByLabel('Account',{exact:true}).selectOption(test.state.id.personal);
-    await personal.getByRole('status').filter({hasText:'Sharing request pending'}).waitFor();
+    await personal.getByRole('status',{name:/Sharing request pending/}).waitFor();
     await button(personal,/^Share an action$/).click();
     assert.equal(await button(personal,/^Share action$/).count(),0);
     assert.equal(mutations(test.state,`/v1/connections/personal/${test.state.id.personal}/grants`).length,1);
     test.state.grantGate.resolve();
-    await personal.getByRole('status').filter({hasText:'Sharing request pending'}).waitFor({state:'hidden'});
+    await personal.getByRole('status',{name:/Sharing request pending/}).waitFor({state:'hidden'});
   });
   for(const [outcome,message] of [['FORBIDDEN','You no longer have permission'],['CONNECTION_INACTIVE','Refresh and reconnect'],['CSRF_REQUIRED','Reload the page to refresh your session']]){
     await check(`Personal definite ${outcome} preserves actionable denial without uncertainty`,{app:'github',personal:true,grantResponse:outcome},async test=>{
@@ -778,9 +898,9 @@ async function main() {
       const geometry = await test.page.evaluate(() => {
         const controls = [...document.querySelectorAll('button,input,select,summary')].filter(node => node.getClientRects().length && getComputedStyle(node).visibility !== 'hidden');
         return { overflow: document.documentElement.scrollWidth > innerWidth, outside: controls.filter(node => { const box = node.getBoundingClientRect(); return box.left < -1 || box.right > innerWidth + 1; }).length,
-          small: controls.filter(node => { const box = node.getBoundingClientRect(); const label = node.closest('label'); const target = node.matches('input[type="checkbox"],input[type="radio"]') && label ? label.getBoundingClientRect() : box; return target.height < 44 || target.width < 44; }).length };
+          small: controls.filter(node => { const box = node.getBoundingClientRect(); const label = node.closest('label') ?? node.labels?.[0]; const target = node.matches('input[type="checkbox"],input[type="radio"]') && label ? label.getBoundingClientRect() : box; return target.height < 44 || target.width < 44; }).length };
       });
-      assert.deepEqual(geometry, { overflow: false, outside: 0, small: 0 });
+      assert.deepEqual(geometry, { overflow: false, outside: 0, small: 0 }, JSON.stringify(geometry));
       if (width < 600) {
         await fields.repository.tap(); assert.equal(await fields.repository.isChecked(), false);
         await fields.repository.tap(); await fields.consent.tap();
@@ -800,6 +920,9 @@ try {
 } finally {
   await browser?.close();
   const passed = results.length > 0 && results.every(result => result.passed);
-  console.log(JSON.stringify({ fixtureOnly: true, liveBackendVerified: false, passed, results }, null, 2));
+  const report={...evidenceMetadata,fixtureOnly:true,liveBackendVerified:false,passed,results};
+  if(process.env.CAPYKIT_AGENT_VISUAL_DIR&&visualOnly)await writeFile(join(process.env.CAPYKIT_AGENT_VISUAL_DIR,'metadata.json'),JSON.stringify(report,null,2)+'\n');
+  if(process.env.CAPYKIT_AGENT_EVIDENCE_FILE)await writeFile(process.env.CAPYKIT_AGENT_EVIDENCE_FILE,JSON.stringify(report,null,2)+'\n');
+  console.log(JSON.stringify(report, null, 2));
   if (!passed) process.exitCode = 1;
 }
