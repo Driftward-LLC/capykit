@@ -11,8 +11,9 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const origin = 'https://capykit.example.test';
 const baseline = process.env.CAPYKIT_SHELL_BASELINE === '1';
-const phase = baseline ? 'before' : 'after';
-const evidence = join(root, 'docs/evidence/ENG-160', phase);
+const contrastOnly = process.env.CAPYKIT_SHELL_CONTRAST_ONLY === '1';
+const phase = baseline ? 'before' : contrastOnly ? 'contrast-repair' : 'after';
+const evidence = resolve(process.env.CAPYKIT_SHELL_EVIDENCE_DIR ?? join(root, 'docs/evidence/ENG-160', phase));
 const directory = resolve(process.env.CAPYKIT_CONSOLE_DIR ?? join(root, 'dist/console'));
 const privateCsrf = 'fixture-private-csrf-sentinel', publicCsrf = 'fixture-public-csrf-sentinel';
 const results = [], screenshots = [];
@@ -95,7 +96,7 @@ async function check(name, settings, run) {
       if (path === '/v1/apps' || path === '/v1/apps/catalog') {
         if (state.appsGate) await state.appsGate.promise;
         if (state.appsStatus !== 200) return json({ error: { code: state.appsStatus === 401 ? 'AUTHENTICATION_REQUIRED' : 'FIXTURE_UNAVAILABLE' } }, state.appsStatus);
-        return json({ apps: state.empty ? [] : [{ id: 'github', name: 'GitHub', configured: true, connected: false, supportedInCapykit: true, categories: [], actionCount: 1, triggerCount: 0, description: 'Read-only issue metadata.' }, { id: 'google-drive', name: 'Google Drive', configured: false, connected: false, supportedInCapykit: true, categories: [], actionCount: 1, triggerCount: 0, description: 'Read-only file metadata.' }], github: [], google: { configured: false, connection: null }, personalEnabled: false });
+        return json({ apps: state.empty ? [] : [{ id: 'github', name: 'GitHub', configured: true, connected: false, supportedInCapykit: true, categories: [], actionCount: 1, triggerCount: 0, description: 'Read-only issue metadata.' }, { id: 'google-drive', name: 'Google Drive', configured: Boolean(state.connectedDrive), connected: Boolean(state.connectedDrive), supportedInCapykit: true, categories: [], actionCount: 1, triggerCount: 0, description: 'Read-only file metadata.' }], github: [], google: { configured: Boolean(state.connectedDrive), connection: state.connectedDrive ? { status: 'active', email: 'fixture@example.test' } : null }, personalEnabled: false });
       }
       if (path === '/v1/capabilities') return json({ capabilities: [] });
       if (path === '/v1/access/options') return json({ users: [], connections: [], versions: [], truncated: false });
@@ -112,7 +113,7 @@ async function check(name, settings, run) {
     await run(test);
     assert.deepEqual(await page.evaluate(() => window.__fixtureCspViolations), [], 'Hosted CSP must not block bootstrap, components, or self-hosted fonts.');
     assert.deepEqual(state.violations, [], 'Runtime/network violations');
-    results.push({ name, passed: true, fixture: fixtureMetadata(settings), requestPaths: state.requests.map(r => `${r.method} ${r.path}`) });
+    results.push({ name, passed: true, fixture: fixtureMetadata(settings), ...(state.contrast ? { contrast: state.contrast } : {}), requestPaths: state.requests.map(r => `${r.method} ${r.path}`) });
   } catch (error) {
     // Fixtures have only sentinel identities. Keep errors concise; no DOM/trace/raw body capture.
     results.push({ name, passed: false, fixture: fixtureMetadata(settings), error: error.message.split('\n')[0], violations: state.violations, requestPaths: state.requests.map(r => `${r.method} ${r.path}`) });
@@ -165,6 +166,36 @@ async function shellGeometry(page) {
   await noOverflow(page);
   const invalid = await page.locator('.app-header button,.app-header select,.workspace-nav button,.sign-in button,.sign-in input').filter({ visible: true }).evaluateAll(nodes => nodes.map(node => ({ label: node.getAttribute('aria-label') || node.textContent || node.id, box: node.getBoundingClientRect() })).filter(({ box }) => box.width < 44 || box.height < 44 || box.left < -1 || box.right > innerWidth + 1).map(({ label }) => label.trim()));
   assert.deepEqual(invalid, [], 'Shell controls must be in-bounds with at least 44px targets.');
+}
+async function destructiveContrastChecks() {
+  for (const theme of ['light', 'dark']) await check(`Enabled destructive confirmation contrast ${theme}`, { theme, connectedDrive: true, width: 375 }, async test => {
+    const { page, state } = test;
+    await appsReady(page); await themeReady(page, theme);
+    await page.locator('.app-row').filter({ hasText: 'Google Drive' }).click();
+    await page.getByRole('heading', { name: 'Connected account', exact: true }).waitFor();
+    await activate(page, button(page, 'Disconnect'));
+    const confirm = button(page, 'Confirm disconnect');
+    await confirm.waitFor(); assert.ok(await confirm.isEnabled());
+    assert.ok(await confirm.evaluate(node => node.matches('.legacy-route button.danger')));
+    state.contrast = await confirm.evaluate(node => {
+      const style = getComputedStyle(node), canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+      const luminance = color => {
+        ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = color; ctx.fillRect(0, 0, 1, 1);
+        const [r, g, b, alpha] = ctx.getImageData(0, 0, 1, 1).data;
+        if (alpha !== 255) throw new Error('Contrast check requires opaque foreground/background.');
+        const linear = [r, g, b].map(value => { const channel = value / 255; return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4; });
+        return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+      };
+      const foreground = luminance(style.color), background = luminance(style.backgroundColor);
+      return { foreground: style.color, background: style.backgroundColor, fontSize: style.fontSize, opacity: style.opacity, ratio: (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05) };
+    });
+    assert.equal(state.contrast.opacity, '1');
+    assert.ok(state.contrast.ratio >= 4.5, `Enabled destructive text contrast must be >=4.5:1; measured ${state.contrast.ratio}:1 in ${theme}.`);
+    await noOverflow(page); await screenshot(test, `google-drive-confirm-disconnect-${theme}`);
+    await activate(page, button(page, 'Keep connected'));
+    assert.equal(await confirm.count(), 0);
+    assert.ok(state.requests.every(request => ['GET', 'HEAD'].includes(request.method)), 'Opening/cancelling confirmation must not submit a destructive action.');
+  });
 }
 async function functionalChecks() {
   for (const theme of ['light', 'dark']) await check(`Public Google initiation ${theme} (provider page fixture only)`, { signedIn: false, method: 'google', oauthFixture: true, route: '/', theme, width: 375 }, async test => {
@@ -385,7 +416,7 @@ try {
     const installed = JSON.parse(await readFile(join(root, 'node_modules/@astryxdesign/core/package.json'), 'utf8'));
     assert.equal(installed.version, '0.7.0'); metadata.astryxVersion = installed.version;
   }
-  for (const width of [320, 375, 430, 1440]) for (const theme of baseline ? ['legacy'] : ['light', 'dark']) {
+  if (!contrastOnly) for (const width of [320, 375, 430, 1440]) for (const theme of baseline ? ['legacy'] : ['light', 'dark']) {
     const settings = { width, ...(baseline ? {} : { theme }) }, suffix = baseline ? `${width}` : `${width}-${theme}`;
     await check(`${phase.toUpperCase()} Apps ${suffix}`, settings, async test => {
       await appsReady(test.page); await shellGeometry(test.page); await themeReady(test.page, theme);
@@ -396,8 +427,11 @@ try {
       if (!baseline || [1440, 375].includes(width)) await screenshot(test, `sign-in-${suffix}`);
     });
   }
-  await functionalChecks();
-  if (!baseline) await appearanceChecks();
+  if (!contrastOnly) await functionalChecks();
+  if (!baseline) {
+    if (!contrastOnly) await appearanceChecks();
+    await destructiveContrastChecks();
+  }
 } catch (error) { results.push({ name: 'harness readiness', passed: false, error: error.message }); }
 finally {
   await browser.close();

@@ -1,0 +1,99 @@
+{
+  "phase": "contrast-repair",
+  "revision": "5c7dec703422b6d22e0ad28cd095ddadce36b869",
+  "revisionMeaning": "Repository HEAD; build SHA identifies exact built bytes including uncommitted source",
+  "disabledChecks": [],
+  "buildSha256": "03b6d1a093dc144c07b9f08e7f50e36128f1d568834eb3e40f1d5a43f75f0648",
+  "capturedAt": "2026-10-14T14:51:27.492Z",
+  "fixtureOnly": true,
+  "liveApiVerified": false,
+  "providerVerified": false,
+  "physicalDeviceVerified": false,
+  "independentReview": false,
+  "pluginRevision": "08359024b405bf92afc3b4624675415384b67e5a",
+  "assets": [
+    "/",
+    "/assets/theme-bootstrap.js",
+    "/assets/index-C1ZULxXC.js",
+    "/assets/index-D0s23OUF.css",
+    "/assets/Tooltip-DBD8EzUS.js",
+    "/assets/figtree-latin-ext-wght-normal-DCwSJGxG.woff2",
+    "/assets/figtree-latin-wght-normal-D_ZTVpCC.woff2"
+  ],
+  "results": [
+    {
+      "name": "Enabled destructive confirmation contrast light",
+      "passed": true,
+      "fixture": {
+        "theme": "light",
+        "connectedDrive": true,
+        "width": 375
+      },
+      "contrast": {
+        "foreground": "rgb(255, 255, 255)",
+        "background": "rgb(118, 0, 12)",
+        "fontSize": "16px",
+        "opacity": "1",
+        "ratio": 11.826859886371434
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-C1ZULxXC.js",
+        "GET /assets/index-D0s23OUF.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/actions"
+      ]
+    },
+    {
+      "name": "Enabled destructive confirmation contrast dark",
+      "passed": false,
+      "fixture": {
+        "theme": "dark",
+        "connectedDrive": true,
+        "width": 375
+      },
+      "error": "Enabled destructive text contrast must be >=4.5:1; measured 1.5117144702215695:1 in dark.",
+      "violations": [],
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-C1ZULxXC.js",
+        "GET /assets/index-D0s23OUF.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/actions"
+      ]
+    }
+  ],
+  "browserVersion": "156.0.8078.4",
+  "fixtureDefaults": {
+    "origin": "https://capykit.example.test",
+    "signedIn": true,
+    "method": "email",
+    "role": "owner",
+    "kind": "human",
+    "media": "light",
+    "sentinelCookiesOnly": true,
+    "cookieNames": [
+      "capykit_csrf",
+      "capykit_public_csrf"
+    ]
+  },
+  "astryxVersion": "0.7.0",
+  "passed": false,
+  "screenshotRetention": "Red-run screenshots were generated in scratch and are not retained in the repository."
+}

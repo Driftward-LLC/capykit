@@ -111,3 +111,58 @@ review. It proves an isolated fixture/browser path only: no deployment,
 production session, real provider authorization, or physical-device pass.
 The referenced verification plugin revision is
 `08359024b405bf92afc3b4624675415384b67e5a`.
+
+## PR #81 contrast repair — October 14, 2026
+
+The only application change pairs the shared `button.danger` error fill with
+`var(--color-on-error)` instead of fixed white. Installed Neutral 0.7.0 defines
+that semantic foreground for both themes. Audited consumers are exact-key
+replacement/revocation and action-grant revocation (`action-access.ts`), workspace
+Google Drive disconnect (`apps.ts`), GitHub disconnect/discard (`connections.ts`),
+personal-account disconnect (`personal-app.ts`), capability deletion (`library.ts`)
+and function/skill grant revocation (`access.ts`). They inherit the same scoped
+selector through the existing `main.ts` legacy-route wrappers; no route, consent,
+CSRF, owner/tenant, provider credential or one-time-key logic changed.
+
+The new regression opens actual built Apps → connected Google Drive → Disconnect
+at 375px, checks the enabled 16px Confirm disconnect's computed opaque colors and
+WCAG contrast ≥4.5:1 in light and dark, then keyboard-cancels. It never submits
+the confirmation; both scenarios assert only GET/HEAD requests. Traffic remains
+intercepted fixture traffic, with synthetic account metadata and sentinel cookies.
+
+- [Red results](contrast-repair/red-results.json): the original build fails dark
+  contrast at 1.5117144702:1; light passes at 11.8268598864:1.
+- [Repaired results and screenshot provenance](contrast-repair/metadata.json):
+  dark is `rgb(17, 17, 17)` on `rgb(255, 196, 190)` at 12.4911557947:1;
+  light remains white on `rgb(118, 0, 12)` at 11.8268598864:1. Both pass.
+- Credential-free [dark confirmation](contrast-repair/google-drive-confirm-disconnect-dark.png)
+  and [light confirmation](contrast-repair/google-drive-confirm-disconnect-light.png).
+- [Full shell browser rerun](contrast-repair/full-browser-results.json): 51/51
+  scenarios pass, including the two new contrast checks. Full-run screenshots
+  were generated in scratch; only the two focused repair screenshots are added.
+  Original BEFORE, target and AFTER artifacts are preserved.
+- [Existing agent-safety rerun](contrast-repair/agent-safety-results.json): 47/47
+  fixture scenarios pass, retaining exact-consent, one-time-key disposal and
+  ambiguous-write coverage.
+- [Repository verification](contrast-repair/local-validation.json): `npm run lint`,
+  `npm run typecheck`, `npm test`, `npm run build`, `npm run test:package` and
+  `npm run check:schema` all exit 0. Unit results remain 404 passed / 85
+  environment-gated skips. Runtime: Node v26.7.0, npm 11.19.0, Chromium 156.0.8078.4.
+
+The starting remote HEAD is `5c7dec703422b6d22e0ad28cd095ddadce36b869`.
+Metadata records that HEAD while the one-line CSS repair was uncommitted;
+it does not claim a clean-head build. Exact repaired served-byte SHA-256 is
+`8ec0f421bb2eb2fcc50bf77cc05df2fd2fa5d02d143a089a1f849c17b1b41a4e`.
+The red-run served-byte checksum matches the original AFTER checksum above.
+This repair was implemented by GPT-6.1 Sol, with no additional reviewer invoked.
+Independent Astra pass 2 remains the coordinating session's gate. No production,
+real-provider, physical-device, merge or deployment verification is claimed.
+
+Reproduce the focused repair after `npm run build`:
+
+```sh
+CAPYKIT_SHELL_CONTRAST_ONLY=1 node scripts/test-astryx-shell.mjs
+```
+
+`CAPYKIT_SHELL_EVIDENCE_DIR` can redirect a full rerun to an isolated scratch
+directory without overwriting the original AFTER artifacts.

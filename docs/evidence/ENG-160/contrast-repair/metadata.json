@@ -1,0 +1,151 @@
+{
+  "phase": "contrast-repair",
+  "revision": "5c7dec703422b6d22e0ad28cd095ddadce36b869",
+  "revisionMeaning": "Repository HEAD; build SHA identifies exact built bytes including uncommitted source",
+  "disabledChecks": [],
+  "buildSha256": "8ec0f421bb2eb2fcc50bf77cc05df2fd2fa5d02d143a089a1f849c17b1b41a4e",
+  "capturedAt": "2026-10-14T14:55:13.345Z",
+  "fixtureOnly": true,
+  "liveApiVerified": false,
+  "providerVerified": false,
+  "physicalDeviceVerified": false,
+  "independentReview": false,
+  "pluginRevision": "08359024b405bf92afc3b4624675415384b67e5a",
+  "assets": [
+    "/",
+    "/assets/theme-bootstrap.js",
+    "/assets/index-DN61QrSu.js",
+    "/assets/index-Cxa15b12.css",
+    "/assets/Tooltip-CeDketcm.js",
+    "/assets/figtree-latin-ext-wght-normal-DCwSJGxG.woff2",
+    "/assets/figtree-latin-wght-normal-D_ZTVpCC.woff2"
+  ],
+  "results": [
+    {
+      "name": "Enabled destructive confirmation contrast light",
+      "passed": true,
+      "fixture": {
+        "theme": "light",
+        "connectedDrive": true,
+        "width": 375
+      },
+      "contrast": {
+        "foreground": "rgb(255, 255, 255)",
+        "background": "rgb(118, 0, 12)",
+        "fontSize": "16px",
+        "opacity": "1",
+        "ratio": 11.826859886371434
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-DN61QrSu.js",
+        "GET /assets/index-Cxa15b12.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/actions"
+      ]
+    },
+    {
+      "name": "Enabled destructive confirmation contrast dark",
+      "passed": true,
+      "fixture": {
+        "theme": "dark",
+        "connectedDrive": true,
+        "width": 375
+      },
+      "contrast": {
+        "foreground": "rgb(17, 17, 17)",
+        "background": "rgb(255, 196, 190)",
+        "fontSize": "16px",
+        "opacity": "1",
+        "ratio": 12.491155794670231
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-DN61QrSu.js",
+        "GET /assets/index-Cxa15b12.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/actions"
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "contrast-repair/google-drive-confirm-disconnect-light.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "light",
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "theme": "light",
+        "connectedDrive": true,
+        "width": 375
+      },
+      "buildSha256": "8ec0f421bb2eb2fcc50bf77cc05df2fd2fa5d02d143a089a1f849c17b1b41a4e",
+      "revision": "5c7dec703422b6d22e0ad28cd095ddadce36b869"
+    },
+    {
+      "file": "contrast-repair/google-drive-confirm-disconnect-dark.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "dark",
+        "bodyBackground": "rgb(27, 27, 27)",
+        "bodyColor": "rgb(255, 255, 255)"
+      },
+      "fixture": {
+        "theme": "dark",
+        "connectedDrive": true,
+        "width": 375
+      },
+      "buildSha256": "8ec0f421bb2eb2fcc50bf77cc05df2fd2fa5d02d143a089a1f849c17b1b41a4e",
+      "revision": "5c7dec703422b6d22e0ad28cd095ddadce36b869"
+    }
+  ],
+  "browserVersion": "156.0.8078.4",
+  "fixtureDefaults": {
+    "origin": "https://capykit.example.test",
+    "signedIn": true,
+    "method": "email",
+    "role": "owner",
+    "kind": "human",
+    "media": "light",
+    "sentinelCookiesOnly": true,
+    "cookieNames": [
+      "capykit_csrf",
+      "capykit_public_csrf"
+    ]
+  },
+  "astryxVersion": "0.7.0",
+  "passed": true
+}

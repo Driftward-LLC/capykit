@@ -127,7 +127,7 @@ a { color: var(--color-accent); text-underline-offset: 3px; }
 
 /* Apps use the approved vertical list on phones and larger screens. */
 button { color: var(--color-on-accent); border-radius: 12px; }
-button.danger { color: #fff; }
+button.danger { color: var(--color-on-error); }
 .message.success { background: var(--color-success-muted); color: var(--color-accent); border-color: var(--color-border-green); }
 .message.error { background: var(--color-error-muted); color: var(--color-error); border-color: var(--color-border-red); }
 .apps { max-width: 920px; margin: 0 auto; }
