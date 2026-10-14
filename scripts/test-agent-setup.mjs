@@ -3,10 +3,11 @@
 // CAPYKIT_AGENT_SOURCE=1 bundles current source in memory instead of reading dist/console.
 // Existing scripts' CAPYKIT_PLAYWRIGHT_MODULE / CAPYKIT_CHROMIUM_PATH overrides are supported.
 // Labels are centralized below; selectors use roles, actual UUID option values and native forms.
-// No traces, HAR, screenshots, DOM dumps, credentials, or raw request bodies are written/logged.
+// No traces, HAR, DOM dumps, credentials, or raw request bodies are written/logged.
+// Optional CAPYKIT_AGENT_VISUAL_DIR captures only explicitly credential-free metadata scenarios.
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { access, readFile, readdir } from 'node:fs/promises';
+import { access, readFile, readdir, mkdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -87,7 +88,7 @@ async function completed(promise) {
   finally { clearTimeout(timer); }
 }
 function fixture(settings) {
-  const id = Object.fromEntries(['workspace', 'a', 'b', 'noKey', 'owner', 'a1', 'a2', 'b1', 'ga', 'gb', 'connection', 'otherConnection', 'personal'].map(name => [name, randomUUID()]));
+  const id = Object.fromEntries(['workspace', 'a', 'b', 'noKey', 'owner', 'a1', 'a2', 'b1', 'ga', 'gb', 'connection', 'otherConnection', 'personal', 'otherPersonal'].map(name => [name, randomUUID()]));
   const expiresAt = new Date(fixedNow.getTime() + 30 * 86400000).toISOString();
   const repositories = [{ id: '101', name: 'fixture/first' }, { id: '102', name: 'fixture/second' }];
   const actions = [{ id: 'github.get-issue.v1', app: 'github', name: 'Get an issue', description: 'Read-only issue metadata.', fields: [{ key: 'issueNumber', name: 'Issue number', description: '', required: true, type: 'number' }], connections: [{ id: id.connection, name: 'Fixture GitHub', repositories }, { id: id.otherConnection, name: 'Other fixture GitHub', repositories: [{ id: '103', name: 'fixture/third' }] }] },
@@ -195,15 +196,21 @@ async function check(name, settings, run) {
       const connection = { id: state.id.connection, status: 'active', account: { login: 'Fixture GitHub', id: '1', type: 'Organization' }, installationId: '1', repositories: [{ id: '101', fullName: 'fixture/first', url: 'https://github.com/fixture/first' }, { id: '102', fullName: 'fixture/second', url: 'https://github.com/fixture/second' }], permissions: { issues: 'read', metadata: 'read' }, consentAt: fixedNow.toISOString(), updatedAt: fixedNow.toISOString(), createdAt: fixedNow.toISOString() };
       if (path === '/v1/apps') return json({ apps: [{ id: 'github', name: 'GitHub', configured: true, connected: true, supportedInCapykit: true, categories: [], actionCount: 1, triggerCount: 0, description: 'Read-only issue metadata.' }, { id: 'google-drive', name: 'Google Drive', configured: true, connected: true, supportedInCapykit: true, categories: [], actionCount: 1, triggerCount: 0, description: 'Read-only file metadata.' }], github: [connection], google: { configured: true, connection: { status: 'active', email: 'fixture@example.test' } }, personalEnabled: state.personal === true });
       if (path === '/v1/connections') return json({ configured: true, setup: null, connections: [connection], installationUrl: 'https://github.com/apps/fixture/installations/new' });
-      if (path === '/v1/connections/personal') return json({ connections: [{ id: state.id.personal, appId: 'github', name: 'Fixture personal account', personal: true, status: 'active', version: 'fixture' }] });
+      if (path === '/v1/connections/personal') return json({ connections: [state.id.personal,...(state.multiplePersonal?[state.id.otherPersonal]:[])].map(id=>({id,appId:'github',name:`Fixture personal ${id.slice(0,8)}`,personal:true,status:'active',version:'fixture'})) });
       if (path === '/v1/apps/github/connection-schema') return json({ methods: [{ index: 0, type: 'NO_AUTH', name: 'Fixture', description: '', fields: [], ready: true }] });
-      if (path === `/v1/connections/personal/${state.id.personal}/actions`) return json({ actions: [{ name: 'getIssueInformation', displayName: 'Get issue information', description: 'Reviewed read-only fixture action', shareable: true, fields: [] }] });
-      if (path === `/v1/connections/personal/${state.id.personal}/sharing`) return json({ recipients: state.recipients, grants: state.personalGrants });
+      if ([state.id.personal,state.id.otherPersonal].some(id=>path===`/v1/connections/personal/${id}/actions`)) return json({ actions: [{ name: 'getIssueInformation', displayName: 'Get issue information', description: 'Reviewed read-only fixture action', shareable: true, fields: [] }] });
+      if ([state.id.personal,state.id.otherPersonal].some(id=>path===`/v1/connections/personal/${id}/sharing`)) return json({ recipients: state.recipients, grants: path.includes(state.id.personal)?state.personalGrants:[] });
       if (path === `/v1/connections/personal/${state.id.personal}/grants` && request.method() === 'POST') {
-        const grant = { id: randomUUID(), recipientId: body.recipientId, actionName: body.actionName, expiresAt: body.expiresAt, revokedAt: null };
-        state.personalGrants.push(grant); state.grantStarted.resolve();
+        if(['FORBIDDEN','CONNECTION_INACTIVE','CSRF_REQUIRED'].includes(state.grantResponse)){state.grantStarted.resolve();return json({error:{code:state.grantResponse}},403);}
+        state.grantStarted.resolve();
         if (state.grantGate) await state.grantGate.promise;
+        if(state.grantResponse==='uncommitted')return route.abort('failed');
+        const grant = { id: randomUUID(), recipientId: body.recipientId, actionName: body.actionName, expiresAt: body.expiresAt, revokedAt: null };
+        state.personalGrants.push(grant);
         if (state.grantResponse === 'ambiguous') return route.abort('failed');
+        if (state.grantResponse === 'server-error') return json({error:{code:'UNAVAILABLE'}},503);
+        if (state.grantResponse === 'timeout') return json({error:{code:'REQUEST_TIMEOUT'}},408);
+        if (state.grantResponse === 'malformed') return json({},201);
         return json({ id: grant.id }, 201);
       }
       if (path === `/v1/actions/github.get-issue.v1/run` || path === '/v1/apps/github/test') {
@@ -243,6 +250,7 @@ async function check(name, settings, run) {
 }
 let getAsset;
 async function reach(panel, find) {
+  await openSetup(panel);
   for (let count = 0; count < 5; count++) {
     const target = find();
     if (await target.count()) return target;
@@ -254,6 +262,7 @@ async function reach(panel, find) {
   assert.fail('Expected setup control was not reached.');
 }
 async function chooseAgent({ panel, state }, identity = 'a') {
+  await openSetup(panel);
   step = 'select existing agent by UUID';
   const existing = button(panel, labels.existing);
   if (await existing.count()) await existing.first().click();
@@ -266,6 +275,23 @@ async function chooseAgent({ panel, state }, identity = 'a') {
   assert.notEqual(a.text, b.text, 'Duplicate names must be disambiguated with stable identity metadata.');
   assert.ok(a.text.includes(state.id.a) || a.text.includes(state.id.a.slice(0, 8)), 'The agent ID must be visible.');
   await choice.first().selectOption(state.id[identity]);
+}
+async function openSetup(panel) {
+  const setup=panel.locator('.agent-setup');
+  if(await setup.count() && !(await setup.evaluate(node=>node.open)))await setup.locator(':scope > summary').click();
+}
+async function personalReview(test) {
+  const personal=visible(test.page.locator('.personal-app'));
+  await button(personal,/^Share an action$/).click();
+  await personal.getByLabel('User or agent',{exact:true}).selectOption(test.state.id.a);
+  await personal.getByLabel('Action',{exact:true}).selectOption('getIssueInformation');
+  await personal.getByRole('checkbox',{name:/^I approve this exact personal/}).check();
+  return {personal,submit:button(personal,/^Share action$/)};
+}
+async function reopenPersonal(test) {
+  await button(test.page,/^← All apps$/).click();
+  await button(test.page,/^GitHub.*Connected/s).first().click();
+  return visible(test.page.locator('.personal-app'));
 }
 async function createAgent({ panel }, name = 'Fixture new agent') {
   step = 'select new identity';
@@ -372,11 +398,12 @@ async function main() {
   await check('Expired and revoked metadata stay in collapsed history with exact recovery controls', {}, async test => {
     test.state.keys[0].status = 'expired'; test.state.keys[1].status = 'revoked';
     await reconcile(test); await chooseAgent(test);
-    const summary = test.panel.locator('summary').filter({ hasText: /^Inactive key history$/ });
+    const summary = test.panel.locator('summary').filter({ hasText: /^Key history$/ });
     const history = summary.locator('..');
     assert.equal(await history.getAttribute('open'), null);
     await summary.click();
     assert.equal(await button(history, /^Replace this key$/).count(), 1);
+    for(const detail of await history.locator('.agent-key-card > details > summary').all())await detail.click();
     assert.ok((await history.innerText()).includes(test.state.id.a1));
     assert.ok((await history.innerText()).includes(test.state.id.a2));
     await unknownReadiness(test.panel);
@@ -389,7 +416,7 @@ async function main() {
     const matching = controls.filter({ hasText: test.state.id.a1 });
     let rotate = matching;
     if (!(await rotate.count())) {
-      const card = visible(test.panel.locator('article,li,[data-key-id]')).filter({ hasText: test.state.id.a1 });
+      const card = visible(test.panel.locator(`[data-key-id="${test.state.id.a1}"]`));
       rotate = button(card, /Rotate(?: key)?|Replace this key/i);
     }
     assert.equal(await rotate.count(), 1, 'Rotation controls must identify the full exact key ID.');
@@ -522,6 +549,7 @@ async function main() {
     await chooseAgent(test); await approveGrant(test);
     step = 'identity switch resets consent';
     await chooseAgent(test, 'b');
+    await openSetup(test.panel);
     assert.equal(await visible(test.panel.getByRole('combobox', { name: /^Action$/i })).inputValue(), '');
     assert.equal(await visible(test.panel.getByRole('combobox', { name: /^Connected account$/i })).inputValue(), '');
     assert.equal(await test.panel.getByRole('checkbox', { checked: true }).count(), 0);
@@ -566,6 +594,7 @@ async function main() {
   }
   await check('Workspace and personal MCP examples use placeholders and distinct exact tools', {}, async test => {
     await chooseAgent(test, 'noKey');
+    await openSetup(test.panel);
     step = 'placeholder-only client configuration';
     const details = visible(test.panel.getByRole('button', { name: /Client setup|Connect client|MCP setup|Connection instructions/i }));
     if (await details.count()) await details.first().click();
@@ -589,6 +618,8 @@ async function main() {
   });
   await check('App access retains grant metadata after provider availability disappears', { app: 'github' }, async test => {
     await chooseAgent(test); test.state.actions = []; await reconcile(test);
+    await openSetup(test.panel);
+    for(const card of await test.panel.locator('.agent-access-card > summary').all())await card.click();
     const text = await test.panel.innerText();
     assert.ok(text.includes(test.state.id.ga)); assert.ok(text.includes('Unavailable account'));
     assert.ok(text.includes('No workspace actions available'));
@@ -611,7 +642,7 @@ async function main() {
       await consent.check(); await button(personal, /^7 days$/).click(); assert.equal(await consent.isChecked(), false);
       await consent.check();
       await submit.evaluate(node => { const form = node.closest('form'); form.requestSubmit(); form.requestSubmit(); });
-      await completed(test.state.grantStarted.promise); assert.equal(test.state.personalGrants.length, 1);
+      await completed(test.state.grantStarted.promise); assert.equal(test.state.personalGrants.length, 0);
       test.state.grantGate.resolve();
       if (ambiguous) {
         await personal.getByRole('alert').first().waitFor(); assert.ok(await submit.isDisabled());
@@ -624,8 +655,82 @@ async function main() {
       assert.ok(await test.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     });
   }
+  for(const outcome of ['ok','ambiguous','uncommitted']) {
+    await check(`Personal pending ${outcome} survives actual All apps navigation before commit`,{app:'github',personal:true,grantGate:deferred(),grantResponse:outcome},async test=>{
+      step='pending grant then All apps and reopen';
+      const {submit}=await personalReview(test);await submit.click();await completed(test.state.grantStarted.promise);
+      const path=`/v1/connections/personal/${test.state.id.personal}/grants`,readPath=`/v1/connections/personal/${test.state.id.personal}/sharing`;
+      assert.equal(test.state.personalGrants.length,0);
+      const reads=test.state.requests.filter(r=>r.path===readPath).length;
+      const personal=await reopenPersonal(test);
+      await personal.getByRole('status').filter({hasText:'Sharing request pending'}).waitFor();
+      await button(personal,/^Share an action$/).click();
+      assert.equal(test.state.requests.filter(r=>r.path===readPath).length,reads,'A pre-commit read must not unlock a pending write.');
+      assert.equal(await button(personal,/^Share action$/).count(),0);
+      assert.equal(mutations(test.state,path).length,1);
+      test.state.grantGate.resolve();
+      await personal.getByRole('status').filter({hasText:'Sharing request pending'}).waitFor({state:'hidden'});
+      await button(personal,/^Share an action$/).click();
+      await personal.getByLabel('User or agent',{exact:true}).waitFor();
+      assert.equal(mutations(test.state,path).length,1);
+      if(outcome==='uncommitted'){
+        await personal.getByRole('alert').filter({hasText:'Grant outcome unknown'}).waitFor();
+        assert.ok(await personal.getByLabel('User or agent',{exact:true}).isDisabled());
+        await button(personal,/^Reload sharing$/).click();
+        assert.ok(await personal.getByLabel('User or agent',{exact:true}).isDisabled(),'Absence in a read cannot prove an ambiguous write failed.');
+        const body=mutations(test.state,path)[0].body;
+        test.state.personalGrants.push({id:randomUUID(),...body,revokedAt:null});
+        await button(personal,/^Reload sharing$/).click();
+      }
+      await test.page.waitForFunction(()=>!document.querySelector('.personal-sharing select')?.disabled);
+      assert.equal(test.state.personalGrants.length,1);
+      assert.equal(mutations(test.state,path).length,1,'Reconciliation never retries the POST.');
+      assert.equal(await personal.getByRole('checkbox',{name:/^I approve this exact personal/}).count(),0,'Reopened consent must be reviewed again.');
+    });
+  }
+  await check('Personal pending state is account-scoped, not an app-wide lock',{app:'github',personal:true,multiplePersonal:true,grantGate:deferred()},async test=>{
+    const {submit}=await personalReview(test);await submit.click();await completed(test.state.grantStarted.promise);
+    const personal=await reopenPersonal(test);
+    await personal.getByLabel('Account',{exact:true}).selectOption(test.state.id.otherPersonal);
+    const other=await personalReview(test);assert.ok(await other.submit.isEnabled(),'Unrelated accounts must not inherit the pending grant.');
+    await personal.getByLabel('Account',{exact:true}).selectOption(test.state.id.personal);
+    await personal.getByRole('status').filter({hasText:'Sharing request pending'}).waitFor();
+    await button(personal,/^Share an action$/).click();
+    assert.equal(await button(personal,/^Share action$/).count(),0);
+    assert.equal(mutations(test.state,`/v1/connections/personal/${test.state.id.personal}/grants`).length,1);
+    test.state.grantGate.resolve();
+    await personal.getByRole('status').filter({hasText:'Sharing request pending'}).waitFor({state:'hidden'});
+  });
+  for(const [outcome,message] of [['FORBIDDEN','You no longer have permission'],['CONNECTION_INACTIVE','Refresh and reconnect'],['CSRF_REQUIRED','Reload the page to refresh your session']]){
+    await check(`Personal definite ${outcome} preserves actionable denial without uncertainty`,{app:'github',personal:true,grantResponse:outcome},async test=>{
+      step='definite sharing denial';
+      const {personal,submit}=await personalReview(test);await submit.click();
+      await personal.getByRole('alert').filter({hasText:message}).waitFor();
+      assert.doesNotMatch(await personal.innerText(),/Grant outcome unknown/);
+      assert.equal(test.state.personalGrants.length,0);
+      assert.ok(await personal.getByLabel('User or agent',{exact:true}).isEnabled());
+      assert.ok(await submit.isDisabled(),'A denial clears consent, not the ability to correct it.');
+      test.state.grantResponse='ok';
+      await personal.getByRole('checkbox',{name:/^I approve this exact personal/}).check();await submit.click();
+      await personal.getByRole('status').filter({hasText:'Only the reviewed personal-account action'}).waitFor();
+      assert.equal(test.state.personalGrants.length,1);
+    });
+  }
+  for(const outcome of ['server-error','timeout','malformed']){
+    await check(`Personal ambiguous ${outcome} pauses until matching metadata reconciliation`,{app:'github',personal:true,grantResponse:outcome},async test=>{
+      step='uncertain sharing response';
+      const {personal,submit}=await personalReview(test);await submit.click();
+      await personal.getByRole('alert').filter({hasText:'Grant outcome unknown'}).first().waitFor();
+      assert.ok(await submit.isDisabled());assert.equal(test.state.personalGrants.length,1);
+      await button(personal,/^Reload sharing$/).click();
+      await personal.getByRole('status').filter({hasText:'The reviewed grant is recorded'}).waitFor();
+      assert.equal(test.state.personalGrants.length,1);
+      assert.equal(mutations(test.state,`/v1/connections/personal/${test.state.id.personal}/grants`).length,1);
+    });
+  }
   await check('Read-only browser owner test is not client readiness evidence', {}, async test => {
     await chooseAgent(test); await unknownReadiness(test.panel);
+    await openSetup(test.panel);
     step = 'owner read-only test';
     const summary = visible(test.panel.locator('summary')).filter({ hasText: /^Owner-browser read-only connection test$/i });
     if (await summary.count()) await summary.click();
@@ -642,6 +747,26 @@ async function main() {
     await unknownReadiness(test.panel);
   });
   for (const width of [320, 375, 430, 1440]) {
+    await check(`Selected design hierarchy and intact primary navigation at ${width}px`,{width},async test=>{
+      await chooseAgent(test,'b');
+      assert.equal(await test.panel.locator('.agent-setup').evaluate(node=>node.open),false);
+      assert.equal(await test.panel.locator('.agent-history').evaluate(node=>node.open),false);
+      assert.equal(await visible(test.panel.getByRole('combobox')).count(),0,'Returning management is not an expanded form stack.');
+      const nav=test.page.getByRole('navigation',{name:'Workspace',exact:true});
+      assert.deepEqual(await nav.getByRole('button').allTextContents(),['Apps','Agents','Actions']);
+      const hierarchy=await test.panel.evaluate(panel=>['.agent-heading','.agent-verification','.agent-setup','[aria-label="Agent keys"]','[aria-label="Allowed workspace access"]','.agent-history'].map(selector=>panel.querySelector(selector).getBoundingClientRect().top));
+      assert.ok(hierarchy.every((top,index)=>!index||top>hierarchy[index-1]));
+      const navLines=await nav.locator('button span').evaluateAll(nodes=>nodes.every(node=>node.getBoundingClientRect().height<=parseFloat(getComputedStyle(node).lineHeight)+1));
+      assert.ok(navLines,'Navigation labels must not wrap, including midword.');
+      if(process.env.CAPYKIT_AGENT_VISUAL_DIR){
+        assert.equal(test.state.sentinels.length,0,'Never capture a credential reveal.');
+        await mkdir(process.env.CAPYKIT_AGENT_VISUAL_DIR,{recursive:true});
+        await test.page.screenshot({path:join(process.env.CAPYKIT_AGENT_VISUAL_DIR,`fixture-agent-${width}.png`),fullPage:true});
+      }
+      await test.page.locator('.workspace-tools > summary').click();
+      const tools=test.page.getByRole('navigation',{name:'Workspace tools',exact:true});
+      assert.deepEqual(await tools.getByRole('button').allTextContents(),['Functions','People access']);
+    });
     await check(`Layout, keyboard focus and touch controls at ${width}px`, { width }, async test => {
       await chooseAgent(test); const fields = await grantFields(test);
       step = 'keyboard repository and consent';

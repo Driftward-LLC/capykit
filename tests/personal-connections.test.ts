@@ -7,6 +7,11 @@ import {PieceEngine,type PieceMetadata} from '../src/hosted/piece-engine.js';
 import {literalInput,pieceFields} from '../src/hosted/piece-properties.js';
 import type {AuthenticatedContext} from '../src/hosted/identity.js';
 import {ActionAccess} from '../src/hosted/action-access.js';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {createHostedServer} from '../src/hosted/server.js';
+import {createHostedDatabase} from '../src/hosted/db.js';
+import {loadHostedConfig} from '../src/hosted/config.js';
 const databaseUrl=process.env.CAPYKIT_TEST_POSTGRES_URL;
 it('rejects expressions and credential selectors while projecting only public property fields',()=>{
  for(const input of [{value:'{{connections.private}}'},{auth:'other'},{nested:[{value:'{{secret}}'}]},JSON.parse('{"__proto__":{}}')])expect(()=>literalInput(input)).toThrow();
@@ -42,4 +47,19 @@ describe.skipIf(!databaseUrl)('personal account isolation with PostgreSQL RLS',(
  it('stores only encrypted OAuth setup, binds it to the personal browser session and consumes it once',async()=>{metadata.mockResolvedValueOnce({...piece,auth:{type:'OAUTH2',scope:['read']}});const begun=await start(member),state=new URL(begun.authorizationUrl??'').searchParams.get('state');const raw=(await db.query('select setup from personal_app_connections where id=$1',[begun.connectionId])).rows;expect(JSON.stringify(raw)).not.toContain('private-verifier');await expect(personal.callback(owner,'session',{code:'provider-code',state})).rejects.toMatchObject({code:'CONNECT_STATE_INVALID'});await expect(personal.callback(member,'different-session',{code:'provider-code',state})).rejects.toMatchObject({code:'CONNECT_STATE_INVALID'});expect(await personal.callback(member,'session',{code:'provider-code',state})).toEqual({appId:'text-helper',status:'connected'});await expect(personal.callback(member,'session',{code:'provider-code',state})).rejects.toMatchObject({code:'CONNECT_STATE_INVALID'});expect(connect).toHaveBeenLastCalledWith(piece,expect.any(String),'My text tool',expect.objectContaining({client_id:'client',code:'provider-code'}));
  });
  it('rejects expression injection before it reaches the shared engine and omits inputs/results from audit',async()=>{const saved=await start(member),calls=action.mock.calls.length;await expect(personal.run(member,saved.connectionId,'concat',{texts:['{{connections.other}}']})).rejects.toMatchObject({code:'INVALID_REQUEST'});expect(action.mock.calls).toHaveLength(calls);expect(JSON.stringify((await db.query('select * from personal_connection_audit')).rows)).not.toMatch(/provider-code|private-verifier|Hello Capykit/);});
+ it.skipIf(!process.env.CAPYKIT_PLAYWRIGHT_MODULE)('preserves personal grant state across real app navigation and maps actual API denials in Chromium',async()=>{
+  const isolatedOwner=await actor(),issued=await access.issueKey(isolatedOwner,{name:'Personal browser agent',expiresAt:expiresAt()});
+  metadata.mockResolvedValue({...piece,name:'@activepieces/piece-github',version:'0.9.0',actions:{getIssueInformation:{name:'getIssueInformation',displayName:'Get issue information',props:{}},custom_api_call:{name:'custom_api_call',displayName:'Custom API call',props:{}}}});
+  const saved=await personal.start(isolatedOwner,'session','github',{name:'Isolated browser GitHub',method:0,credentials:{}});
+  const app=createHostedServer({consoleDirectory:new URL('../dist/console/',import.meta.url).pathname,pieceEngine:engine,database:createHostedDatabase(runtimeUrl.toString()),config:loadHostedConfig({DATABASE_URL:runtimeUrl.toString(),CAPYKIT_PUBLIC_BASE_URL:'https://capykit.example.test',CAPYKIT_AUTH_URL:'http://auth:9999'}),auth:{verifyBearer:token=>Promise.resolve(token==='owner'?isolatedOwner.identity:undefined),requestOtp:async()=>{},verifyOtp:()=>Promise.resolve(undefined),refresh:()=>Promise.resolve(undefined),signOut:async()=>{}}});
+  try{
+   const url=await app.listen({host:'127.0.0.1',port:0});
+   const result=await promisify(execFile)(process.execPath,['scripts/test-personal-share-api.mjs'],{env:{...process.env,CAPYKIT_AGENT_TEST_SERVER:url,CAPYKIT_AGENT_TEST_PRINCIPAL:issued.principalId},timeout:90000});
+   expect(result.stdout.trim()).toBe('PASS isolated personal API/browser: pending navigation at 320/375/430/1440px, committed lost-response reconciliation, actionable CSRF/permission denials');
+   // Four phone/desktop grants plus one committed response-loss; the two denials add none.
+   const grants=await personal.sharing(isolatedOwner,saved.connectionId);
+   expect(grants.grants).toHaveLength(5);
+   for(const recorded of grants.grants)expect(recorded).toMatchObject({recipientId:issued.principalId,actionName:'getIssueInformation'});
+  }finally{await app.close();metadata.mockResolvedValue(piece);}
+ },100000);
 });

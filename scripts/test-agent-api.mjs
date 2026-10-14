@@ -1,5 +1,7 @@
 // Invoked by the isolated PostgreSQL suite; real API, fixture authentication, no live providers.
 import assert from 'node:assert/strict';
+import {mkdir} from 'node:fs/promises';
+import {join} from 'node:path';
 const target = new URL(process.env.CAPYKIT_AGENT_TEST_SERVER ?? '');
 assert.equal(target.hostname, '127.0.0.1');
 const principalId = process.env.CAPYKIT_AGENT_TEST_PRINCIPAL;
@@ -42,6 +44,7 @@ try {
  await page.goto(origin + '/?tab=agents');
  const panel = page.locator('.action-access').filter({ visible: true });
  await panel.getByLabel('Existing agent', { exact: true }).selectOption(principalId);
+ await panel.locator('.agent-setup > summary').click();
  await panel.getByRole('button', { name: 'Issue key for existing agent', exact: true }).click();
  const keyField = panel.getByLabel('One-time agent key', { exact: true });
  await keyField.waitFor();
@@ -71,6 +74,25 @@ try {
  await page.reload();
  await panel.getByLabel('Existing agent', { exact: true }).selectOption(principalId);
  assert.equal(await keyField.count(), 0);
+ for(const width of [320,375,430,1440]){
+  await page.setViewportSize({width,height:900});
+  assert.equal(await panel.getByRole('heading',{level:1}).innerText(),'Browser isolated agent');
+  assert.equal(await panel.locator('.agent-setup').evaluate(node=>node.open),false);
+  assert.equal(await panel.locator('.agent-history').evaluate(node=>node.open),false);
+  assert.ok((await panel.locator('.agent-verification').innerText()).includes('Not yet verified'));
+  const nav=page.getByRole('navigation',{name:'Workspace',exact:true});
+  assert.deepEqual(await nav.getByRole('button').allTextContents(),['Apps','Agents','Actions']);
+  const geometry=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth,nav:[...document.querySelectorAll('.workspace-nav button span')].map(node=>{const box=node.getBoundingClientRect();return box.height<=parseFloat(getComputedStyle(node).lineHeight)+1;})}));
+  assert.equal(geometry.overflow,false);assert.ok(geometry.nav.every(Boolean));
+  await nav.getByRole('button',{name:'Actions',exact:true}).focus();
+  assert.equal(await nav.getByRole('button',{name:'Actions',exact:true}).evaluate(node=>document.activeElement===node),true);
+  if(process.env.CAPYKIT_AGENT_VISUAL_DIR){
+   // Metadata-only screenshots: reload discarded the reveal and no key appears in the DOM.
+   const clean=await page.evaluate(values=>values.every(value=>!document.documentElement.textContent.includes(value)&&![...document.querySelectorAll('input,textarea')].some(node=>node.value.includes(value))),secrets);
+   assert.ok(clean);await mkdir(process.env.CAPYKIT_AGENT_VISUAL_DIR,{recursive:true});
+   await page.screenshot({path:join(process.env.CAPYKIT_AGENT_VISUAL_DIR,`real-api-agent-${width}.png`),fullPage:true});
+  }
+ }
  const persisted = await page.evaluate(values => [localStorage, sessionStorage].some(storage => Object.values(storage).some(value => values.some(secret => value.includes(secret)))), secrets);
  assert.equal(persisted, false);
  assert.deepEqual(failures, []);

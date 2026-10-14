@@ -5,7 +5,7 @@ import { Connections, hasGitHubReturn } from "./connections.js";
 import { sessionFetch, writeRequest } from "./session.js";
 import type {CatalogApp} from "../hosted/piece-catalog.js";
 import {PieceDetails,categoryName} from "./piece-details.js";
-import {PersonalApp,personalJson,type PersonalAccount} from "./personal-app.js";
+import {PersonalApp,personalJson,type PersonalAccount,type PersonalShareState} from "./personal-app.js";
 const h = React.createElement;
 type AppId = string;
 interface Catalog {
@@ -62,6 +62,10 @@ export function Apps({active,onSessionExpired,onCreateFunction,onManageAgents,ma
     return personalReturn?.appId?personalReturn.appId:googleReturn?"google-drive":hasGitHubReturn()?"github":app&&/^[a-z0-9-]{1,120}$/u.test(app)?app:url.searchParams.has("setup")?"github":null;
   });
   const [personalAccounts,setPersonalAccounts]=useState<PersonalAccount[]>([]);
+  // ponytail: per signed-in workspace, in-memory locks; cross-tab coordination needs server idempotency.
+  const shareStates=useRef(new Map<string,PersonalShareState>());
+  const [,setShareVersion]=useState(0);
+  const shareChanged=useCallback(()=>{setShareVersion(v=>v+1);},[]);
   const [accessOpen,setAccessOpen]=useState(false);
   useEffect(()=>{setAccessOpen(false);},[selected,active]);
   const [data,setData]=useState<Catalog|null>(null),[error,setError]=useState(""),[notice,setNotice]=useState("");
@@ -102,7 +106,7 @@ export function Apps({active,onSessionExpired,onCreateFunction,onManageAgents,ma
       manage?h("button",{type:"button",className:"create-function",onClick:onCreateFunction},"＋ Create a function"):null,
       h("p",{className:"small muted catalog-note"},data?.personalEnabled?`${String(data.catalog?.count??0)} integrations. Personal accounts, centrally managed provider setup.`:`${String(data?.catalog?.count??0)} integrations from Activepieces. GitHub and Google Drive are enabled in Capykit; other integrations are available to explore.`,data?.catalog?h("span",null,` Catalog updated ${new Date(data.catalog.retrievedAt).toLocaleDateString()}.`):null)),
     selected&&data&&!selectedApp?h("p",{className:"empty-state"},"This app is not in the current catalog. Choose All apps to browse."):null,
-    selectedApp&&data?.personalEnabled?h(PersonalApp,{key:selectedApp.id,appId:selectedApp.id,appName:selectedApp.name,active,accounts:personalAccounts.filter(a=>a.appId===selectedApp.id),onSessionExpired,onChanged:()=>{void load();}}):null,
+    selectedApp&&data?.personalEnabled?h(PersonalApp,{key:selectedApp.id,appId:selectedApp.id,appName:selectedApp.name,active,accounts:personalAccounts.filter(a=>a.appId===selectedApp.id),shareStates,onShareChanged:shareChanged,onSessionExpired,onChanged:()=>{void load();}}):null,
     selectedApp&&!data?.personalEnabled&&!selectedApp.supportedInCapykit?h(PieceDetails,{app:selectedApp}):null,
     selectedApp?.supportedInCapykit&&data?.personalEnabled?h("h2",null,"Workspace connection"):null,
     manage&&selectedApp?.supportedInCapykit&&(selected==="github"||selected==="google-drive")?h("details",{key:`access-${selected}`,open:accessOpen,onToggle:(event:React.ToggleEvent<HTMLDetailsElement>)=>{setAccessOpen(event.currentTarget.open);}},h("summary",null,"Who can use this app?"),h("p",{className:"small muted"},"Workspace action access shares the same identity and grant records as Agents. Personal-account sharing stays in the account above."),onManageAgents?h("button",{type:"button",className:"secondary",onClick:onManageAgents},"Manage identities in Agents"):null,h(ActionAccess,{key:selected,app:selected,onSessionExpired,active:active&&accessOpen})):null,
