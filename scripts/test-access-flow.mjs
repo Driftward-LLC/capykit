@@ -23,14 +23,17 @@ async function check(name, settings, run) {
       requests.push({ path: url.pathname, method: req.method(), body: req.postData(), csrf: req.headers()['x-csrf-token'] });
       assert.equal(url.origin, origin);
       if (url.pathname === '/') return route.fulfill({ contentType: 'text/html', body: await readFile(`${directory}/index.html`) });
-      if (url.pathname.startsWith('/assets/')) return route.fulfill({ contentType: url.pathname.endsWith('.js') ? 'text/javascript' : 'text/css', body: await readFile(directory + url.pathname) });
+      if (url.pathname.startsWith('/assets/')) return route.fulfill({ contentType: url.pathname.endsWith('.js') ? 'text/javascript' : url.pathname.endsWith('.woff2') ? 'font/woff2' : 'text/css', body: await readFile(directory + url.pathname) });
       const json = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+      if (url.pathname === '/v1/auth/method') return json({ method: 'email' });
       if (url.pathname === '/v1/me') return json({ identity: { email: 'alex@example.test', principalKind: 'human' }, workspace: { id: 'workspace', role: state.member ? 'member' : 'owner' } });
       if (url.pathname === '/v1/capabilities') return json({ capabilities: state.member ? [capability] : [] });
       if (url.pathname === '/v1/capabilities/skill') return json(detail);
-   if(url.pathname==='/v1/apps')return json({apps:[{id:'github',name:'GitHub',configured:true,connected:false,description:'Read issues'}],github:[],google:{configured:false,connection:null}});
+   if(url.pathname==='/v1/apps')return json({apps:[{id:'github',name:'GitHub',configured:true,connected:false,supportedInCapykit:true,categories:[],actionCount:1,triggerCount:0,description:'Read issues'}],github:[],google:{configured:false,connection:null}});
       if (url.pathname === '/v1/connections') return json({ configured: true, setup: null, installationUrl: 'https://github.com/apps/example/installations/new', connections: [] });
       if (url.pathname === '/v1/access/options') return json(state.empty ? { ...options, versions: [] } : options);
+      if (url.pathname === '/v1/apps/catalog') return json({ apps: [], personalEnabled: false });
+      if (url.pathname === '/v1/actions') return json({ actions: [] });
       if (url.pathname === '/v1/grants' && req.method() === 'GET') return json({ grants: state.grants, nextCursor: null });
       if (url.pathname === '/v1/grants' && req.method() === 'POST') {
         if (state.fail) return json({ error: { code: 'CONNECTION_INACTIVE' } }, 403);
@@ -43,7 +46,7 @@ async function check(name, settings, run) {
     } catch (e) { errors.push(e.message); await route.abort(); }
   });
   try {
-    await page.goto(origin + '/?tab=access');
+    await page.goto(origin + (state.member ? '/?tab=capabilities' : '/?tab=access'));
     if (!state.member) { await page.getByRole('heading', { name: 'Existing grants' }).waitFor(); await page.waitForFunction(() => document.querySelector('section[aria-label="Workspace access"]')?.getAttribute('aria-busy') === 'false'); }
     await run({ page, state, requests });
     assert.deepEqual(errors, []); results.push({ name, passed: true }); console.log(`PASS ${name}`);
@@ -60,11 +63,11 @@ try {
   await check('explicit repository choice and consent; changed scope clears approval', {}, async ({ page, requests }) => {
     await select(page); assert.ok(await submit(page).isDisabled());
     assert.equal(await page.getByRole('checkbox', { checked: true }).count(), 0);
-    await page.getByRole('checkbox', { name: 'example/first', exact: true }).check();
-    await page.getByRole('checkbox', { name: /^I grant/ }).check(); assert.ok(await submit(page).isEnabled());
-    await page.getByRole('checkbox', { name: 'example/second', exact: true }).check(); assert.ok(await submit(page).isDisabled());
-    await page.getByRole('checkbox', { name: 'example/second', exact: true }).uncheck();
-    await page.getByRole('checkbox', { name: /^I grant/ }).check();
+    await page.getByRole('checkbox', { name: 'example/first · 101', exact: true }).check();
+    await page.getByRole('checkbox', { name: /^I approve this exact/ }).check(); assert.ok(await submit(page).isEnabled());
+    await page.getByRole('checkbox', { name: 'example/second · 102', exact: true }).check(); assert.ok(await submit(page).isDisabled());
+    await page.getByRole('checkbox', { name: 'example/second · 102', exact: true }).uncheck();
+    await page.getByRole('checkbox', { name: /^I approve this exact/ }).check();
     await page.screenshot({ path: `${prefix}-desktop.png`, fullPage: true });
     await submit(page).click(); await page.getByRole('status').filter({ hasText: 'Access granted' }).waitFor();
     const posted = requests.find(r => r.path === '/v1/grants' && r.method === 'POST');
@@ -76,7 +79,7 @@ try {
   });
   await check('skill grant excludes provider scope and revoke requires confirmation', {}, async ({ page, requests }) => {
     await select(page, 'skill'); assert.equal(await page.getByLabel('GitHub connection', { exact: true }).count(), 0);
-    await page.getByRole('checkbox', { name: /^I grant/ }).check(); await submit(page).click();
+    await page.getByRole('checkbox', { name: /^I approve this exact/ }).check(); await submit(page).click();
     await page.getByRole('status').filter({ hasText: 'Access granted' }).waitFor();
     const body = JSON.parse(requests.find(r => r.method === 'POST' && r.path === '/v1/grants').body);
     assert.equal(body.connectionId, undefined); assert.equal(body.repositoryIds, undefined);
@@ -87,22 +90,22 @@ try {
     assert.equal(await page.getByRole('button', { name: 'Revoke access for Alex' }).count(), 0);
   });
   await check('provider failure explains recovery and preserves choices', { fail: true }, async ({ page, state }) => {
-    await select(page); await page.getByRole('checkbox', { name: 'example/first', exact: true }).check(); await page.getByRole('checkbox', { name: /^I grant/ }).check();
+    await select(page); await page.getByRole('checkbox', { name: 'example/first · 101', exact: true }).check(); await page.getByRole('checkbox', { name: /^I approve this exact/ }).check();
     await submit(page).click(); await page.getByRole('alert').filter({ hasText: 'Reconnect it' }).waitFor();
-    assert.ok(await page.getByRole('checkbox', { name: 'example/first', exact: true }).isChecked()); state.fail = false;
+    assert.ok(await page.getByRole('checkbox', { name: 'example/first · 101', exact: true }).isChecked()); state.fail = false;
     await submit(page).click(); await page.getByRole('status').filter({ hasText: 'Access granted' }).waitFor();
   });
   await check('empty library explains the prerequisite', { empty: true }, async ({ page }) => { await page.getByText('Publish a function or skill in Capabilities first.', { exact: false }).waitFor(); assert.equal(await submit(page).count(), 0); });
   await check('member gets read-only granted library without management routes', { member: true }, async ({ page, requests }) => {
     await page.getByRole('heading', { name: 'Functions & skills', exact: true }).waitFor();
-    assert.equal(await page.getByRole('button', { name: 'Access', exact: true }).count(), 0); assert.equal(await page.getByRole('button', { name: 'New capability' }).count(), 0);
-    await page.getByRole('button').filter({ hasText: 'Review guide' }).click(); await page.getByRole('button', { name: 'Download 1.0.0' }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'People access', exact: true }).count(), 0); assert.equal(await page.getByRole('button', { name: 'New capability' }).count(), 0);
+    await page.getByRole('button', { name: /Review guide/ }).click(); await page.getByRole('button', { name: 'Download 1.0.0' }).waitFor();
     assert.equal(await page.getByRole('button', { name: /Delete|Publish|Save draft/ }).count(), 0);
     assert.equal(requests.some(r => r.path === '/v1/access/options' || r.path === '/v1/connections'), false);
   });
   await check('mobile native fields fit and repository approval is keyboard accessible', { mobile: true }, async ({ page }) => {
-    await select(page); const checkbox = page.getByRole('checkbox', { name: 'example/first', exact: true }); await checkbox.focus(); await page.keyboard.press('Space'); assert.ok(await checkbox.isChecked());
-    const approval = page.getByRole('checkbox', { name: /^I grant/ }); await approval.focus(); await page.keyboard.press('Space'); assert.ok(await submit(page).isEnabled());
+    await select(page); const checkbox = page.getByRole('checkbox', { name: 'example/first · 101', exact: true }); await checkbox.focus(); await page.keyboard.press('Space'); assert.ok(await checkbox.isChecked());
+    const approval = page.getByRole('checkbox', { name: /^I approve this exact/ }); await approval.focus(); await page.keyboard.press('Space'); assert.ok(await submit(page).isEnabled());
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)); await page.screenshot({ path: `${prefix}-mobile.png`, fullPage: true });
   });
 } finally { await writeFile(`${prefix}-results.json`, JSON.stringify(results, null, 2)); await browser.close(); }

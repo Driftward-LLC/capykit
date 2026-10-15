@@ -1,0 +1,159 @@
+{
+  "baselineRevision": "6819c79230221355046261a16bf5e314753eb46e",
+  "measurement": "All emitted console files, gzip level 9 with mtime 0; same installed dependencies for baseline and after. Asset/source hashes identify precommit working-tree build.",
+  "before": {
+    "totals": {
+      "js": {
+        "rawBytes": 624269,
+        "gzipBytes": 191839,
+        "fileCount": 3
+      },
+      "css": {
+        "rawBytes": 229560,
+        "gzipBytes": 39174,
+        "fileCount": 1
+      },
+      "fonts": {
+        "rawBytes": 30436,
+        "gzipBytes": 30430,
+        "fileCount": 2
+      },
+      "html": {
+        "rawBytes": 510,
+        "gzipBytes": 309,
+        "fileCount": 1
+      }
+    },
+    "assets": {
+      "assets/ItemSwipeLayer-DfFOlD5m.js": {
+        "sha256": "f1e076b59235ddfc2eb3d0e16e1cccb7a793249922bf0740165f1d13364659c5",
+        "rawBytes": 8710
+      },
+      "assets/figtree-latin-ext-wght-normal-DCwSJGxG.woff2": {
+        "sha256": "bf7828e2c258cffcfa50a048ee388a36b95bc16b452e8d36fa797635dbe15965",
+        "rawBytes": 10280
+      },
+      "assets/figtree-latin-wght-normal-D_ZTVpCC.woff2": {
+        "sha256": "4ba7d3d096695818fe0686be4f1e82c6b05134e18a22260336130335027462dd",
+        "rawBytes": 20156
+      },
+      "assets/index-Dd3Wfh3x.css": {
+        "sha256": "57efd2cd49472d9c32af6553a57b33f55be399dd9f96c76238915d8433843045",
+        "rawBytes": 229560
+      },
+      "assets/index-fll22w2d.js": {
+        "sha256": "42dd3ac8f42c073eebebb5385b1c882477fce1dc3ba7e661f07a1b3510e4f5c4",
+        "rawBytes": 615211
+      },
+      "assets/theme-bootstrap.js": {
+        "sha256": "a6905a87f0cd51f7aa57184a8991540be2cb255cf52c1e55e3fcc4d64ff77c13",
+        "rawBytes": 348
+      },
+      "index.html": {
+        "sha256": "f097c95e6cc4cd819224ad8f6c873176badc6d431c09aa2f818a834c35864008",
+        "rawBytes": 510
+      }
+    }
+  },
+  "after": {
+    "totals": {
+      "js": {
+        "rawBytes": 731220,
+        "gzipBytes": 226115,
+        "fileCount": 4
+      },
+      "css": {
+        "rawBytes": 219914,
+        "gzipBytes": 37033,
+        "fileCount": 1
+      },
+      "fonts": {
+        "rawBytes": 30436,
+        "gzipBytes": 30430,
+        "fileCount": 2
+      },
+      "html": {
+        "rawBytes": 510,
+        "gzipBytes": 310,
+        "fileCount": 1
+      }
+    },
+    "assets": {
+      "assets/ItemSwipeLayer-K-QjmuNS.js": {
+        "sha256": "bd89ccfad543f3eb89ead9f107ebaceb09af90585244c446a27274dbb2adffd4",
+        "rawBytes": 8360
+      },
+      "assets/MenuBottomSheet-Bmh7ewVE.js": {
+        "sha256": "e808d41b2a0a83e0dbb663ac52aa8c6cbb62b8d6385be99ee8af1a130f52abb2",
+        "rawBytes": 35548
+      },
+      "assets/figtree-latin-ext-wght-normal-DCwSJGxG.woff2": {
+        "sha256": "bf7828e2c258cffcfa50a048ee388a36b95bc16b452e8d36fa797635dbe15965",
+        "rawBytes": 10280
+      },
+      "assets/figtree-latin-wght-normal-D_ZTVpCC.woff2": {
+        "sha256": "4ba7d3d096695818fe0686be4f1e82c6b05134e18a22260336130335027462dd",
+        "rawBytes": 20156
+      },
+      "assets/index-BeS4hWkv.js": {
+        "sha256": "fa37e5b05131d5184012c1fbf5eef48b863705ea1d61849c2f70543c67054691",
+        "rawBytes": 686964
+      },
+      "assets/index-CDodmdwU.css": {
+        "sha256": "376a53073e6e50eb4bef4946297a90816071c21ea35d29257f98b73f80ea59be",
+        "rawBytes": 219914
+      },
+      "assets/theme-bootstrap.js": {
+        "sha256": "a6905a87f0cd51f7aa57184a8991540be2cb255cf52c1e55e3fcc4d64ff77c13",
+        "rawBytes": 348
+      },
+      "index.html": {
+        "sha256": "94a4c976b0c936340d385a0c77aa93903ad677644f3c8a7b8f58f7b5d6729009",
+        "rawBytes": 510
+      }
+    }
+  },
+  "delta": {
+    "js": {
+      "rawBytes": 106951,
+      "gzipBytes": 34276,
+      "fileCount": 1
+    },
+    "css": {
+      "rawBytes": -9646,
+      "gzipBytes": -2141,
+      "fileCount": 0
+    },
+    "fonts": {
+      "rawBytes": 0,
+      "gzipBytes": 0,
+      "fileCount": 0
+    },
+    "html": {
+      "rawBytes": 0,
+      "gzipBytes": 1,
+      "fileCount": 0
+    }
+  },
+  "afterSourceSha256": {
+    "src/console/access.ts": "f77e4eda42da450fd40cc3eb27b1f4eef6947e5083afde9beb56831b886ddf71",
+    "src/console/action-access.ts": "752b3ac3dbff91f0f2aff0da9dc01fb4b424daf0fe9d0814012b68fa812b5259",
+    "src/console/actions.ts": "33de4910b564d25eb1403f704d266b31d53fcd1be4e879c0d76a1514e849cce2",
+    "src/console/agent-setup.ts": "948928958976f1af8b1dc8664dc49ac9a09e64520effee06e162b0b8654c7724",
+    "src/console/apps.ts": "d365955255f71c7cb758988858c482056cd65b5123333f9c2372c6b56e249e4c",
+    "src/console/connections.ts": "9aa1cf5279d6b62eff7e62ffbed9a127c67fb6de57d04f88863cf61189780c95",
+    "src/console/fonts.css": "817801e2469cb87c355e277ef507c67d6b1151cf4dda44cafceb3db9bfa10417",
+    "src/console/index.html": "f16268c2c8a3f75b1c4c83c76923e12301109d857d1ec5be35fa8eaec3e14bf7",
+    "src/console/library.ts": "6e9a1b125568069003665c37a37110240a6319433d7b88d0fd9f6cb56070b79f",
+    "src/console/main.ts": "b6b3a9b8b4d992fc3f1af5c9ca1221a11c3e83d8f2a89d52398f8ccdb558e10c",
+    "src/console/personal-app.ts": "1f924881dfc405b2ae425295c59c5a33923284b3ec560489c58137ff447943df",
+    "src/console/piece-details.ts": "31f7dba4fd38288e81e471dee4fd852ba047b59be11a3e1f77de786c257acae3",
+    "src/console/public/assets/theme-bootstrap.js": "a6905a87f0cd51f7aa57184a8991540be2cb255cf52c1e55e3fcc4d64ff77c13",
+    "src/console/session.ts": "10783c7a3b81794f85e86d62cffd03100740ea06be413de8f6fefe87b9e1c053",
+    "src/console/shell.css": "802f1fef9df03351e8a1667b5975f70bc53927ca6c3199d254858ce157f26ae8",
+    "src/console/theme.ts": "cd74d2eccbf1a09a481c35af6f6f496a701e0956e33583caf603278121746f37",
+    "src/console/tsconfig.json": "41dcee1148dd913a0ba761099c259f6a41e8b54ba6d386c1e7fb4b142e9c8da7",
+    "package.json": "5f42bfe9ff37292594424ca5b8da77110f4c424476d5fbe59d590af1e13a849a",
+    "package-lock.json": "a770e671a6a707197b1e3a81125d8f9c10a282f05694ff983cb8a27414ba9eeb"
+  }
+}

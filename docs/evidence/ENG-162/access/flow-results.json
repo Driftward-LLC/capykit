@@ -1,0 +1,26 @@
+[
+  {
+    "name": "explicit repository choice and consent; changed scope clears approval",
+    "passed": true
+  },
+  {
+    "name": "skill grant excludes provider scope and revoke requires confirmation",
+    "passed": true
+  },
+  {
+    "name": "provider failure explains recovery and preserves choices",
+    "passed": true
+  },
+  {
+    "name": "empty library explains the prerequisite",
+    "passed": true
+  },
+  {
+    "name": "member gets read-only granted library without management routes",
+    "passed": true
+  },
+  {
+    "name": "mobile native fields fit and repository approval is keyboard accessible",
+    "passed": true
+  }
+]

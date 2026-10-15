@@ -440,6 +440,7 @@ async function visualChecks() {
     await check(`Visual Agents list/detail ${width} ${theme}`,{width,theme},async test=>{
       if(!baseline){await visualGeometry(test.page);assert.ok(await test.panel.locator('.astryx-list').count());}
       await capture(test,'agents-list');await chooseAgent(test,'b');await unknownReadiness(test.panel);
+      if(!baseline){const summary=await test.panel.locator('.agent-access-card > summary').first().innerText();assert.ok(summary.includes(test.state.id.b));assert.ok(summary.includes(`Versioned action: ${test.state.actions[0].id}`));}
       await visualGeometry(test.page);await capture(test,'agents-detail');
       await openSetup(test.panel);await visualGeometry(test.page);
       if(!baseline&&width===375){await capture(test,'agents-setup');
@@ -1099,9 +1100,9 @@ async function main() {
       assert.ok((await test.panel.locator('.agent-metadata').innerText()).includes(test.state.id.b.slice(-8)));
       assert.equal(await test.panel.locator('.agent-verification.astryx-banner').count(),0,'Unverified is neutral information, not a warning.');
       const copy=test.panel.locator('.agent-access-copy');
-      assert.match(await copy.innerText(),/GitHub\nGet an issue\nAccount: Fixture GitHub\nRepositories: fixture\/second\nRead only · active\nExpires /u);
+      assert.match(await copy.innerText(),/GitHub\nGet an issue\nRecipient: [^\n]+ · Versioned action: github\.get-issue\.v1\nAccount: Fixture GitHub\nRepositories: fixture\/second\nRead only · active\nExpires /u);
       const lines=await copy.locator(':scope > .astryx-text').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect()));
-      assert.equal(lines.length,6);
+      assert.equal(lines.length,7);
       assert.ok(lines.every((box,index)=>!index||box.top>=lines[index-1].bottom),'Access labels must not merge inline.');
       await copy.locator('..').click();
       const exact=test.panel.locator('.agent-access-card');

@@ -1,0 +1,39 @@
+{
+  "revision": "6819c79230221355046261a16bf5e314753eb46e",
+  "revisionMeaning": "Repository HEAD; buildSha256 identifies exact served bytes including working-tree changes.",
+  "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+  "browserVersion": "156.0.8078.4",
+  "nodeVersion": "v26.7.0",
+  "fixtureOnly": true,
+  "providerVerified": false,
+  "physicalDeviceVerified": false,
+  "independentReview": false,
+  "phase": "after",
+  "passed": true,
+  "screenshots": [
+    {
+      "file": "flow-desktop.png",
+      "route": "/?tab=access",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2"
+    },
+    {
+      "file": "flow-mobile.png",
+      "route": "/?tab=access",
+      "viewport": {
+        "width": 390,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2"
+    }
+  ]
+}

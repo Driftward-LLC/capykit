@@ -1,11 +1,12 @@
-# Capykit Astryx migration — ENG-160, slice 1
+# Capykit Astryx migration — ENG-160 through ENG-162
 
 ## Direction and source
 
 Capykit keeps its product name, React/Vite, URLs and session/owner boundaries.
 The maintained Astryx Neutral theme replaces the mint/green product palette:
 Figtree typography, restrained neutral surfaces, semantic status colors and
-Lucide icons. This is the first slice of ENG-159, not a route-form redesign.
+Lucide icons. All three UI slices of ENG-159 are implemented; this is not a
+business/API or authorization redesign.
 
 References inspected: [components](https://astryx.atmeta.com/components),
 [theme](https://astryx.atmeta.com/docs/theme),
@@ -20,8 +21,9 @@ was rendered using installed Neutral `Theme`, `Button`, `Card`, `Badge`,
 `Banner` and `EmptyState` components. [Target screenshots](evidence/ENG-160/target)
 show desktop Apps and 375px navigation, an app row, status, primary action and
 empty/error treatment. This is an implementation target, not a human-approved mock.
-The actual route row/forms remain native in this slice; the shared primary action,
-shell/navigation, account controls, notices and sign-in use installed components.
+That foundation slice established the shared shell. The final slice adapts the
+remaining route controls to installed components, keeping native inputs/selects
+inside Astryx Field slots where browser validation or file semantics matter.
 
 ## Pinned foundation
 
@@ -33,18 +35,18 @@ shell/navigation, account controls, notices and sign-in use installed components
 | `lucide-react` | 1.57.0 | Neutral's icon family |
 | `@fontsource-variable/figtree` | 5.3.0 | Same-origin variable font assets |
 
-These versions are pinned in the manifest and lockfile. Registry `latest` for
-core/Neutral was 0.7.0; the 0.7.1 canary was deliberately not selected.
+These versions remain pinned in the manifest and lockfile. At foundation selection,
+registry `latest` for core/Neutral was 0.7.0; the canary was not selected.
 No unpublished or cross-repository component dependency is used. MIT/ISC/OFL
 notices are retained in `docs/LICENSE.*` and included in the npm package.
 
 `main.ts` imports the built Neutral theme, not an ejected/custom fork.
-`shell.css` declares `reset, legacy, astryx-base, astryx-theme, capykit` before
+`shell.css` declares `reset, astryx-base, astryx-theme, capykit` before
 reset/component/theme styles load. Shell CSS adjusts composition, geometry and
 44px targets; component presentation comes from installed CSS/Neutral tokens.
-Legacy selectors are isolated inside `@scope (.legacy-route)` in the lower
-`legacy` layer. Their old palette uses Neutral tokens, not a second theme.
-Obsolete shell/reset selectors were removed without rewriting route workflows.
+ENG-162 removes `style.css`, its import, every `legacy-route` wrapper and the
+legacy cascade layer after migrating their consumers. There is no retained
+green/mint control stylesheet or parallel visual component system.
 
 `fonts.css` registers the package's variable assets as `Figtree`, the exact family
 Neutral expects. Fontsource's default `Figtree Variable` family would otherwise
@@ -72,13 +74,16 @@ mode before React/CSS without inline script or changing `script-src 'self'`.
 Native email/OTP form validity and attributes are retained inside Astryx cards;
 real Astryx submit buttons use `type` and `isDisabled`, not lookalike classes.
 
-Remaining dependent slices: Apps search/filter/rows, connection and provider forms,
-Agents/key reveal/grant forms, Actions/results, Functions/publishing, People access
-and route-local alerts. Their business logic is not migrated here. Preserve the
-PR #80 ambiguous-write recovery, one-time key disposal and exact-access consent
-safeguards when adapting those controls.
+ENG-161 delivered Apps/Agents and their setup, key disposal, exact-access consent,
+modal error recovery and ambiguous-write reconciliation. ENG-162 reuses those
+flows; it does not reimplement them. Actions lists/forms/results, Functions
+drafts/imports/inventories/publishing, People access, Appearance and email/OTP
+fields now use the same installed primitives. Versioned action grant summaries
+show the recipient as well as the exact action ID, account, resources and expiry.
+People grants distinguish exact published version and provider scope from keys,
+identity and authenticated-client evidence. No additional backend is introduced.
 
-## Evidence, cost and review limits
+## Foundation evidence and cost (historical ENG-160)
 
 [Browser evidence](evidence/ENG-160/README.md) retains BEFORE/target/AFTER screenshots,
 exact served-byte checksums, routes, viewports, themes and fixture provenance.
@@ -102,5 +107,34 @@ attempted. No database/live-provider or physical-device pass is claimed.
 
 Implementation model: GPT-6.1 Sol. Installed engineering plugin revision:
 `08359024b405bf92afc3b4624675415384b67e5a`. No repository AGENTS.md was tracked.
-No independent GPT-6 Astra review was available or performed. This remains a draft
-for independent review and bundle-cost acceptance; nothing is merged or deployed.
+No independent GPT-6 Astra review was available or performed for that slice.
+
+## Final slice evidence and review limits (ENG-162)
+
+[Retained evidence and reproduction](evidence/ENG-162/README.md) covers the final
+slice against ENG-161 commit `6819c79230221355046261a16bf5e314753eb46e`:
+
+- Advanced BEFORE: 24 fixture scenarios; AFTER: 49. Actions, native validation,
+  account/repository payloads and CSRF, loading/empty/error/retry, file import,
+  executable flags, exact publish version/digest, and safe delete/revoke dialogs.
+- Apps/Agents visual regression: 58 scenarios; security/recovery regression: 67.
+- Shell, sign-in and shared settings: 51 scenarios; People access flow: 6.
+- 320/375/430/1440px, light/dark, system preference changes, saved appearance,
+  keyboard activation, native modal inertness, cancellation and focus recovery.
+  Screenshots carry route, viewport, theme, exact build hash and fixture provenance.
+- The standard suite passes 430 tests; 85 environment-gated database/provider tests
+  remain skipped. Required lint/typecheck/build/package/schema checks also pass.
+
+[Final bundle delta](evidence/ENG-162/bundle-size.json), using the same dependencies:
+JS +106,951 bytes raw / +34,276 gzip; CSS -9,646 / -2,141; font bytes unchanged.
+The added installed Table/component runtime is material; Vite's >500kB chunk
+warning remains a performance-review item. No dependency or lockfile changed.
+
+No known UI slice remains on the legacy stylesheet. Live provider/backend,
+database, physical-device, screen-reader and human visual approval are not proven
+by these isolated Chromium fixtures. Native modal Tab can visit browser chrome;
+tests verify background controls are inert rather than adding a custom focus trap.
+Implementation used GPT-6.1 Sol and the plugin revision above. Independent
+GPT-6 Astra review was not available/performed; that remains a draft review gate,
+along with bundle-cost acceptance and ENG-161's existing manual hold. Nothing in
+this slice merges, deploys, changes production settings or performs credential work.

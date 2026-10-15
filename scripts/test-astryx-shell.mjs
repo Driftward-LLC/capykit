@@ -48,7 +48,7 @@ async function screenshot(test, name) {
   const filename = `${name}.png`;
   await test.page.screenshot({ path: join(evidence, filename), fullPage: true });
   const rendered = await test.page.evaluate(() => ({ themeName: document.documentElement.getAttribute('data-astryx-theme'), mode: document.documentElement.getAttribute('data-theme'), bodyBackground: getComputedStyle(document.body).backgroundColor, bodyColor: getComputedStyle(document.body).color }));
-  screenshots.push({ file: `${phase}/${filename}`, route: new URL(test.page.url()).pathname + new URL(test.page.url()).search, viewport: test.page.viewportSize(), theme: baseline ? 'legacy-fixed-dark' : test.settings.theme ?? 'system', mediaPreference: test.settings.media ?? 'light', rendered, fixture: fixtureMetadata(test.settings), buildSha256, revision });
+  screenshots.push({ file: filename, route: new URL(test.page.url()).pathname + new URL(test.page.url()).search, viewport: test.page.viewportSize(), theme: baseline ? 'legacy-fixed-dark' : test.settings.theme ?? 'system', mediaPreference: test.settings.media ?? 'light', rendered, fixture: fixtureMetadata(test.settings), buildSha256, revision });
 }
 async function check(name, settings, run) {
   const state = { signedIn: true, method: 'email', available: true, role: 'owner', kind: 'human', meStatus: 200, logoutStatus: 200, googleStatus: 200, tailscaleStatus: 401, appsStatus: 200, verifyStatus: 200, requests: [], violations: [], ...settings };
@@ -241,7 +241,7 @@ async function functionalChecks() {
       await activate(page, summary, 'Space');
       await tabTo(page, button(page.getByRole('navigation', { name: 'Workspace tools', exact: true }), 'Functions'));
       const tools = page.getByRole('navigation', { name: 'Workspace tools', exact: true });
-      for (const [label, tab, heading] of [['Functions', 'capabilities', 'Functions & skills'], ['People access', 'access', 'Access']]) {
+      for (const [label, tab, heading] of [['Functions', 'capabilities', 'Functions & skills'], ['People access', 'access', baseline ? 'Access' : 'People access']]) {
         const control = button(tools, label); await astryxButton(control); await activate(page, control);
         await page.getByRole('heading', { name: heading, exact: true }).filter({ visible: true }).waitFor();
         assert.equal(new URL(page.url()).searchParams.get('tab'), tab);

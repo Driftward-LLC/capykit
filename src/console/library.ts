@@ -1,4 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
+import { Button } from "@astryxdesign/core/Button";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Card } from "@astryxdesign/core/Card";
+import { Badge } from "@astryxdesign/core/Badge";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { Table, TableHeader, TableBody, TableRow, TableHeaderCell, TableCell } from "@astryxdesign/core/Table";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Dialog } from "@astryxdesign/core/Dialog";
+import { FormLayout } from "@astryxdesign/core/FormLayout";
+import { NativeField } from "./piece-details.js";
 import { sessionFetch, writeRequest } from "./session.js";
 
 const h = React.createElement;
@@ -82,10 +94,10 @@ function Summary({ artifact }: { artifact: ArtifactSummary }): React.ReactElemen
     h("p", { className: "muted" }, `${String(artifact.fileCount)} ${artifact.fileCount === 1 ? "file" : "files"} · ${bytesLabel(artifact.byteCount)}`),
     h("p", { className: "digest" }, h("strong", null, "SHA-256 "), h("code", null, artifact.digest)),
     h("details", null, h("summary", null, "File inventory"),
-      h("div", { className: "table-scroll" }, h("table", null,
-        h("thead", null, h("tr", null, h("th", { scope: "col" }, "File"), h("th", { scope: "col" }, "Size"), h("th", { scope: "col" }, "Executable"))),
-        h("tbody", null, ...artifact.files.map((file) => h("tr", { key: file.path }, h("td", null, h("code", null, file.path), h("code", { className: "file-hash" }, `SHA-256 ${file.sha256}`)), h("td", null, bytesLabel(file.byteLength)), h("td", null, file.executable ? "Yes" : "No")))),
-      ))),
+      h(Table, { density: "compact", "aria-label": "Artifact file inventory" },
+        h(TableHeader, null, h(TableRow, { isHeaderRow: true, children: [h(TableHeaderCell, { key: "file", scope: "col" }, "File"), h(TableHeaderCell, { key: "size", scope: "col" }, "Size"), h(TableHeaderCell, { key: "executable", scope: "col" }, "Executable")] })),
+        h(TableBody, null, ...artifact.files.map((file) => h(TableRow, { key: file.path, children: [h(TableCell, { key: "file" }, h("code", null, file.path), h("code", { className: "file-hash" }, `SHA-256 ${file.sha256}`)), h(TableCell, { key: "size" }, bytesLabel(file.byteLength)), h(TableCell, { key: "executable" }, file.executable ? "Yes" : "No")] }))),
+      )),
     artifact.contract === null ? null : h("details", null, h("summary", null, "Function contract"), h("pre", null, JSON.stringify(artifact.contract, null, 2))),
   );
 }
@@ -116,6 +128,8 @@ export function CapabilityLibrary({ onSessionExpired, manage = true, createFunct
   const [version, setVersion] = useState("1.0.0");
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [deleting, setDeleting] = useState(false);
+  const dialogId = useId();
+  const refreshButton = useRef<HTMLButtonElement>(null);
   useEffect(() => { if (createFunctionRequest > 0 && manage) { setCreating(true); setKind("function"); } }, [createFunctionRequest, manage]);
 
   async function checked(response: Response): Promise<Response> {
@@ -221,73 +235,86 @@ export function CapabilityLibrary({ onSessionExpired, manage = true, createFunct
 
   async function remove(): Promise<void> {
     if (selected === null) return;
+    const outcome = { removed: false };
     await run(async () => {
       await checked(await writeRequest(`/v1/capabilities/${encodeURIComponent(selected.id)}`, "DELETE"));
-      setSelected(null); setDeleting(false); setFiles([]); await refresh();
+      outcome.removed = true;
+      setSelected(null); setDeleting(false); setFiles([]);
+      await refresh();
       setNotice("Capability deleted. Its drafts and published versions are no longer downloadable.");
     });
+    if (outcome.removed) requestAnimationFrame(() => { refreshButton.current?.focus(); });
   }
 
   const dirty = files.length > 0;
-  return h("section", { className: "library", "aria-label": "Capability library", "aria-busy": loading || pending },
+  return h("section", { className: "library astryx-route", "aria-label": "Capability library", "aria-busy": loading || pending },
     h("div", { className: "section-heading" }, h("div", null, h("p", { className: "eyebrow" }, "Workspace library"), h("h1", null, "Functions & skills"), h("p", { className: "muted" }, manage ? "Store complete skills and reviewed functions. Publish versions you can reuse anywhere." : "Browse versions granted to you by a workspace owner.")),
-      !manage ? null : h("button", { type: "button", disabled: pending, onClick: () => { setCreating(true); setError(""); setNotice(""); } }, "New capability")),
-    error === "" ? null : h("p", { className: "message error", role: "alert" }, error),
-    notice === "" ? null : h("p", { className: "message success", role: "status" }, notice),
-    creating ? h("section", { className: "panel", "aria-label": "Create capability" },
+      !manage ? null : h(Button, { label: "New capability", variant: "primary", isDisabled: pending, onClick: () => { setCreating(true); setError(""); setNotice(""); } })),
+    error === "" || deleting ? null : h(Banner, { status: "error", title: error, role: "alert" }),
+    notice === "" ? null : h(Banner, { status: "success", title: notice, role: "status" }),
+    pending && !deleting ? h(Spinner, { label: "Working…" }) : null,
+    creating && manage ? h(Card, { "aria-label": "Create capability", role: "region" },
       h("h2", null, "Create a capability"),
       h("form", { onSubmit: (event) => { void create(event); } },
-        h("div", { className: "form-grid" },
-          h("label", null, "Name", h("input", { required: true, maxLength: 120, value: name, disabled: pending, onChange: (event) => { setName(event.currentTarget.value); }, placeholder: "Repository triage" })),
-          h("label", null, "Identifier", h("input", { autoCapitalize: "none", autoCorrect: "off", spellCheck: false, required: true, maxLength: 80, pattern: "[a-z0-9]+(?:-[a-z0-9]+)*", value: slug, disabled: pending, onChange: (event) => { setSlug(event.currentTarget.value); }, placeholder: "repository-triage", "aria-describedby": "identifier-help" })),
-          h("label", null, "Kind", h("select", { value: kind, disabled: pending, onChange: (event: React.ChangeEvent<HTMLSelectElement>) => { setKind(event.currentTarget.value as CapabilityKind); } }, h("option", { value: "skill" }, "Skill bundle"), h("option", { value: "function" }, "Function"))),
+        h(FormLayout, null,
+          h("div", { className: "form-grid" },
+            h(NativeField, { label: "Name" }, h("input", { required: true, maxLength: 120, value: name, disabled: pending, onChange: (event) => { setName(event.currentTarget.value); }, placeholder: "Repository triage" })),
+            h(NativeField, { label: "Identifier", description: "Use a stable lowercase identifier with letters, numbers, or hyphens. It cannot be changed later." }, h("input", { autoCapitalize: "none", autoCorrect: "off", spellCheck: false, required: true, maxLength: 80, pattern: "[a-z0-9]+(?:-[a-z0-9]+)*", value: slug, disabled: pending, onChange: (event) => { setSlug(event.currentTarget.value); }, placeholder: "repository-triage" })),
+            h(NativeField, { label: "Kind" }, h("select", { value: kind, disabled: pending, onChange: (event: React.ChangeEvent<HTMLSelectElement>) => { setKind(event.currentTarget.value as CapabilityKind); } }, h("option", { value: "skill" }, "Skill bundle"), h("option", { value: "function" }, "Function"))),
+          ),
+          h("div", { className: "actions" }, h(Button, { label: "Create capability", variant: "primary", type: "submit", isDisabled: pending }), h(Button, { label: "Cancel", variant: "secondary", isDisabled: pending, onClick: () => { setCreating(false); } })),
         ),
-        h("p", { id: "identifier-help", className: "muted small" }, "Use a stable lowercase identifier with letters, numbers, or hyphens. It cannot be changed later."),
-        h("div", { className: "actions" }, h("button", { type: "submit", disabled: pending }, "Create capability"), h("button", { type: "button", className: "secondary", disabled: pending, onClick: () => { setCreating(false); } }, "Cancel")),
       )) : null,
     h("div", { className: "library-layout" },
-      h("aside", { className: "panel library-nav", "aria-label": "Your capabilities" },
-        h("div", { className: "section-heading compact" }, h("h2", null, "Your library"), h("button", { type: "button", className: "text-button", disabled: pending || loading, onClick: () => { void run(refresh); } }, "Refresh")),
-        loading ? h("p", { role: "status" }, "Loading capabilities…") : capabilities.length === 0 ? h("p", { className: "muted" }, manage ? "No capabilities yet. Create a skill or function to get started." : "No capabilities have been granted to you. Ask your workspace owner for access.") : h("ul", { className: "capability-list" }, ...capabilities.map((capability) => h("li", { key: capability.id },
-          h("button", { type: "button", className: selected?.id === capability.id ? "capability-item active" : "capability-item", "aria-current": selected?.id === capability.id ? "true" : undefined, disabled: pending, onClick: () => { void open(capability.id); } }, h("span", { className: "kind-badge" }, capability.kind), h("strong", null, capability.name), h("span", { className: "muted small" }, capability.slug)),
-        ))),
+      h(Card, { className: "library-nav", role: "complementary", "aria-label": "Your capabilities" },
+        h("div", { className: "section-heading compact" }, h("h2", null, "Your library"), h(Button, { ref: refreshButton, label: "Refresh", variant: "ghost", isDisabled: pending || loading, onClick: () => { void run(refresh); } })),
+        loading ? h(Spinner, { label: "Loading capabilities…" }) : capabilities.length === 0 ? h(EmptyState, { title: "No capabilities yet", description: manage ? "Create a skill or function to get started." : "No capabilities have been granted to you. Ask your workspace owner for access.", isCompact: true }) : h(List, { hasDividers: true, children: capabilities.map((capability) => h(ListItem, {
+          key: capability.id, label: h("strong", null, capability.name), description: h("span", null, capability.slug), endContent: h(Badge, { label: capability.kind }), isSelected: selected?.id === capability.id, isDisabled: pending, onClick: () => { void open(capability.id); },
+        })) }),
       ),
-      selected === null ? h("section", { className: "panel empty-state" }, h("h2", null, "A home for reusable capabilities"), h("p", { className: "muted" }, manage ? "Choose a capability to inspect its draft, publish a version, or download its complete contents." : "Choose a granted capability to inspect its published versions and download authorized skills."), h("p", { className: "muted small" }, "Skills include SKILL.md and their supporting files. Functions currently support github.issues.list.v1. Publishing creates no recipient grant. Owners manage version access in Access; function execution is the next milestone.")) : h("div", { className: "capability-detail" },
-        h("section", { className: "panel" },
-          h("div", { className: "section-heading" }, h("div", null, h("span", { className: "kind-badge" }, selected.kind), h("h2", null, selected.name), h("p", { className: "muted" }, selected.slug)), h("button", { type: "button", className: "secondary", disabled: pending, onClick: () => { void open(selected.id); } }, "Reload capability")),
+      selected === null ? h(Card, null, h(EmptyState, { headingLevel: 2, title: "A home for reusable capabilities", description: manage ? "Choose a capability to inspect its draft, publish a version, or download its complete contents." : "Choose a granted capability to inspect its published versions and download authorized skills." }), h("p", { className: "muted small" }, "Skills include SKILL.md and their supporting files. Functions currently support github.issues.list.v1. Publishing creates no recipient grant. Owners manage version access in Access; function execution is the next milestone.")) : h("div", { className: "capability-detail" },
+        h(Card, null,
+          h("div", { className: "section-heading" }, h("div", null, h(Badge, { label: selected.kind }), h("h2", null, selected.name), h("p", { className: "muted" }, selected.slug)), h(Button, { label: "Reload capability", variant: "secondary", isDisabled: pending, onClick: () => { void open(selected.id); } })),
           !manage ? null : h(React.Fragment, null,
           h("h3", null, selected.draft === null ? "Upload a draft" : "Replace the draft"),
           h("p", { className: "muted" }, selected.kind === "skill" ? "Choose the complete folder with SKILL.md at its root. Include scripts, references, and binary assets. SKILL.md needs name and description frontmatter. Maximum 512 files, 8 MiB per file, 32 MiB total." : "Upload one UTF-8 index.mjs, up to 1 MiB, exporting an async handler without imports or dependencies. This function uses the fixed github.issues.list.v1 contract."),
-          h("form", { onSubmit: (event) => { void saveDraft(event); } },
-            h("label", { className: "version-field" }, "Version", h("input", { required: true, maxLength: 64, pattern: "[A-Za-z0-9][A-Za-z0-9._\\-]{0,63}", value: version, disabled: pending, onChange: (event) => { setVersion(event.currentTarget.value); }, placeholder: "1.0.0", title: "Start with a letter or number; use letters, numbers, dots, underscores, or hyphens." })),
+          h("form", { onSubmit: (event) => { void saveDraft(event); } }, h(FormLayout, null,
+            h(NativeField, { label: "Version", className: "version-field" }, h("input", { required: true, maxLength: 64, pattern: "[A-Za-z0-9][A-Za-z0-9._\\-]{0,63}", value: version, disabled: pending, onChange: (event) => { setVersion(event.currentTarget.value); }, placeholder: "1.0.0", title: "Start with a letter or number; use letters, numbers, dots, underscores, or hyphens." })),
             h("div", { className: "form-grid uploads" },
-              h("label", null, selected.kind === "skill" ? "Skill folder" : "Function source", h("input", { key: `${selected.id}-${selected.kind}`, type: "file", disabled: pending, ...(selected.kind === "skill" ? { multiple: true, webkitdirectory: "" } : { accept: ".mjs" }), onChange: (event) => { const chosen = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void choose(chosen); } })),
-              h("label", null, "Or import a Capykit download", h("input", { type: "file", accept: ".json,application/json", disabled: pending, onChange: (event) => { const chosen = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void choose(chosen, true); } })),
+              h(NativeField, { label: selected.kind === "skill" ? "Skill folder" : "Function source" }, h("input", { key: `${selected.id}-${selected.kind}`, type: "file", disabled: pending, ...(selected.kind === "skill" ? { multiple: true, webkitdirectory: "" } : { accept: ".mjs" }), onChange: (event) => { const chosen = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void choose(chosen); } })),
+              h(NativeField, { label: "Or import a Capykit download" }, h("input", { type: "file", accept: ".json,application/json", disabled: pending, onChange: (event) => { const chosen = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; void choose(chosen, true); } })),
             ),
             files.length === 0 ? null : h("div", { className: "upload-review" },
               h("h4", null, `${String(files.length)} files selected`),
               h("p", { className: "muted small" }, "Folder uploads cannot read executable permissions. Mark executable scripts below. Importing a Capykit download preserves those flags."),
-              h("div", { className: "table-scroll" }, h("table", null,
-                h("thead", null, h("tr", null, h("th", { scope: "col" }, "File"), h("th", { scope: "col" }, "Executable"))),
-                h("tbody", null, ...files.map((file, index) => h("tr", { key: file.path }, h("td", null, h("code", null, file.path)), h("td", null, h("input", { type: "checkbox", checked: file.executable, disabled: pending, "aria-label": `Executable: ${file.path}`, onChange: (event) => { const executable = event.currentTarget.checked; setFiles((current) => current.map((entry, position) => position === index ? { ...entry, executable } : entry)); } }))))),
-              ))),
-            h("div", { className: "actions" }, h("button", { type: "submit", disabled: pending || !dirty }, pending ? "Working…" : "Save and validate draft"), !dirty ? null : h("button", { type: "button", className: "secondary", disabled: pending, onClick: () => { setFiles([]); setVersion(selected.draft?.version ?? "1.0.0"); setNotice(""); } }, "Discard selected files")),
-          ),
+              h(Table, { density: "compact", "aria-label": "Selected files and executable flags" },
+                h(TableHeader, null, h(TableRow, { isHeaderRow: true, children: [h(TableHeaderCell, { key: "file", scope: "col" }, "File"), h(TableHeaderCell, { key: "executable", scope: "col" }, "Executable")] })),
+                h(TableBody, null, ...files.map((file, index) => h(TableRow, { key: file.path, children: [h(TableCell, { key: "file" }, h("code", null, file.path)), h(TableCell, { key: "executable" }, h(CheckboxInput, { label: `Executable: ${file.path}`, isLabelHidden: true, value: file.executable, isDisabled: pending, onChange: (executable: boolean) => { setFiles((current) => current.map((entry, position) => position === index ? { ...entry, executable } : entry)); } }))] }))),
+              )),
+            h("div", { className: "actions" }, h(Button, { label: "Save and validate draft", variant: "primary", type: "submit", isDisabled: pending || !dirty }), !dirty ? null : h(Button, { label: "Discard selected files", variant: "secondary", isDisabled: pending, onClick: () => { setFiles([]); setVersion(selected.draft?.version ?? "1.0.0"); setNotice(""); } })),
+          )),
         )),
-        !manage || selected.draft === null ? null : h("section", { className: "panel", "aria-label": "Saved draft" }, h("div", { className: "section-heading" }, h("h3", null, `Draft · ${selected.draft.version}`), h("span", { className: "status-badge" }, "Unpublished")),
+        !manage || selected.draft === null ? null : h(Card, { role: "region", "aria-label": "Saved draft" }, h("div", { className: "section-heading" }, h("h3", null, `Draft · ${selected.draft.version}`), h(Badge, { label: "Unpublished" })),
           h(Summary, { artifact: selected.draft }),
           h("p", { className: "muted small" }, "Publishing permanently fixes these files, their executable flags, and the contract to this version. A later change requires a new version."),
-          h("button", { type: "button", disabled: pending || dirty || version.trim() !== selected.draft.version, onClick: () => { void publish(); } }, `Publish ${selected.draft.version}`),
+          h(Button, { label: `Publish ${selected.draft.version}`, variant: "primary", isDisabled: pending || dirty || version.trim() !== selected.draft.version, onClick: () => { void publish(); } }),
           !dirty && version.trim() === selected.draft.version ? null : h("p", { className: "muted small" }, "Save or discard your upload changes before publishing the saved draft."),
         ),
-        h("section", { className: "panel", "aria-label": "Published versions" }, h("h3", null, "Published versions"),
-          selected.versions.length === 0 ? h("p", { className: "muted" }, "No published versions yet.") : selected.versions.map((published) => h("article", { className: "published-version", key: published.version },
-            h("div", { className: "section-heading" }, h("div", null, h("h4", null, published.version), h("p", { className: "muted small" }, `Published ${new Date(published.publishedAt).toLocaleString()}`)), !manage && selected.kind === "function" ? null : h("button", { type: "button", className: "secondary", disabled: pending, onClick: () => { void download(published.version); } }, `Download ${published.version}`)), h(Summary, { artifact: published }),
+        h(Card, { role: "region", "aria-label": "Published versions" }, h("h3", null, "Published versions"),
+          selected.versions.length === 0 ? h(EmptyState, { title: "No published versions yet.", isCompact: true }) : selected.versions.map((published) => h("article", { className: "published-version", key: published.version },
+            h("div", { className: "section-heading" }, h("div", null, h("h4", null, published.version), h("p", { className: "muted small" }, `Published ${new Date(published.publishedAt).toLocaleString()}`)), !manage && selected.kind === "function" ? null : h(Button, { label: `Download ${published.version}`, variant: "secondary", isDisabled: pending, onClick: () => { void download(published.version); } })), h(Summary, { artifact: published }),
           )),
           h("p", { className: "muted small" }, "Downloads include every file as base64, original paths, executable flags, a verified digest, and invocation guidance in one portable JSON artifact."),
         ),
-        !manage ? null : h("section", { className: "panel deletion", "aria-label": "Delete capability" },
-          deleting ? h("div", null, h("h3", null, `Delete ${selected.name}?`), h("p", null, "This removes its draft and all published versions from the workspace. Future downloads stop immediately. Existing downloaded copies and backups are not erased."), h("div", { className: "actions" }, h("button", { type: "button", className: "danger", disabled: pending, onClick: () => { void remove(); } }, "Delete capability and versions"), h("button", { type: "button", className: "secondary", disabled: pending, onClick: () => { setDeleting(false); } }, "Keep capability"))) : h("button", { type: "button", className: "text-button danger-text", disabled: pending, onClick: () => { setDeleting(true); } }, "Delete capability"),
+        !manage ? null : h(Card, { role: "region", "aria-label": "Delete capability" },
+          h(Button, { label: "Delete capability", variant: "destructive", isDisabled: pending, onClick: () => { setDeleting(true); setError(""); } }),
+          h(Dialog, { isOpen: deleting, purpose: pending ? "required" : "form", width: 560, "aria-labelledby": `${dialogId}-title`, "aria-describedby": `${dialogId}-description`, onOpenChange: (isOpen: boolean) => { if (!isOpen && !pending) setDeleting(false); }, children: h(FormLayout, { className: "capability-confirm-content", style: { overflowY: "auto" } },
+            h("h3", { id: `${dialogId}-title` }, `Delete ${selected.name}?`),
+            h("p", { id: `${dialogId}-description` }, "This removes its draft and all published versions from the workspace. Future downloads stop immediately. Existing downloaded copies and backups are not erased."),
+            !deleting || error === "" ? null : h(Banner, { status: "error", title: error, role: "alert" }),
+            pending ? h(Spinner, { label: "Deleting capability…" }) : null,
+            h("div", { className: "actions" }, h(Button, { label: "Delete capability and versions", variant: "destructive", isDisabled: pending, onClick: () => { void remove(); } }), h(Button, { label: "Keep capability", variant: "secondary", "data-autofocus": "", isDisabled: pending, onClick: () => { setDeleting(false); } })),
+          ) }),
         ),
       ),
     ),
