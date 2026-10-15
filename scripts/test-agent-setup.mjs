@@ -104,7 +104,7 @@ function fixture(settings) {
   if (settings.noActiveFor) for (const key of keys) if (key.principalId === id[settings.noActiveFor]) key.status = 'revoked';
   const grants = [{ id: id.ga, recipientId: id.a, name: recipients[0].name, actionId: actions[0].id, connectionId: id.connection, repositoryIds: ['101'], expiresAt, status: 'active' }, { id: id.gb, recipientId: id.b, name: recipients[1].name, actionId: actions[0].id, connectionId: id.connection, repositoryIds: ['102'], expiresAt, status: 'active' }];
   return { id, recipients, keys, grants, actions, expiresAt, requests: [], violations: [], sentinels: [],
-    keyStarted: deferred(), grantStarted: deferred(), keyGate: null, grantGate: null, keyResponse: 'ok', grantResponse: 'ok', personalGrants: [], failRefresh: false, clipboardFails: false, ownerReads: 0, ...settings };
+    keyStarted: deferred(), grantStarted: deferred(), connectionStarted: deferred(), keyGate: null, grantGate: null, connectionGate: null, keyResponse: 'ok', grantResponse: 'ok', personalGrants: [], failRefresh: false, clipboardFails: false, ownerReads: 0, ...settings };
 }
 const visible = locator => locator.filter({ visible: true });
 const button = (scope, name) => visible(scope.getByRole('button', { name }));
@@ -150,6 +150,11 @@ async function check(name, settings, run) {
         const content = await getAsset(path);
         assert.ok(content, 'Fixture asset missing.');
         return route.fulfill({ contentType: path === '/' ? 'text/html' : path.endsWith('.css') ? 'text/css' : path.endsWith('.woff2') ? 'font/woff2' : 'text/javascript', body: content });
+      }
+      if (state.connectionError && ((request.method() === 'DELETE' && path.startsWith('/v1/connections/')) || path === '/v1/connections/github/start')) {
+        state.connectionStarted.resolve();
+        if (state.connectionGate) await state.connectionGate.promise;
+        return json({ error: { code: state.connectionError } }, 403);
       }
       if (path === '/v1/auth/method') return json({ method: 'email', available: true });
       if (path === '/v1/me') return json({ identity: { email: 'owner@example.test', principalKind: 'human' }, workspace: { id: state.id.workspace, role: 'owner' } });
@@ -264,7 +269,7 @@ async function check(name, settings, run) {
     const assertion = error instanceof assert.AssertionError || (settings.personal && state.sentinels.length === 0) ? error.message.split('\n')[0].replace(/ck_agent_[A-Za-z0-9_-]{43}/gu, '[redacted]') : undefined;
     results.push({ name, passed: false, fixtureOnly: true, step, violations: state.violations, requestPaths: state.requests.map(r => `${r.method} ${r.path}`), error: error instanceof assert.AssertionError ? 'assertion' : error.name === 'TimeoutError' ? 'timeout' : 'fixture-error', ...(assertion ? { assertion } : {}) });
   } finally {
-    state.keyGate?.resolve(); state.grantGate?.resolve(); state.accessGate?.resolve(); state.appsGate?.resolve(); await context.close();
+    state.keyGate?.resolve(); state.grantGate?.resolve(); state.connectionGate?.resolve(); state.accessGate?.resolve(); state.appsGate?.resolve(); await context.close();
   }
 }
 let getAsset;
@@ -410,7 +415,7 @@ async function capture(test,name) {
   if(state.sentinels.length)await secretPresent(page,state,revealing);
   screenshots.push({file,route:new URL(page.url()).pathname+new URL(page.url()).search,viewport:page.viewportSize(),theme:settings.theme??'system',mediaPreference:settings.media??'light',fixtureOnly:true,credentialValuesRedacted:revealing,redactionMethod:revealing?'DOM input values replaced for capture only; restored after screenshot':null,buildSha256:evidenceMetadata.buildSha256});
 }
-async function visualChecks() {
+async function describeBuild() {
   assert.notEqual(process.env.CAPYKIT_AGENT_SOURCE,'1','Visual proof must use built Vite assets.');
   await mkdir(process.env.CAPYKIT_AGENT_VISUAL_DIR,{recursive:true});
   const directory=resolve(process.env.CAPYKIT_CONSOLE_DIR??join(root,'dist/console'));
@@ -418,6 +423,9 @@ async function visualChecks() {
   const hash=createHash('sha256'),assetHashes={};
   for(const file of files){const bytes=await readFile(join(directory,file));hash.update(file);hash.update(bytes);assetHashes[file]=createHash('sha256').update(bytes).digest('hex');}
   evidenceMetadata={phase:baseline?'before':'after',revision:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),revisionMeaning:'HEAD identifies repository revision; buildSha256 identifies exact served Vite bytes including any uncommitted implementation.',buildSha256:hash.digest('hex'),assetHashes,browserVersion:browser.version(),nodeVersion:process.version,astryxVersion:'0.7.0',fixtureOnly:true,liveBackendVerified:false,providerVerified:false,physicalDeviceVerified:false,independentReview:false,implementationModel:'gpt-6.1-sol',pluginRevision:'08359024b405bf92afc3b4624675415384b67e5a',screenshots};
+}
+async function visualChecks() {
+  await describeBuild();
   for(const width of baseline?[375,1440]:[320,375,430,1440]) for(const theme of ['light','dark']) {
     await check(`Visual Agents list/detail ${width} ${theme}`,{width,theme},async test=>{
       if(!baseline){await visualGeometry(test.page);assert.ok(await test.panel.locator('.astryx-list').count());}
@@ -489,6 +497,7 @@ async function visualChecks() {
     await unknownReadiness(test.panel);
   });
   await replacementRecoveryChecks(true);
+  await modalRecoveryChecks(true);
 }
 async function replacementRecoveryChecks(retain=false) {
   for(const outcome of ['ambiguous','denied'])for(const theme of ['light','dark']) {
@@ -546,18 +555,119 @@ async function replacementRecoveryChecks(retain=false) {
     });
   }
 }
+async function modalRecoveryChecks(retain=Boolean(process.env.CAPYKIT_AGENT_VISUAL_DIR)) {
+  for (const theme of ['light', 'dark']) {
+    for (const kind of ['google', 'personal', 'github', 'reconnect']) {
+      await check(`${kind} rejected confirmation exposes keyboard recovery ${theme}`, {
+        width: 320, theme, raw: true, personal: kind === 'personal',
+        route: '/?tab=connections&app=' + (kind === 'google' ? 'google-drive' : 'github'),
+        connectionError: kind === 'reconnect' ? 'GITHUB_SELECTED_REPOSITORIES_REQUIRED' : 'FORBIDDEN', connectionGate: deferred(),
+      }, async test => {
+        const { page, state } = test;
+        const beforeKeys=structuredClone(state.keys),beforeGrants=structuredClone(state.grants);
+        let scope=page;
+        if (kind === 'personal') {scope=page.getByRole('region',{name:'GitHub personal connections',exact:true});await scope.waitFor();}
+        if (kind === 'github' || kind === 'reconnect') {
+          await page.locator('.connection-management > summary').click();
+          await page.getByRole('navigation',{name:'Connections',exact:true}).getByRole('button',{name:/Fixture GitHub/}).click();
+          scope=page.getByRole('region',{name:'Connection details',exact:true});await scope.waitFor();
+        }
+        step='open exact connection confirmation';
+        const trigger=button(scope,kind === 'reconnect' ? /^Review and reconnect$/ : /^Disconnect$/);
+        await trigger.focus();await page.keyboard.press('Enter');
+        const dialog=page.getByRole('dialog',{name:kind === 'google' ? 'Disconnect Google Drive' : kind === 'personal' ? 'Disconnect personal account' : kind === 'github' ? 'Disconnect GitHub' : 'Review and reconnect GitHub',exact:true});
+        await dialog.waitFor();assert.equal(await dialog.getByRole('alert').count(),0);
+        const submit=button(dialog,kind === 'reconnect' ? /^Continue with GitHub$/ : /^Confirm disconnect$/);
+        await submit.focus();await page.keyboard.press('Enter');await completed(state.connectionStarted.promise);
+        step='pending connection request blocks duplicate submit and Escape';
+        const pending=page.locator('dialog[open]');
+        assert.equal(await pending.getByRole('button').filter({visible:true}).evaluateAll(nodes=>nodes.every(node=>node.disabled)),true);
+        await page.keyboard.press('Enter');await page.keyboard.press('Escape');
+        assert.equal(await pending.count(),1);
+        const writes=()=>state.requests.filter(r=>r.method==='DELETE'||r.path==='/v1/connections/github/start');
+        assert.equal(writes().length,1);
+        assert.equal(writes()[0].path,kind === 'google' ? '/v1/connections/google' : kind === 'personal' ? `/v1/connections/personal/${state.id.personal}` : kind === 'github' ? `/v1/connections/${state.id.connection}` : '/v1/connections/github/start');
+        if (kind === 'reconnect') assert.deepEqual(writes()[0].body,{connectionId:state.id.connection});
+        state.connectionGate.resolve();
+        step='rejected connection shows one reachable modal alert';
+        await dialog.getByRole('alert').waitFor();await submit.waitFor();
+        await page.waitForFunction(()=>[...document.querySelectorAll('dialog[open] button')].every(node=>!node.disabled));
+        assert.equal(await page.getByRole('alert').count(),1,'Only the active dialog announces its error.');
+        assert.equal(await page.locator('[role="alert"]').count(),1,'The outer error must not be duplicated.');
+        assert.match(await dialog.getByRole('alert').innerText(),kind === 'reconnect' ? /Only select repositories/ : kind === 'personal' ? /no longer have permission/ : /workspace owner/);
+        if (kind === 'reconnect') {
+          const recovery=dialog.getByRole('link',{name:'Manage GitHub access ↗',exact:true});
+          assert.equal(await recovery.getAttribute('href'),'https://github.com/apps/fixture/installations/new');
+          await recovery.focus();assert.ok(await recovery.evaluate(node=>document.activeElement===node));
+        }
+        const cancel=button(dialog,kind === 'google' || kind === 'personal' ? /^Keep connected$/ : kind === 'github' ? /^Cancel$/ : /^Keep current connection$/);
+        await cancel.focus();assert.ok(await cancel.evaluate(node=>document.activeElement===node));
+        await visualGeometry(page);
+        if (retain) await capture(test,`${kind}-rejected-dialog`);
+        await page.keyboard.press('Enter');await dialog.waitFor({state:'hidden'});
+        assert.ok(await trigger.evaluate(node=>document.activeElement===node));
+        assert.equal(writes().length,1,'Recovery does not replay a rejected request.');
+        await page.keyboard.press('Enter');await dialog.waitFor();
+        assert.equal(await dialog.getByRole('alert').count(),0,'Opening a new confirmation clears stale errors.');
+        await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
+        assert.deepEqual(state.keys,beforeKeys);assert.deepEqual(state.grants,beforeGrants);
+      });
+    }
+    for (const elapsed of [false,true]) {
+      await check(`Replacement expiry ${elapsed ? 'passes while confirming' : 'is already past with setup closed'} focuses editable field ${theme}`,{width:320,theme},async test=>{
+        const {page,panel,state}=test;
+        await chooseAgent(test);await openSetup(panel);
+        const beforeKeys=structuredClone(state.keys),beforeGrants=structuredClone(state.grants),beforeRecipients=structuredClone(state.recipients);
+        const expiry=panel.getByLabel('Access expires',{exact:true});
+        await expiry.fill(elapsed ? '2026-10-15T11:31' : '2026-10-14T10:00');
+        await panel.locator('.agent-setup > summary').click();
+        const rotate=button(panel.locator(`[data-key-id="${state.id.a1}"]`),/^Replace this key$/);
+        await rotate.focus();await page.keyboard.press('Enter');
+        const dialog=page.getByRole('dialog',{name:'Replace this exact key?',exact:true});
+        if (elapsed) {
+          await dialog.waitFor();
+          for (const id of [state.id.a,state.id.a1]) assert.ok((await dialog.innerText()).includes(id));
+          await page.clock.setFixedTime(new Date(fixedNow.getTime()+120000));
+          await button(dialog,/^Confirm exact key replacement$/).focus();await page.keyboard.press('Enter');
+        }
+        step='invalid expiry restores focus without a request';
+        await panel.getByRole('alert').filter({hasText:'Choose a valid future local expiry within one year.'}).waitFor();
+        await dialog.waitFor({state:'hidden'});
+        await page.waitForFunction(()=>document.activeElement?.getAttribute('type')==='datetime-local');
+        assert.equal(await panel.locator('.agent-setup').evaluate(node=>node.open),true);
+        assert.ok(await expiry.isEnabled());assert.equal(keyPosts(state).length,0);
+        await visualGeometry(page);
+        if (retain) await capture(test,`replacement-expiry-${elapsed?'elapsed':'past'}-recovery`);
+        // Repeating validation with the same error still returns keyboard focus.
+        await panel.locator('.agent-setup > summary').click();
+        await rotate.focus();await page.keyboard.press('Enter');
+        assert.ok(await expiry.evaluate(node=>document.activeElement===node));
+        await expiry.fill('2026-11-01T10:00');
+        await rotate.focus();await page.keyboard.press('Enter');await dialog.waitFor();
+        assert.equal(await panel.getByRole('alert').count(),0,'Corrected expiry must not retain the stale validation error.');
+        for (const id of [state.id.a,state.id.a1]) assert.ok((await dialog.innerText()).includes(id));
+        await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
+        assert.ok(await rotate.evaluate(node=>document.activeElement===node),'Corrected expiry cancellation restores the exact replacement trigger.');
+        assert.equal(keyPosts(state).length,0);assert.deepEqual(state.keys,beforeKeys);assert.deepEqual(state.grants,beforeGrants);assert.deepEqual(state.recipients,beforeRecipients);
+        await secretPresent(page,state,false);
+      });
+    }
+  }
+}
 async function main() {
   const { chromium } = await loadPlaywright();
   getAsset = await assets();
   const executablePath = await chromiumPath();
   browser = await chromium.launch({ ...(executablePath ? { executablePath } : {}), headless: true, args: ['--no-sandbox'] });
   if(visualOnly){await visualChecks();return;}
+  if(process.env.CAPYKIT_AGENT_VISUAL_DIR)await describeBuild();
   await check('Agents route and owner entry point', {}, async ({ page }) => {
     step = 'Agents navigation is current';
     assert.equal(await page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', { name: 'Agents', exact: true }).getAttribute('aria-current'), 'page');
   });
   if (!results[0].passed) return; // Missing integration is a blocker, not dozens of invented results.
   await replacementRecoveryChecks();
+  await modalRecoveryChecks();
   await check('Existing duplicate-name identity reuse does not create another principal', { noActiveFor: 'b' }, async test => {
     await chooseAgent(test, 'b'); const recipients = structuredClone(test.state.recipients);
     await issueKey(test);

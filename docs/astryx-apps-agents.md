@@ -91,7 +91,21 @@ package upgrade is attempted. The existing dependency audit reported 15 findings
 Implementation model: GPT-6.1 Sol (`gpt-6.1-sol`). Installed engineering plugin
 revision: `08359024b405bf92afc3b4624675415384b67e5a`; its instructions were read.
 There is no tracked repository AGENTS.md. This is a reviewable draft, not
-merge or production approval. Independent GPT-6 Astra review was unavailable
-and was not
-performed or claimed. Live backend/provider, physical-device and environment-gated
-database verification remain unverified; fixtures are not substitutes for them.
+merge or production approval. The original implementation had no independent
+review; two later GPT-6 Astra passes identified confirmation recovery defects.
+The user-authorized manual GPT-6.1 Sol repair exposes connection errors and GitHub
+repository recovery inside their confirmations and returns invalid replacement
+expiry to its editable field, including when setup is collapsed. A new independent
+review of this repair remains pending.
+
+The existing browser harness now covers four rejected connection confirmations
+and replacement expiry both before and during confirmation, in light/dark mode at
+320px. Run the retained recovery capture against an isolated build:
+
+```sh
+CAPYKIT_AGENT_VISUAL_DIR=/tmp/capykit-eng161-manual-evidence/recovery CAPYKIT_AGENT_EVIDENCE_FILE=/tmp/capykit-eng161-manual-evidence/regression.json node scripts/test-agent-setup.mjs
+```
+
+These are new synthetic recovery captures; the original screenshot metadata is
+historical. Live backend/provider, physical-device and environment-gated database
+verification remain unverified; fixtures are not substitutes for them.
