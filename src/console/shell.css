@@ -68,7 +68,12 @@
   .astryx-route summary { min-height: 44px; padding-block: 12px; cursor: pointer; }
   .astryx-route details { margin-block: 12px; }
   .astryx-route .agent-key-heading, .astryx-route .agent-setup > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .astryx-route .agent-setup > summary { flex-wrap: nowrap; }
+  .astryx-route .agent-setup > summary > span:nth-child(2) { min-width: 0; flex: 1; }
   .astryx-route .setup-description { display: block; }
+  .astryx-route .agent-access-card > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .astryx-route .agent-access-copy { min-width: 0; }
+  .astryx-route .agent-verification { margin-block: 16px; }
   .astryx-route .agent-section { margin-block: 24px; }
   .astryx-route .repository-picker { min-width: 0; max-height: 360px; overflow: auto; margin-block: 16px; }
   .astryx-route .astryx-checkbox-input, .astryx-route .astryx-checkbox-label { min-height: 44px; }
@@ -82,6 +87,10 @@
   .astryx-route .capykit-native-control { width: 100%; min-width: 0; min-height: 44px; font: inherit; font-size: 1rem; padding: 10px; }
   .astryx-route .astryx-field input[type="datetime-local"] { max-width: 100%; }
   .astryx-route .astryx-text-input input { min-height: 44px; }
+  @media (max-width: 640px) {
+    .astryx-route .agent-heading { flex-wrap: wrap; }
+    .astryx-route .agent-heading > div { width: 100%; }
+  }
   @media (min-width: 641px) {
     .console { padding-inline: 32px; padding-bottom: 48px; }
     .app-header { flex-wrap: nowrap; }

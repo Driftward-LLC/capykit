@@ -166,6 +166,11 @@ async function check(name, settings, run) {
       if (path === '/v1/agents/keys' && request.method() === 'POST') {
         assert.equal(['name', 'principalId', 'rotateKeyId'].filter(field => Object.hasOwn(body, field)).length, 1, 'Key selectors must be mutually exclusive.');
         assert.ok(Date.parse(body.expiresAt) > fixedNow.getTime(), 'Key expiry must be in the future.');
+        if(state.keyResponse==='denied'){
+          state.keyStarted.resolve();
+          if(state.keyGate)await state.keyGate.promise;
+          return json({error:{code:'FORBIDDEN'}},403);
+        }
         let principalId = body.principalId;
         if (body.rotateKeyId) {
           const old = state.keys.find(key => key.id === body.rotateKeyId);
@@ -397,12 +402,13 @@ async function capture(test,name) {
   const fields=page.locator('input,textarea');
   // Full-page pixel masks can drift when focused inputs scroll. Redact the fixture
   // DOM values for capture only; never rely on a rectangle hiding the secret.
-  const originals=state.sentinels.length?await fields.evaluateAll(nodes=>nodes.map(node=>node.value)):null;
+  const revealing=state.sentinels.length>0&&await fields.evaluateAll((nodes,values)=>nodes.some(node=>values.includes(node.value)),state.sentinels);
+  const originals=revealing?await fields.evaluateAll(nodes=>nodes.map(node=>node.value)):null;
   if(originals)await fields.evaluateAll(nodes=>{for(const node of nodes){node.value='[REDACTED FIXTURE VALUE]';if(node instanceof HTMLInputElement&&['text','password','search'].includes(node.type))node.setSelectionRange(0,0);}});
   try{await page.screenshot({path:join(dir,file),fullPage:true});}
   finally{if(originals)await fields.evaluateAll((nodes,values)=>{nodes.forEach((node,index)=>{node.value=values[index];});},originals);}
-  if(state.sentinels.length)await secretPresent(page,state,true);
-  screenshots.push({file,route:new URL(page.url()).pathname+new URL(page.url()).search,viewport:page.viewportSize(),theme:settings.theme??'system',mediaPreference:settings.media??'light',fixtureOnly:true,credentialValuesRedacted:state.sentinels.length>0,redactionMethod:state.sentinels.length?'DOM input values replaced for capture only; restored after screenshot':null,buildSha256:evidenceMetadata.buildSha256});
+  if(state.sentinels.length)await secretPresent(page,state,revealing);
+  screenshots.push({file,route:new URL(page.url()).pathname+new URL(page.url()).search,viewport:page.viewportSize(),theme:settings.theme??'system',mediaPreference:settings.media??'light',fixtureOnly:true,credentialValuesRedacted:revealing,redactionMethod:revealing?'DOM input values replaced for capture only; restored after screenshot':null,buildSha256:evidenceMetadata.buildSha256});
 }
 async function visualChecks() {
   assert.notEqual(process.env.CAPYKIT_AGENT_SOURCE,'1','Visual proof must use built Vite assets.');
@@ -482,6 +488,63 @@ async function visualChecks() {
     await capture(test,`system-${media}`);await test.page.emulateMedia({colorScheme:media==='light'?'dark':'light'});
     await unknownReadiness(test.panel);
   });
+  await replacementRecoveryChecks(true);
+}
+async function replacementRecoveryChecks(retain=false) {
+  for(const outcome of ['ambiguous','denied'])for(const theme of ['light','dark']) {
+    await check(`Exact-key ${outcome} response closes modal and focuses keyboard reconciliation ${theme}`,{width:375,theme,keyResponse:outcome,keyGate:deferred()},async test=>{
+      await chooseAgent(test);
+      const {page,panel,state}=test,beforeKeys=structuredClone(state.keys),beforeGrants=structuredClone(state.grants),beforeRecipients=structuredClone(state.recipients);
+      const rotate=button(panel.locator(`[data-key-id="${state.id.a1}"]`),/^Replace this key$/);
+      await rotate.focus();await page.keyboard.press('Enter');
+      const dialog=page.getByRole('dialog',{name:'Replace this exact key?',exact:true});await dialog.waitFor();
+      for(const id of [state.id.a,state.id.a1])assert.ok((await dialog.innerText()).includes(id));
+      await button(dialog,/^Confirm exact key replacement$/).evaluate(node=>{node.click();node.click();});
+      await completed(state.keyStarted.promise);assert.equal(keyPosts(state).length,1);
+      await page.keyboard.press('Escape');assert.equal(await page.locator('dialog[open]').count(),1,'Pending writes cannot dismiss confirmation.');
+      state.keyGate.resolve();
+      step='failed exact-key modal releases recovery focus';
+      await visible(panel.getByRole('alert')).first().waitFor();
+      await dialog.waitFor({state:'hidden'});
+      const reload=button(panel,labels.refresh);
+      await page.waitForFunction(()=>document.activeElement?.textContent==='Reload metadata');
+      assert.ok(await reload.isEnabled());
+      assert.equal(keyPosts(state).length,1);assert.equal(keyPosts(state)[0].body.rotateKeyId,state.id.a1);
+      assert.equal(keyPosts(state)[0].body.principalId,undefined);assert.equal(keyPosts(state)[0].body.name,undefined);
+      if(outcome==='ambiguous'){
+        assert.ok(await rotate.isDisabled(),'Uncertainty pauses replacement until metadata reconciliation.');
+        assert.equal(state.keys.find(k=>k.id===state.id.a1).status,'revoked');
+        assert.equal(state.keys[0].principalId,state.id.a);
+      }else{
+        assert.deepEqual(state.keys,beforeKeys,'Denied replacement must not change keys.');
+        assert.doesNotMatch(await panel.innerText(),/Reconcile before changing access|outcome is unknown/u);
+      }
+      await unknownReadiness(panel);await secretPresent(page,state,false);
+      if(retain){await visualGeometry(page);await capture(test,`exact-key-${outcome}-recovery`);}
+      if(outcome==='denied'){
+        await rotate.focus();await page.keyboard.press('Enter');await dialog.waitFor();
+        await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
+        assert.ok(await rotate.evaluate(node=>document.activeElement===node),'A stale denial must not steal Cancel/Escape restoration from the exact trigger.');
+        await reload.focus();
+      }
+      // Exercise recovery through real keyboard activation, never a forced click behind a modal.
+      if(outcome==='ambiguous'){
+        state.failRefresh=true;await page.keyboard.press('Enter');
+        await panel.getByRole('alert').filter({hasText:'Could not load current agent metadata'}).waitFor();
+        await page.waitForFunction(()=>document.activeElement?.textContent==='Reload metadata');
+        assert.ok(await rotate.isDisabled());assert.equal(keyPosts(state).length,1);
+      }
+      state.failRefresh=false;
+      const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/v1/action-access');
+      await page.keyboard.press('Enter');await response;
+      await page.waitForFunction(()=>document.querySelector('.action-access')?.getAttribute('aria-busy')==='false');
+      assert.equal(keyPosts(state).length,1,'Recovery never replays the write.');
+      assert.deepEqual(state.grants,beforeGrants);assert.deepEqual(state.recipients,beforeRecipients);
+      for(const id of [state.id.a2,state.id.b1])assert.deepEqual(state.keys.find(k=>k.id===id),beforeKeys.find(k=>k.id===id));
+      await openSetup(panel);assert.equal(await panel.getByLabel('Existing agent',{exact:true}).inputValue(),state.id.a);
+      await secretPresent(page,state,false);await unknownReadiness(panel);
+    });
+  }
 }
 async function main() {
   const { chromium } = await loadPlaywright();
@@ -494,6 +557,7 @@ async function main() {
     assert.equal(await page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', { name: 'Agents', exact: true }).getAttribute('aria-current'), 'page');
   });
   if (!results[0].passed) return; // Missing integration is a blocker, not dozens of invented results.
+  await replacementRecoveryChecks();
   await check('Existing duplicate-name identity reuse does not create another principal', { noActiveFor: 'b' }, async test => {
     await chooseAgent(test, 'b'); const recipients = structuredClone(test.state.recipients);
     await issueKey(test);
@@ -874,8 +938,19 @@ async function main() {
       assert.equal(await visible(test.panel.getByRole('combobox')).count(),0,'Returning management is not an expanded form stack.');
       const nav=test.page.getByRole('navigation',{name:'Workspace',exact:true});
       assert.deepEqual(await nav.getByRole('button').allTextContents(),['Apps','Agents','Actions']);
-      const hierarchy=await test.panel.evaluate(panel=>['.agent-heading','.agent-verification','.agent-setup','[aria-label="Agent keys"]','[aria-label="Allowed workspace access"]','.agent-history'].map(selector=>panel.querySelector(selector).getBoundingClientRect().top));
+      const hierarchy=await test.panel.evaluate(panel=>['.agent-heading','.agent-verification','[aria-label="Allowed workspace access"]','.agent-setup','[aria-label="Agent keys"]','.agent-history'].map(selector=>panel.querySelector(selector).getBoundingClientRect().top));
       assert.ok(hierarchy.every((top,index)=>!index||top>hierarchy[index-1]));
+      assert.ok((await test.panel.locator('.agent-metadata').innerText()).includes(test.state.id.b.slice(-8)));
+      assert.equal(await test.panel.locator('.agent-verification.astryx-banner').count(),0,'Unverified is neutral information, not a warning.');
+      const copy=test.panel.locator('.agent-access-copy');
+      assert.match(await copy.innerText(),/GitHub\nGet an issue\nAccount: Fixture GitHub\nRepositories: fixture\/second\nRead only · active\nExpires /u);
+      const lines=await copy.locator(':scope > .astryx-text').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect()));
+      assert.equal(lines.length,6);
+      assert.ok(lines.every((box,index)=>!index||box.top>=lines[index-1].bottom),'Access labels must not merge inline.');
+      await copy.locator('..').click();
+      const exact=test.panel.locator('.agent-access-card');
+      for(const id of [test.state.id.b,test.state.id.gb,test.state.id.connection,'102'])assert.ok((await exact.innerText()).includes(id),'Technical IDs remain discoverable.');
+      await copy.locator('..').click();
       const navLines=await nav.locator('button span').evaluateAll(nodes=>nodes.every(node=>node.getBoundingClientRect().height<=parseFloat(getComputedStyle(node).lineHeight)+1));
       assert.ok(navLines,'Navigation labels must not wrap, including midword.');
       if(process.env.CAPYKIT_AGENT_VISUAL_DIR){

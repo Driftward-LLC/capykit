@@ -75,3 +75,65 @@ See [migration notes](../../astryx-apps-agents.md) for exact commands and suppor
 external browser overrides. Preserve BEFORE; do not overwrite it with a current
 build. The fixture origin is `https://capykit.example.test`; every browser request
 is intercepted and unknown/external routes are aborted.
+
+## Bounded PR #82 repair after review pass 1
+
+The repair starts from exact remote head
+`005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2` on the existing branch. The PR body,
+Linear reference and bridge marker remain unchanged. Only the supplied independent
+review findings are addressed; this is still a draft, not merge or deployment
+approval. Implementation is GPT-6.1 Sol through the managed bridge. No additional
+independent review was launched; the coordinator owns Astra pass 2 of 2.
+
+- Failed exact-key changes now close the native modal and focus Reload metadata.
+  Uncertain writes remain paused, including after a failed reconciliation read.
+  Recovery uses keyboard activation and never replays the write. Definite denial
+  stays distinct from unknown completion; reopening/cancelling retains normal
+  trigger focus restoration. The shared mutation path covers revoke failures too.
+- Allowed access leads the selected identity view. Installed Astryx 0.7.0 Stack
+  and Text separate app, action, account, resource scope, status and expiry. Exact
+  IDs remain in expandable details and confirmations. The name and safe identity
+  suffix are readable at narrow widths; normal Not yet verified is compact,
+  neutral information, not a warning or a successful-client claim. Keys, history
+  and the existing focused setup disclosure stay available below access.
+- [Fresh BEFORE metadata](repair-before/metadata.json): 38 fixture scenarios,
+  64 captures from the original PR head, including 320/375/430/1440px in both
+  themes. A separate rebuild of that head matches every retained asset SHA-256.
+- [Regression against the original head](repair-before-regression.json): the four
+  lost-response/denied replacement cases fail at modal recovery, and the four
+  changed hierarchy checks fail as expected. This is intentional RED evidence,
+  not a claimed pass.
+- [Fresh AFTER metadata](repair-after/metadata.json): 42 scenarios pass, 68
+  captures. [Lifecycle regressions](repair-regression.json): all 51 scenarios pass,
+  including four new exact-key recovery cases across light/dark, exactly one POST,
+  exact principal/key targeting, unchanged sibling keys/grants/identities, failed
+  read recovery, no blind retry and no secret visibility/persistence.
+- [Fresh shell/CSP/contrast evidence](repair-shell/metadata.json): all 51 scenarios
+  pass, including the existing destructive-button contrast checks.
+- [Local validation](repair-local-validation.json): the six required commands
+  pass. The unit suite remains 412 passed with 85 environment-gated skips. The
+  existing bundle-size warning and dependency audit findings are not repaired.
+
+BEFORE/AFTER agent detail captures at all four widths in both themes were visually
+inspected, not inferred from passing assertions. Before: merged grant labels,
+warning-heavy unknown status and a squeezed mobile name. After: separate readable
+labels, neutral status, full-width mobile name and access before setup/keys.
+Recovery screenshots show the modal closed and focus on Reload metadata. Browser
+fixtures, not real accounts or physical devices, are the sole evidence. Every API
+request is intercepted; one-time fixture values are redacted only when revealed.
+
+Representative repair captures:
+
+| Surface | BEFORE | AFTER |
+| --- | --- | --- |
+| Agent, 375px light | [Image](repair-before/agents-detail-375-light.png) | [Image](repair-after/agents-detail-375-light.png) |
+| Agent, 320px dark | [Image](repair-before/agents-detail-320-dark.png) | [Image](repair-after/agents-detail-320-dark.png) |
+| Agent, desktop dark | [Image](repair-before/agents-detail-1440-dark.png) | [Image](repair-after/agents-detail-1440-dark.png) |
+
+- [Lost-response recovery, light](repair-after/exact-key-ambiguous-recovery-375-light.png)
+- [Definite-denial recovery, dark](repair-after/exact-key-denied-recovery-375-dark.png)
+
+Each capture's route, viewport, appearance, intercepted-fixture provenance and
+served-build SHA-256 are in its metadata. The recorded repository HEAD is the
+starting revision, not a claim that uncommitted repairs already had a commit SHA;
+the asset hashes identify the exact bytes actually exercised.

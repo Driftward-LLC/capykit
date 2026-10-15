@@ -22,18 +22,21 @@ function render(metadata=options,states:unknown[]=[metadata,principalId]){seed.v
 afterEach(()=>{seed.values=[];finishMutation('idle');});
 
 describe('selected-agent static hierarchy (not browser interaction coverage)',()=>{
- it('leads with the stable name and short ID, then readiness, setup, keys, access and collapsed history',()=>{
+ it('leads with the stable name, safe ID suffix, neutral readiness and readable allowed access before setup and keys',()=>{
   const html=render();
   expect(html).toContain('<h1 tabindex="-1">Factory</h1>');
-  expect(html).toContain('Agent · ID 11111111');
+  expect(html).toContain('Agent · ID …11111111');
   expect(html).toContain('Missing verification is not an access denial.');
-  const markers=['<h1','Client connection:','Continue setup','<h2>Keys</h2>','<h2>Allowed access</h2>','<summary>Key history</summary>'];
+  const markers=['<h1','Client connection:','<h2>Allowed access</h2>','Continue setup','<h2>Keys</h2>','<summary>Key history</summary>'];
   let previous=-1;for(const marker of markers){const position=html.indexOf(marker);expect(position).toBeGreaterThan(previous);previous=position;}
   expect(html).toContain('<details class="agent-setup">');
   expect(html).toContain('<details class="agent-history">');
   expect(html).toContain('aria-label="Existing agent"');
   expect(html).toContain('Grant a workspace action');
   expect(html).toContain('Owner-browser read-only connection test');
+  expect(html).not.toContain('astryx-banner');
+  expect(html).toContain('astryx-stack');expect(html).toContain('astryx-text');
+  for(const label of ['Account: Workspace account','Repositories: acme/demo','Read only · active','Expires '])expect(html).toContain(label);
  });
  it('keeps compact keys and complete access metadata without exposing a credential',()=>{
   const html=render();
@@ -52,7 +55,7 @@ describe('selected-agent static hierarchy (not browser interaction coverage)',()
  it('uses real Astryx controls and keeps exact replacement consent in a modal',()=>{
   const states=[options,principalId,'',false,'','2027-01-01T12:00','','',[],false,null,false,'',false,'','',{kind:'rotate',id:keyId,principalId},false];
   const html=render(options,states);
-  for(const component of ['astryx-button','astryx-card','astryx-banner','astryx-field','astryx-dialog'])expect(html.includes(component)).toBe(true);
+  for(const component of ['astryx-button','astryx-card','astryx-stack','astryx-text','astryx-field','astryx-dialog'])expect(html.includes(component)).toBe(true);
   expect(html.includes('aria-modal="true"')).toBe(true);
   expect(html.includes('Confirm exact key replacement')).toBe(true);
   expect(html.includes(`Only key ${keyId} stops working immediately.`)).toBe(true);
