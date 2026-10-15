@@ -295,6 +295,7 @@ export function Connections({ onSessionExpired, active, onConnectionsChanged }: 
   }
 
   const disabled = pending || loading;
+  const confirmationOpen = active && !loading && configured !== null && setup === null && connections.length > 0 && selected !== null && (reconnecting || disconnecting);
   const installLink = configured ? githubLink(installationUrl) : undefined;
   const selectedUnfinished = selected !== null && unfinishedConnection(selected);
   const installationBlocked = error === errorMessages.GITHUB_SELECTED_REPOSITORIES_REQUIRED;
@@ -316,7 +317,7 @@ export function Connections({ onSessionExpired, active, onConnectionsChanged }: 
       h("div", null, h("p", { className: "eyebrow" }, "Workspace connections"), h("h1", null, "Connect GitHub"), h("p", { className: "muted" }, "Choose which repositories Capykit can read for this workspace.")),
       setup !== null || selectedUnfinished || resumable !== undefined || loading ? null : h(Button, {type: "button", variant: "ghost", isDisabled: disabled, onClick: () => { void run(refresh); }, label: "Refresh connections"}),
     ),
-    error === "" || reconnecting || disconnecting ? null : h(Banner,{status:"error",role:"alert",title:error}),
+    error === "" || confirmationOpen ? null : h(Banner,{status:"error",role:"alert",title:error}),
     notice === "" ? null : h(Banner,{status:"success",role:"status",title:notice}),
     loading ? h(Card,{className:"connection-intro"},h(Spinner,{label:checkingGitHub?"Checking your GitHub access…":"Loading connections…"}),checkingGitHub?h("p",{className:"muted"},"You’ll review repository access here before anything is connected."):null) : configured === null ? h(Card, {className: "connection-intro", role:"region", "aria-label": "Connection status unavailable" },
       h("h2", null, "Could not load connection status"), h("p", { className: "muted" }, "Retry to check whether GitHub is ready to connect."),

@@ -151,6 +151,11 @@ async function check(name, settings, run) {
         assert.ok(content, 'Fixture asset missing.');
         return route.fulfill({ contentType: path === '/' ? 'text/html' : path.endsWith('.css') ? 'text/css' : path.endsWith('.woff2') ? 'font/woff2' : 'text/javascript', body: content });
       }
+      if (state.personalDisconnectOutcome && request.method() === 'DELETE' && path === `/v1/connections/personal/${state.id.personal}`) {
+        state.personalDisconnected=true;state.connectionStarted.resolve();
+        if (state.connectionGate) await state.connectionGate.promise;
+        return route.abort('failed'); // The fixture committed; only the response was lost.
+      }
       if (state.connectionError && ((request.method() === 'DELETE' && path.startsWith('/v1/connections/')) || path === '/v1/connections/github/start')) {
         state.connectionStarted.resolve();
         if (state.connectionGate) await state.connectionGate.promise;
@@ -220,7 +225,12 @@ async function check(name, settings, run) {
       }
       if (path === '/v1/connections') return json({ configured: true, setup: null, connections: [connection], installationUrl: 'https://github.com/apps/fixture/installations/new' });
       if(path===`/v1/connections/${state.id.connection}`&&request.method()==='GET') return json(connection);
-      if (path === '/v1/connections/personal') return json({ connections: [state.id.personal,...(state.multiplePersonal?[state.id.otherPersonal]:[])].map(id=>({id,appId:'github',name:`Fixture personal ${id.slice(0,8)}`,personal:true,status:'active',version:'fixture'})) });
+      if (path === '/v1/connections/personal') {
+        let connections=[state.id.personal,...(state.multiplePersonal?[state.id.otherPersonal]:[])].map(id=>({id,appId:'github',name:`Fixture personal ${id.slice(0,8)}`,personal:true,status:'active',version:'fixture'}));
+        if (state.personalDisconnected) connections=state.personalDisconnectOutcome==='removed'?connections.filter(c=>c.id!==state.id.personal):connections.map(c=>c.id===state.id.personal?{...c,status:'revoked'}:c);
+        return json({connections});
+      }
+      if (state.personalDisconnectOutcome && path === '/v1/apps/github/connect') return json({error:{code:'FORBIDDEN'}},403);
       if (path === '/v1/apps/github/connection-schema') return json({ methods: [{ index: 0, type: 'NO_AUTH', name: 'Fixture', description: '', fields: [], ready: true }] });
       if ([state.id.personal,state.id.otherPersonal].some(id=>path===`/v1/connections/personal/${id}/actions`)) return json({ actions: [{ name: 'getIssueInformation', displayName: 'Get issue information', description: 'Reviewed read-only fixture action', shareable: true, fields: [] }] });
       if ([state.id.personal,state.id.otherPersonal].some(id=>path===`/v1/connections/personal/${id}/sharing`)) return json({ recipients: state.recipients, grants: path.includes(state.id.personal)?state.personalGrants:[] });
@@ -557,6 +567,42 @@ async function replacementRecoveryChecks(retain=false) {
 }
 async function modalRecoveryChecks(retain=Boolean(process.env.CAPYKIT_AGENT_VISUAL_DIR)) {
   for (const theme of ['light', 'dark']) {
+    for (const outcome of ['revoked','removed']) {
+      await check(`Personal lost disconnect response reconciles ${outcome} account without hiding recovery ${theme}`,{width:320,theme,raw:true,personal:true,personalDisconnectOutcome:outcome,connectionGate:deferred(),route:'/?tab=connections&app=github'},async test=>{
+        const {page,state}=test,personal=page.getByRole('region',{name:'GitHub personal connections',exact:true});
+        await personal.waitFor();
+        await button(personal,/^Disconnect$/).focus();await page.keyboard.press('Enter');
+        const dialog=page.getByRole('dialog',{name:'Disconnect personal account',exact:true});await dialog.waitFor();
+        await button(dialog,/^Confirm disconnect$/).focus();await page.keyboard.press('Enter');
+        await completed(state.connectionStarted.promise);
+        await page.keyboard.press('Enter');await page.keyboard.press('Escape');
+        assert.equal(await page.locator('dialog[open]').count(),1,'Pending disconnect retains its lock.');
+        state.connectionGate.resolve();
+        step='lost disconnect response reconciles revoked or removed account';
+        await dialog.waitFor({state:'hidden'});
+        const error=personal.getByRole('alert');await error.waitFor();
+        await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='alert');
+        assert.match(await error.innerText(),/Disconnect outcome unknown/);
+        assert.doesNotMatch(await error.innerText(),/Could not disconnect|disconnect failed/iu);
+        assert.equal(await personal.locator('[role="alert"]').count(),1);
+        if (outcome==='revoked') await personal.getByText('Disconnected',{exact:true}).waitFor();
+        else assert.equal(await personal.getByLabel('Account',{exact:true}).count(),0);
+        assert.equal(state.requests.filter(r=>r.method==='DELETE').length,1);
+        assert.equal(state.requests.find(r=>r.method==='DELETE').path,`/v1/connections/personal/${state.id.personal}`);
+        await visualGeometry(page);
+        if (retain) await capture(test,`personal-disconnect-${outcome}-recovery`);
+        await button(personal,/^Connect another GitHub account$/).focus();await page.keyboard.press('Enter');
+        await button(personal,/^Enable GitHub$/).focus();await page.keyboard.press('Enter');
+        step='subsequent connect denial stays visible outside any modal';
+        await error.filter({hasText:'You no longer have permission to use this account or action.'}).waitFor();
+        assert.equal(await page.locator('dialog[open]').count(),0);
+        assert.equal(await personal.getByRole('alert').count(),1);
+        assert.equal(state.requests.filter(r=>r.method==='DELETE').length,1,'Metadata refresh and connect recovery never replay disconnect.');
+        assert.equal(mutations(state,'/v1/apps/github/connect').length,1);
+        await visualGeometry(page);
+        if (retain) await capture(test,`personal-disconnect-${outcome}-next-connect-denied`);
+      });
+    }
     for (const kind of ['google', 'personal', 'github', 'reconnect']) {
       await check(`${kind} rejected confirmation exposes keyboard recovery ${theme}`, {
         width: 320, theme, raw: true, personal: kind === 'personal',

@@ -95,8 +95,11 @@ merge or production approval. The original implementation had no independent
 review; two later GPT-6 Astra passes identified confirmation recovery defects.
 The user-authorized manual GPT-6.1 Sol repair exposes connection errors and GitHub
 repository recovery inside their confirmations and returns invalid replacement
-expiry to its editable field, including when setup is collapsed. A new independent
-review of this repair remains pending.
+expiry to its editable field, including when setup is collapsed. The first review
+of that repair caught a personal account disappearing after a lost disconnect
+response. The follow-up keeps the error visible and focused after revoked/removed
+metadata arrives and preserves subsequent connection errors. Final independent
+review remains pending.
 
 The existing browser harness now covers four rejected connection confirmations
 and replacement expiry both before and during confirmation, in light/dark mode at
