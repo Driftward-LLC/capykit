@@ -18,22 +18,25 @@ const options:AccessOptions={
  grants:[{id:grantId,recipientId:principalId,name:'Factory',actionId:'github.get-issue.v1',connectionId,repositoryIds:['7'],expiresAt:'2030-06-01T00:00:00Z',status:'active'}],
  actions:[{id:'github.get-issue.v1',app:'github',name:'Get issue',description:'Read only',fields:[],connections:[{id:connectionId,name:'Workspace account',repositories:[{id:'7',name:'acme/demo'}]}]}],
 };
-function render(metadata=options){seed.values=[metadata,principalId];return renderToStaticMarkup(React.createElement(ActionAccess,{active:true,onSessionExpired:()=>{}}));}
+function render(metadata=options,states:unknown[]=[metadata,principalId]){seed.values=states;return renderToStaticMarkup(React.createElement(ActionAccess,{active:true,onSessionExpired:()=>{}}));}
 afterEach(()=>{seed.values=[];finishMutation('idle');});
 
 describe('selected-agent static hierarchy (not browser interaction coverage)',()=>{
- it('leads with the stable name and short ID, then readiness, setup, keys, access and collapsed history',()=>{
+ it('leads with the stable name, safe ID suffix, neutral readiness and readable allowed access before setup and keys',()=>{
   const html=render();
   expect(html).toContain('<h1 tabindex="-1">Factory</h1>');
-  expect(html).toContain('Agent · ID 11111111');
+  expect(html).toContain('Agent · ID …11111111');
   expect(html).toContain('Missing verification is not an access denial.');
-  const markers=['<h1','Client connection:','Continue setup','<h2>Keys</h2>','<h2>Allowed access</h2>','<summary>Key history</summary>'];
+  const markers=['<h1','Client connection:','<h2>Allowed access</h2>','Continue setup','<h2>Keys</h2>','<summary>Key history</summary>'];
   let previous=-1;for(const marker of markers){const position=html.indexOf(marker);expect(position).toBeGreaterThan(previous);previous=position;}
   expect(html).toContain('<details class="agent-setup">');
   expect(html).toContain('<details class="agent-history">');
   expect(html).toContain('aria-label="Existing agent"');
   expect(html).toContain('Grant a workspace action');
   expect(html).toContain('Owner-browser read-only connection test');
+  expect(html).not.toContain('astryx-banner');
+  expect(html).toContain('astryx-stack');expect(html).toContain('astryx-text');
+  for(const label of ['Account: Workspace account','Repositories: acme/demo','Read only · active','Expires '])expect(html).toContain(label);
  });
  it('keeps compact keys and complete access metadata without exposing a credential',()=>{
   const html=render();
@@ -48,5 +51,30 @@ describe('selected-agent static hierarchy (not browser interaction coverage)',()
   for(const exact of [grantId,connectionId,'github.get-issue.v1','Unavailable account','Unavailable repository · 7'])expect(html).toContain(exact);
   expect(html).toContain('No workspace actions available');
   expect(html).toContain('Not yet verified');
+ });
+ it('uses real Astryx controls and keeps exact replacement consent in a modal',()=>{
+  const states=[options,principalId,'',false,'','2027-01-01T12:00','','',[],false,null,false,'',false,'','',{kind:'rotate',id:keyId,principalId},false];
+  const html=render(options,states);
+  for(const component of ['astryx-button','astryx-card','astryx-stack','astryx-text','astryx-field','astryx-dialog'])expect(html.includes(component)).toBe(true);
+  expect(html.includes('aria-modal="true"')).toBe(true);
+  expect(html.includes('Confirm exact key replacement')).toBe(true);
+  expect(html.includes(`Only key ${keyId} stops working immediately.`)).toBe(true);
+  expect(html.includes('Existing grants and unrelated keys remain unchanged.')).toBe(true);
+  expect(html.includes('data-autofocus=""')).toBe(true);
+ });
+ it('keeps native name and expiry validation under the Astryx form controls',()=>{
+  const html=render(options,[options,'','',true,'New identity']);
+  const nameInput=html.match(/<input[^>]*value="New identity"[^>]*>/u)?.[0]??'';
+  expect(nameInput).toContain('maxLength="80"');expect(nameInput).toContain('required=""');
+  expect(html).toMatch(/<input[^>]*type="datetime-local"[^>]*required=""/u);
+  expect(html).toContain('astryx-form-layout');
+ });
+ it('requires saving independently of copying and names the one-time key without enabling other writes',()=>{
+  const states=[options,principalId,'',false,'','2027-01-01T12:00','','',[],false,{id:keyId,principalId,key:'fixture-one-time-value',expiresAt:'2027-01-01T12:00:00Z'},false,'',false,'','',null,false];
+  const html=render(options,states);
+  for(const copy of ['Save this key now','Factory','Key ID: '+keyId,'Select key for manual copy','I saved this key in secure secret storage.'])expect(html.includes(copy)).toBe(true);
+  expect(/readonly=""/iu.test(html)).toBe(true);expect(/autocomplete="off"/iu.test(html)).toBe(true);expect(/spellcheck="false"/iu.test(html)).toBe(true);
+  expect(/<button[^>]*disabled=""[^>]*>[\s\S]*?Continue after saving/u.test(html)).toBe(true);
+  expect(html.includes('Create agent and key')).toBe(false);expect(html.includes('Grant action access')).toBe(false);
  });
 });

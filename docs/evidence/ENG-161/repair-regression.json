@@ -1,0 +1,262 @@
+{
+  "fixtureOnly": true,
+  "liveBackendVerified": false,
+  "passed": true,
+  "results": [
+    {
+      "name": "Agents route and owner entry point",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Exact-key ambiguous response closes modal and focuses keyboard reconciliation light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Exact-key ambiguous response closes modal and focuses keyboard reconciliation dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Exact-key denied response closes modal and focuses keyboard reconciliation light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Exact-key denied response closes modal and focuses keyboard reconciliation dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Existing duplicate-name identity reuse does not create another principal",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Create identity and key is distinct from identity reuse",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Same-name creation warning offers the exact existing identities",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Expired and revoked metadata stay in collapsed history with exact recovery controls",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Exact-key rotation preserves principal, sibling keys and all grants",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Malformed issuance without one-time key is not setup success",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Clipboard rejection preserves key and requires separate saved acknowledgement",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Successful copy is not an explicit saved acknowledgement",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Synchronous duplicate key submit issues once",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Key ambiguous completion reconciles metadata with no blind retry",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Key refresh completion reconciles metadata with no blind retry",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Key timeout completion reconciles metadata with no blind retry",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "navigation discards one-time secret and setup acknowledgement",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "reload discards one-time secret and setup acknowledgement",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "pending-navigation discards one-time secret and setup acknowledgement",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Page hiding and pagehide discard an unsaved one-time key",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Exact repository grant and consent reset on every scope edit",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Selecting a different identity clears action, account, resources and approval",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Synchronous duplicate grant submit creates one exact grant",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Ambiguous grant completion requires reconciliation, never blind retry",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Expiry presets and custom local time serialize correctly in America/Los_Angeles",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Expiry presets and custom local time serialize correctly in Asia/Kolkata",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Workspace and personal MCP examples use placeholders and distinct exact tools",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "App-scoped setup never grants a different integration",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "App access retains grant metadata after provider availability disappears",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Personal-account exact review, duplicate lock and explicit grant",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Personal-account exact review, duplicate lock and uncertain reconciliation",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Personal pending ok survives actual All apps navigation before commit",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Personal pending ambiguous survives actual All apps navigation before commit",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Personal pending uncommitted survives actual All apps navigation before commit",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Personal pending state is account-scoped, not an app-wide lock",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Personal definite FORBIDDEN preserves actionable denial without uncertainty",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Personal definite CONNECTION_INACTIVE preserves actionable denial without uncertainty",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Personal definite CSRF_REQUIRED preserves actionable denial without uncertainty",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Personal ambiguous server-error pauses until matching metadata reconciliation",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Personal ambiguous timeout pauses until matching metadata reconciliation",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Personal ambiguous malformed pauses until matching metadata reconciliation",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Read-only browser owner test is not client readiness evidence",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Selected design hierarchy and intact primary navigation at 320px",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Layout, keyboard focus and touch controls at 320px",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Selected design hierarchy and intact primary navigation at 375px",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Layout, keyboard focus and touch controls at 375px",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Selected design hierarchy and intact primary navigation at 430px",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Layout, keyboard focus and touch controls at 430px",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Selected design hierarchy and intact primary navigation at 1440px",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Layout, keyboard focus and touch controls at 1440px",
+      "passed": true,
+      "fixtureOnly": true
+    }
+  ]
+}

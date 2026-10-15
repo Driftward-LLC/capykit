@@ -1,0 +1,1192 @@
+{
+  "phase": "after",
+  "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2",
+  "revisionMeaning": "HEAD identifies repository revision; buildSha256 identifies exact served Vite bytes including any uncommitted implementation.",
+  "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d",
+  "assetHashes": {
+    "index.html": "cadd0d45b2281c85c8575f79f987001f9e884ba42fd3f4018ecff1ae991b73af",
+    "assets/ItemSwipeLayer-Fmyedi9M.js": "b859bf29921bd7820607f6be70b9e97a08d47dfcdafa824b9cf5a491907761d9",
+    "assets/figtree-latin-ext-wght-normal-DCwSJGxG.woff2": "bf7828e2c258cffcfa50a048ee388a36b95bc16b452e8d36fa797635dbe15965",
+    "assets/figtree-latin-wght-normal-D_ZTVpCC.woff2": "4ba7d3d096695818fe0686be4f1e82c6b05134e18a22260336130335027462dd",
+    "assets/index-CDRR06Aw.js": "228b919fc95a00335f31295c2522fb53ce877ce4bc4b30286fcfa06d124af5e1",
+    "assets/index-Dd3Wfh3x.css": "57efd2cd49472d9c32af6553a57b33f55be399dd9f96c76238915d8433843045",
+    "assets/theme-bootstrap.js": "a6905a87f0cd51f7aa57184a8991540be2cb255cf52c1e55e3fcc4d64ff77c13"
+  },
+  "browserVersion": "156.0.8078.4",
+  "nodeVersion": "v26.7.0",
+  "astryxVersion": "0.7.0",
+  "fixtureOnly": true,
+  "liveBackendVerified": false,
+  "providerVerified": false,
+  "physicalDeviceVerified": false,
+  "independentReview": false,
+  "implementationModel": "gpt-6.1-sol",
+  "pluginRevision": "08359024b405bf92afc3b4624675415384b67e5a",
+  "screenshots": [
+    {
+      "file": "agents-list-320-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-detail-320-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "apps-list-320-light.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "drive-account-320-light.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-list-320-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-detail-320-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "apps-list-320-dark.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "drive-account-320-dark.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-list-375-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-detail-375-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-setup-375-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "exact-key-dialog-375-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "one-time-key-masked-375-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": true,
+      "redactionMethod": "DOM input values replaced for capture only; restored after screenshot",
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "apps-list-375-light.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "drive-account-375-light.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-list-375-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-detail-375-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-setup-375-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "exact-key-dialog-375-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "one-time-key-masked-375-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": true,
+      "redactionMethod": "DOM input values replaced for capture only; restored after screenshot",
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "apps-list-375-dark.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "drive-account-375-dark.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-list-430-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-detail-430-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "apps-list-430-light.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "drive-account-430-light.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-list-430-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-detail-430-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "apps-list-430-dark.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "drive-account-430-dark.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-list-1440-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-detail-1440-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "apps-list-1440-light.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "drive-account-1440-light.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-list-1440-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-detail-1440-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "apps-list-1440-dark.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "drive-account-1440-dark.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "github-disconnect-dialog-375-light.png",
+      "route": "/?tab=connections&app=github",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "github-reconnect-dialog-375-light.png",
+      "route": "/?tab=connections&app=github",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "personal-disconnect-dialog-375-light.png",
+      "route": "/?tab=connections&app=github",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "personal-exact-sharing-375-light.png",
+      "route": "/?tab=connections&app=github",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-empty-375-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-error-375-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-loading-375-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "connections-empty-375-light.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "connections-error-375-light.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "connections-loading-375-light.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "drive-reconnect-375-light.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "drive-unavailable-375-light.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "github-disconnect-dialog-375-dark.png",
+      "route": "/?tab=connections&app=github",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "github-reconnect-dialog-375-dark.png",
+      "route": "/?tab=connections&app=github",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "personal-disconnect-dialog-375-dark.png",
+      "route": "/?tab=connections&app=github",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "personal-exact-sharing-375-dark.png",
+      "route": "/?tab=connections&app=github",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-empty-375-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-error-375-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "agents-loading-375-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "connections-empty-375-dark.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "connections-error-375-dark.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "connections-loading-375-dark.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "drive-reconnect-375-dark.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "drive-unavailable-375-dark.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "system-light-375-system.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "system-dark-375-system.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "dark",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "exact-key-ambiguous-recovery-375-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "exact-key-ambiguous-recovery-375-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "exact-key-denied-recovery-375-light.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    },
+    {
+      "file": "exact-key-denied-recovery-375-dark.png",
+      "route": "/?tab=agents",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "fixtureOnly": true,
+      "credentialValuesRedacted": false,
+      "redactionMethod": null,
+      "buildSha256": "2a4b8ce8f21792e2e744068259861b4414f325ffb88e506c20832e4a695b973d"
+    }
+  ],
+  "passed": true,
+  "results": [
+    {
+      "name": "Visual Agents list/detail 320 light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Apps list/search/account 320 light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Agents list/detail 320 dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Apps list/search/account 320 dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Agents list/detail 375 light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Apps list/search/account 375 light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Agents list/detail 375 dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Apps list/search/account 375 dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Agents list/detail 430 light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Apps list/search/account 430 light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Agents list/detail 430 dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Apps list/search/account 430 dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Agents list/detail 1440 light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Apps list/search/account 1440 light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Agents list/detail 1440 dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Apps list/search/account 1440 dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual GitHub confirmation focus restore light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual personal confirmation focus and exact sharing light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual agents empty light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual agents error light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual agents loading light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual connections empty light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual connections error light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual connections loading light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Drive reconnect light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Drive not configured light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual GitHub confirmation focus restore dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual personal confirmation focus and exact sharing dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual agents empty dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual agents error dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual agents loading dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual connections empty dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual connections error dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual connections loading dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Drive reconnect dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual Drive not configured dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual system appearance follows light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Visual system appearance follows dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Exact-key ambiguous response closes modal and focuses keyboard reconciliation light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Exact-key ambiguous response closes modal and focuses keyboard reconciliation dark",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Exact-key denied response closes modal and focuses keyboard reconciliation light",
+      "passed": true,
+      "fixtureOnly": true
+    },
+    {
+      "name": "Exact-key denied response closes modal and focuses keyboard reconciliation dark",
+      "passed": true,
+      "fixtureOnly": true
+    }
+  ]
+}

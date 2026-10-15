@@ -1,0 +1,71 @@
+{
+  "policy": "capykit-node-v1",
+  "policy_digest": "0ce5a999e7c58b67904da5b57fa8855e6780a29a03fa193c55baf525323e2494",
+  "expected_base": "main",
+  "base_revision": "40af07ed2491c0193a47b4b940df3a9e4cc5dd89",
+  "local_commands": [
+    {
+      "command": "npm run lint",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run typecheck",
+      "exit_code": 0
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run test:package",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run check:schema",
+      "exit_code": 0
+    }
+  ],
+  "unit_test_summary": {
+    "passed": 412,
+    "skipped": 85
+  },
+  "browser_results": [
+    {
+      "name": "after",
+      "exit_code": 0,
+      "passed": true,
+      "results": 38,
+      "screenshots": 64,
+      "failures": []
+    },
+    {
+      "name": "agent-regression",
+      "exit_code": 0,
+      "passed": true,
+      "results": 47,
+      "screenshots": 0,
+      "failures": []
+    },
+    {
+      "name": "shell-regression",
+      "exit_code": 0,
+      "passed": true,
+      "results": 51,
+      "screenshots": 33,
+      "failures": []
+    }
+  ],
+  "request_argument_comparison": {
+    "src/console/apps.ts": 8,
+    "src/console/connections.ts": 9,
+    "src/console/personal-app.ts": 7,
+    "src/console/action-access.ts": 2
+  },
+  "request_arguments_unchanged": true,
+  "implementation_model": "gpt-6.1-sol",
+  "independent_review": false
+}

@@ -1,0 +1,28 @@
+{
+  "local_commands": [
+    {
+      "command": "npm run lint",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run typecheck",
+      "exit_code": 0
+    },
+    {
+      "command": "npm test",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run test:package",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run check:schema",
+      "exit_code": 0
+    }
+  ]
+}

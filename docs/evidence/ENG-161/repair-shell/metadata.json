@@ -1,0 +1,1979 @@
+{
+  "phase": "after",
+  "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2",
+  "revisionMeaning": "Repository HEAD; build SHA identifies exact built bytes including uncommitted source",
+  "disabledChecks": [],
+  "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+  "capturedAt": "2026-10-15T07:19:53.891Z",
+  "fixtureOnly": true,
+  "liveApiVerified": false,
+  "providerVerified": false,
+  "physicalDeviceVerified": false,
+  "independentReview": false,
+  "pluginRevision": "08359024b405bf92afc3b4624675415384b67e5a",
+  "assets": [
+    "/",
+    "/assets/theme-bootstrap.js",
+    "/assets/index-CDRR06Aw.js",
+    "/assets/index-Dd3Wfh3x.css",
+    "/assets/ItemSwipeLayer-Fmyedi9M.js",
+    "/assets/figtree-latin-ext-wght-normal-DCwSJGxG.woff2",
+    "/assets/figtree-latin-wght-normal-D_ZTVpCC.woff2"
+  ],
+  "results": [
+    {
+      "name": "AFTER Apps 320-light",
+      "passed": true,
+      "fixture": {
+        "width": 320,
+        "theme": "light"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "AFTER sign-in 320-light",
+      "passed": true,
+      "fixture": {
+        "width": 320,
+        "theme": "light",
+        "signedIn": false,
+        "route": "/"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "AFTER Apps 320-dark",
+      "passed": true,
+      "fixture": {
+        "width": 320,
+        "theme": "dark"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "AFTER sign-in 320-dark",
+      "passed": true,
+      "fixture": {
+        "width": 320,
+        "theme": "dark",
+        "signedIn": false,
+        "route": "/"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "AFTER Apps 375-light",
+      "passed": true,
+      "fixture": {
+        "width": 375,
+        "theme": "light"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "AFTER sign-in 375-light",
+      "passed": true,
+      "fixture": {
+        "width": 375,
+        "theme": "light",
+        "signedIn": false,
+        "route": "/"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "AFTER Apps 375-dark",
+      "passed": true,
+      "fixture": {
+        "width": 375,
+        "theme": "dark"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "AFTER sign-in 375-dark",
+      "passed": true,
+      "fixture": {
+        "width": 375,
+        "theme": "dark",
+        "signedIn": false,
+        "route": "/"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "AFTER Apps 430-light",
+      "passed": true,
+      "fixture": {
+        "width": 430,
+        "theme": "light"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "AFTER sign-in 430-light",
+      "passed": true,
+      "fixture": {
+        "width": 430,
+        "theme": "light",
+        "signedIn": false,
+        "route": "/"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "AFTER Apps 430-dark",
+      "passed": true,
+      "fixture": {
+        "width": 430,
+        "theme": "dark"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "AFTER sign-in 430-dark",
+      "passed": true,
+      "fixture": {
+        "width": 430,
+        "theme": "dark",
+        "signedIn": false,
+        "route": "/"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "AFTER Apps 1440-light",
+      "passed": true,
+      "fixture": {
+        "width": 1440,
+        "theme": "light"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "AFTER sign-in 1440-light",
+      "passed": true,
+      "fixture": {
+        "width": 1440,
+        "theme": "light",
+        "signedIn": false,
+        "route": "/"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "AFTER Apps 1440-dark",
+      "passed": true,
+      "fixture": {
+        "width": 1440,
+        "theme": "dark"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "AFTER sign-in 1440-dark",
+      "passed": true,
+      "fixture": {
+        "width": 1440,
+        "theme": "dark",
+        "signedIn": false,
+        "route": "/"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "Public Google initiation light (provider page fixture only)",
+      "passed": true,
+      "fixture": {
+        "signedIn": false,
+        "method": "google",
+        "oauthFixture": true,
+        "route": "/",
+        "theme": "light",
+        "width": 375
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh",
+        "POST /v1/auth/google/start"
+      ]
+    },
+    {
+      "name": "Public Google initiation dark (provider page fixture only)",
+      "passed": true,
+      "fixture": {
+        "signedIn": false,
+        "method": "google",
+        "oauthFixture": true,
+        "route": "/",
+        "theme": "dark",
+        "width": 375
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh",
+        "POST /v1/auth/google/start"
+      ]
+    },
+    {
+      "name": "Google callback google-cancelled preserves retry and removes callback query",
+      "passed": true,
+      "fixture": {
+        "signedIn": false,
+        "method": "google",
+        "route": "/?auth=google-cancelled"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "Google callback google-expired preserves retry and removes callback query",
+      "passed": true,
+      "fixture": {
+        "signedIn": false,
+        "method": "google",
+        "route": "/?auth=google-expired"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "Google callback google-failed preserves retry and removes callback query",
+      "passed": true,
+      "fixture": {
+        "signedIn": false,
+        "method": "google",
+        "route": "/?auth=google-failed"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "Email callback error removes error/hash and preserves code retry",
+      "passed": true,
+      "fixture": {
+        "signedIn": false,
+        "route": "/?error=access_denied#error=fixture"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "Keyboard navigation and preserved URLs 320",
+      "passed": true,
+      "fixture": {
+        "width": 320,
+        "route": "/?tab=connections&retain=fixture"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/action-access",
+        "GET /v1/actions",
+        "GET /v1/apps",
+        "GET /v1/access/options",
+        "GET /v1/grants",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Keyboard navigation and preserved URLs 375",
+      "passed": true,
+      "fixture": {
+        "width": 375,
+        "route": "/?tab=connections&retain=fixture"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/action-access",
+        "GET /v1/actions",
+        "GET /v1/apps",
+        "GET /v1/access/options",
+        "GET /v1/grants",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Keyboard navigation and preserved URLs 430",
+      "passed": true,
+      "fixture": {
+        "width": 430,
+        "route": "/?tab=connections&retain=fixture"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/action-access",
+        "GET /v1/actions",
+        "GET /v1/apps",
+        "GET /v1/access/options",
+        "GET /v1/grants",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Keyboard navigation and preserved URLs 1440",
+      "passed": true,
+      "fixture": {
+        "width": 1440,
+        "route": "/?tab=connections&retain=fixture"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/action-access",
+        "GET /v1/actions",
+        "GET /v1/apps",
+        "GET /v1/access/options",
+        "GET /v1/grants",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Native email/OTP validity, Astryx keyboard submit and pending disabled behavior",
+      "passed": true,
+      "fixture": {
+        "signedIn": false,
+        "route": "/",
+        "otpGate": "held-until-assertion",
+        "verifyStatus": 401
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh",
+        "POST /v1/auth/otp",
+        "POST /v1/auth/verify",
+        "POST /v1/auth/verify",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Google available and start failure stays actionable",
+      "passed": true,
+      "fixture": {
+        "signedIn": false,
+        "method": "google",
+        "googleStatus": 503,
+        "route": "/"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh",
+        "POST /v1/auth/google/start",
+        "POST /v1/auth/google/start"
+      ]
+    },
+    {
+      "name": "Google unavailable and retry restores available method",
+      "passed": true,
+      "fixture": {
+        "signedIn": false,
+        "method": "google",
+        "available": false,
+        "route": "/",
+        "width": 375
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "Tailscale denial and keyboard retry",
+      "passed": true,
+      "fixture": {
+        "signedIn": false,
+        "method": "tailscale",
+        "route": "/",
+        "width": 375
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh",
+        "POST /v1/auth/tailscale",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh",
+        "POST /v1/auth/tailscale",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Session unavailable and real retry",
+      "passed": true,
+      "fixture": {
+        "meStatus": 503,
+        "width": 375
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "401 expiry on focus clears owner UI without changing route",
+      "passed": true,
+      "fixture": {
+        "route": "/?tab=connections&retain=fixture"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "401 application response clears authenticated shell",
+      "passed": true,
+      "fixture": {},
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/me",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Logout failure preserves account and success clears account",
+      "passed": true,
+      "fixture": {
+        "logoutStatus": 503,
+        "width": 375
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "POST /v1/auth/logout",
+        "POST /v1/auth/logout"
+      ]
+    },
+    {
+      "name": "Visibility for human owner",
+      "passed": true,
+      "fixture": {
+        "role": "owner"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Visibility for human member",
+      "passed": true,
+      "fixture": {
+        "role": "member"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/apps/catalog",
+        "GET /v1/actions"
+      ]
+    },
+    {
+      "name": "Agent identity does not render human owner controls",
+      "passed": true,
+      "fixture": {
+        "kind": "agent"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me"
+      ]
+    },
+    {
+      "name": "Session loading evidence and release",
+      "passed": true,
+      "fixture": {
+        "meGate": "held-until-assertion",
+        "width": 375
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Apps loading evidence and release",
+      "passed": true,
+      "fixture": {
+        "appsGate": "held-until-assertion",
+        "width": 375
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Apps empty state evidence",
+      "passed": true,
+      "fixture": {
+        "empty": true,
+        "width": 375
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Apps error evidence and refresh recovery",
+      "passed": true,
+      "fixture": {
+        "appsStatus": 503,
+        "width": 375
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "System preference follows light and live media changes",
+      "passed": true,
+      "fixture": {
+        "media": "light"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "System preference follows dark and live media changes",
+      "passed": true,
+      "fixture": {
+        "media": "dark"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Appearance persists through reload, unrelated keys untouched",
+      "passed": true,
+      "fixture": {},
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Blocked localStorage leaves working system theme and interactive selector",
+      "passed": true,
+      "fixture": {
+        "blockStorage": true,
+        "media": "dark",
+        "signedIn": false,
+        "route": "/"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh",
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/me",
+        "POST /v1/auth/refresh"
+      ]
+    },
+    {
+      "name": "Invalid stored appearance falls back to system",
+      "passed": true,
+      "fixture": {
+        "theme": "not-a-mode",
+        "media": "dark"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Pre-React bootstrap for light",
+      "passed": true,
+      "fixture": {
+        "theme": "light",
+        "scriptGate": "held-until-assertion",
+        "media": "dark"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Pre-React bootstrap for dark",
+      "passed": true,
+      "fixture": {
+        "theme": "dark",
+        "scriptGate": "held-until-assertion",
+        "media": "dark"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Pre-React bootstrap for system",
+      "passed": true,
+      "fixture": {
+        "theme": "system",
+        "scriptGate": "held-until-assertion",
+        "media": "dark"
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /v1/auth/method",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps"
+      ]
+    },
+    {
+      "name": "Enabled destructive confirmation contrast light",
+      "passed": true,
+      "fixture": {
+        "theme": "light",
+        "connectedDrive": true,
+        "width": 375
+      },
+      "contrast": {
+        "foreground": "rgb(118, 0, 12)",
+        "background": "rgb(255, 196, 190)",
+        "compositedBackgroundRgb": [
+          255,
+          196,
+          190
+        ],
+        "fontSize": "16px",
+        "opacity": "1",
+        "ratio": 7.823474683442033
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/actions"
+      ]
+    },
+    {
+      "name": "Enabled destructive confirmation contrast dark",
+      "passed": true,
+      "fixture": {
+        "theme": "dark",
+        "connectedDrive": true,
+        "width": 375
+      },
+      "contrast": {
+        "foreground": "rgb(255, 196, 190)",
+        "background": "rgba(255, 152, 144, 0.24)",
+        "compositedBackgroundRgb": [
+          89.90980392156862,
+          64.79215686274509,
+          62.87843137254902
+        ],
+        "fontSize": "16px",
+        "opacity": "1",
+        "ratio": 6.155710292191512
+      },
+      "requestPaths": [
+        "GET /",
+        "GET /assets/theme-bootstrap.js",
+        "GET /assets/index-CDRR06Aw.js",
+        "GET /assets/index-Dd3Wfh3x.css",
+        "GET /assets/figtree-latin-wght-normal-D_ZTVpCC.woff2",
+        "GET /v1/auth/method",
+        "GET /v1/me",
+        "GET /v1/capabilities",
+        "GET /v1/connections",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/apps",
+        "GET /v1/actions"
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "after/apps-320-light.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "light",
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "width": 320,
+        "theme": "light"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/sign-in-320-light.png",
+      "route": "/",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "light",
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "width": 320,
+        "theme": "light",
+        "signedIn": false,
+        "route": "/"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/apps-320-dark.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "dark",
+        "bodyBackground": "rgb(27, 27, 27)",
+        "bodyColor": "rgb(255, 255, 255)"
+      },
+      "fixture": {
+        "width": 320,
+        "theme": "dark"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/sign-in-320-dark.png",
+      "route": "/",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "dark",
+        "bodyBackground": "rgb(27, 27, 27)",
+        "bodyColor": "rgb(255, 255, 255)"
+      },
+      "fixture": {
+        "width": 320,
+        "theme": "dark",
+        "signedIn": false,
+        "route": "/"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/apps-375-light.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "light",
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "width": 375,
+        "theme": "light"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/sign-in-375-light.png",
+      "route": "/",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "light",
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "width": 375,
+        "theme": "light",
+        "signedIn": false,
+        "route": "/"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/apps-375-dark.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "dark",
+        "bodyBackground": "rgb(27, 27, 27)",
+        "bodyColor": "rgb(255, 255, 255)"
+      },
+      "fixture": {
+        "width": 375,
+        "theme": "dark"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/sign-in-375-dark.png",
+      "route": "/",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "dark",
+        "bodyBackground": "rgb(27, 27, 27)",
+        "bodyColor": "rgb(255, 255, 255)"
+      },
+      "fixture": {
+        "width": 375,
+        "theme": "dark",
+        "signedIn": false,
+        "route": "/"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/apps-430-light.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "light",
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "width": 430,
+        "theme": "light"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/sign-in-430-light.png",
+      "route": "/",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "light",
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "width": 430,
+        "theme": "light",
+        "signedIn": false,
+        "route": "/"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/apps-430-dark.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "dark",
+        "bodyBackground": "rgb(27, 27, 27)",
+        "bodyColor": "rgb(255, 255, 255)"
+      },
+      "fixture": {
+        "width": 430,
+        "theme": "dark"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/sign-in-430-dark.png",
+      "route": "/",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "dark",
+        "bodyBackground": "rgb(27, 27, 27)",
+        "bodyColor": "rgb(255, 255, 255)"
+      },
+      "fixture": {
+        "width": 430,
+        "theme": "dark",
+        "signedIn": false,
+        "route": "/"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/apps-1440-light.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "light",
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "width": 1440,
+        "theme": "light"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/sign-in-1440-light.png",
+      "route": "/",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "light",
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "width": 1440,
+        "theme": "light",
+        "signedIn": false,
+        "route": "/"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/apps-1440-dark.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "dark",
+        "bodyBackground": "rgb(27, 27, 27)",
+        "bodyColor": "rgb(255, 255, 255)"
+      },
+      "fixture": {
+        "width": 1440,
+        "theme": "dark"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/sign-in-1440-dark.png",
+      "route": "/",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "dark",
+        "bodyBackground": "rgb(27, 27, 27)",
+        "bodyColor": "rgb(255, 255, 255)"
+      },
+      "fixture": {
+        "width": 1440,
+        "theme": "dark",
+        "signedIn": false,
+        "route": "/"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/google-sign-in-light.png",
+      "route": "/",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "light",
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "signedIn": false,
+        "method": "google",
+        "oauthFixture": true,
+        "route": "/",
+        "theme": "light",
+        "width": 375
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/google-sign-in-dark.png",
+      "route": "/",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "dark",
+        "bodyBackground": "rgb(27, 27, 27)",
+        "bodyColor": "rgb(255, 255, 255)"
+      },
+      "fixture": {
+        "signedIn": false,
+        "method": "google",
+        "oauthFixture": true,
+        "route": "/",
+        "theme": "dark",
+        "width": 375
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/google-start-error.png",
+      "route": "/",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": null,
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "signedIn": false,
+        "method": "google",
+        "googleStatus": 503,
+        "route": "/"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/google-unavailable.png",
+      "route": "/",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": null,
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "signedIn": false,
+        "method": "google",
+        "available": false,
+        "route": "/",
+        "width": 375
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/tailscale-denied.png",
+      "route": "/",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": null,
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "signedIn": false,
+        "method": "tailscale",
+        "route": "/",
+        "width": 375
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/session-unavailable.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": null,
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "meStatus": 503,
+        "width": 375
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/session-expired.png",
+      "route": "/?tab=connections&retain=fixture",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": null,
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "route": "/?tab=connections&retain=fixture"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/logout-error.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": null,
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "logoutStatus": 503,
+        "width": 375
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/signed-out.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": null,
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "logoutStatus": 503,
+        "width": 375
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/session-loading.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": null,
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "meGate": "held-until-assertion",
+        "width": 375
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/apps-loading.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": null,
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "appsGate": "held-until-assertion",
+        "width": 375
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/apps-empty.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": null,
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "empty": true,
+        "width": 375
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/apps-error.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": null,
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "appsStatus": 503,
+        "width": 375
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/system-light.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": null,
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "media": "light"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/system-dark.png",
+      "route": "/?tab=connections",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "system",
+      "mediaPreference": "dark",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": null,
+        "bodyBackground": "rgb(27, 27, 27)",
+        "bodyColor": "rgb(255, 255, 255)"
+      },
+      "fixture": {
+        "media": "dark"
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/google-drive-confirm-disconnect-light.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "light",
+        "bodyBackground": "rgb(241, 241, 241)",
+        "bodyColor": "rgb(0, 0, 0)"
+      },
+      "fixture": {
+        "theme": "light",
+        "connectedDrive": true,
+        "width": 375
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    },
+    {
+      "file": "after/google-drive-confirm-disconnect-dark.png",
+      "route": "/?tab=connections&app=google-drive",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "mediaPreference": "light",
+      "rendered": {
+        "themeName": "neutral",
+        "mode": "dark",
+        "bodyBackground": "rgb(27, 27, 27)",
+        "bodyColor": "rgb(255, 255, 255)"
+      },
+      "fixture": {
+        "theme": "dark",
+        "connectedDrive": true,
+        "width": 375
+      },
+      "buildSha256": "375ff1360229a98c8dd55508822d6b0038aebd6c3a4757774e98ab919b2683a7",
+      "revision": "005eeb3c85ff07f5e84eb3db1673ab8c2b45dce2"
+    }
+  ],
+  "browserVersion": "156.0.8078.4",
+  "fixtureDefaults": {
+    "origin": "https://capykit.example.test",
+    "signedIn": true,
+    "method": "email",
+    "role": "owner",
+    "kind": "human",
+    "media": "light",
+    "sentinelCookiesOnly": true,
+    "cookieNames": [
+      "capykit_csrf",
+      "capykit_public_csrf"
+    ]
+  },
+  "astryxVersion": "0.7.0",
+  "passed": true
+}

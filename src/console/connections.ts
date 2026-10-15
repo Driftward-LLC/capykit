@@ -1,3 +1,13 @@
+import { Button } from "@astryxdesign/core/Button";
+import { Banner } from "@astryxdesign/core/Banner";
+import { Card } from "@astryxdesign/core/Card";
+import { Badge } from "@astryxdesign/core/Badge";
+import { List, ListItem } from "@astryxdesign/core/List";
+import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Spinner } from "@astryxdesign/core/Spinner";
+import { Dialog } from "@astryxdesign/core/Dialog";
+import { NativeField } from "./piece-details.js";
 import React, { useEffect, useRef, useState } from "react";
 import { sessionFetch, writeRequest } from "./session.js";
 
@@ -285,12 +295,13 @@ export function Connections({ onSessionExpired, active, onConnectionsChanged }: 
   }
 
   const disabled = pending || loading;
+  const confirmationOpen = active && !loading && configured !== null && setup === null && connections.length > 0 && selected !== null && (reconnecting || disconnecting);
   const installLink = configured ? githubLink(installationUrl) : undefined;
   const selectedUnfinished = selected !== null && unfinishedConnection(selected);
   const installationBlocked = error === errorMessages.GITHUB_SELECTED_REPOSITORIES_REQUIRED;
   const reviewExpired = error === errorMessages.CONNECT_SETUP_EXPIRED;
   const reviewing = setup !== null && setup.candidates.length > 0 && !reviewExpired;
-  const manageAccess = installLink === undefined ? null : h("a", { className: "button-link secondary", href: installLink, target: "_blank", rel: "noopener noreferrer" }, "Manage GitHub access", h("span", { className: "small" }, " ↗"));
+  const manageAccess = installLink === undefined ? null : h(Button,{label:"Manage GitHub access ↗",variant:"secondary",href:installLink,target:"_blank",rel:"noopener noreferrer"});
   const progress = h("ol", { className: "connection-progress", "aria-label": "Connection progress" },
     h("li", { "aria-current": reviewing ? undefined : "step", className: reviewing ? "complete" : "current" }, reviewing ? "✓ GitHub verified" : "1. Continue with GitHub"),
     h("li", { "aria-current": reviewing ? "step" : undefined, className: reviewing ? "current" : "" }, "2. Approve workspace access"),
@@ -300,18 +311,18 @@ export function Connections({ onSessionExpired, active, onConnectionsChanged }: 
     h("p", { className: "small muted" }, "In GitHub, install or configure the Capykit GitHub App. Choose Only select repositories, select repositories you administer, and save. Then return here to continue. All repositories is not supported in this preview."),
     manageAccess,
   );
-  const continueSetup = (connectionId?: string): React.ReactElement => h("button", { type: "button", disabled, onClick: () => { void start(connectionId); } }, pending ? "Opening GitHub…" : "Continue with GitHub");
-  return h("section", { className: "connections", "aria-label": "GitHub connections", "aria-busy": disabled },
+  const continueSetup = (connectionId?: string): React.ReactElement => h(Button, {type: "button", isDisabled: disabled, onClick: () => { void start(connectionId); }, variant: "primary", label: pending ? "Opening GitHub…" : "Continue with GitHub"});
+  return h("section", { className: "connections astryx-route", "aria-label": "GitHub connections", "aria-busy": disabled },
     h("div", { className: "section-heading" },
       h("div", null, h("p", { className: "eyebrow" }, "Workspace connections"), h("h1", null, "Connect GitHub"), h("p", { className: "muted" }, "Choose which repositories Capykit can read for this workspace.")),
-      setup !== null || selectedUnfinished || resumable !== undefined || loading ? null : h("button", { type: "button", className: "text-button", disabled, onClick: () => { void run(refresh); } }, "Refresh connections"),
+      setup !== null || selectedUnfinished || resumable !== undefined || loading ? null : h(Button, {type: "button", variant: "ghost", isDisabled: disabled, onClick: () => { void run(refresh); }, label: "Refresh connections"}),
     ),
-    error === "" ? null : h("p", { className: "message error", role: "alert" }, error),
-    notice === "" ? null : h("p", { className: "message success", role: "status" }, notice),
-    loading ? h("section", { className: "panel connection-intro", role: "status" }, h("h2", null, checkingGitHub ? "Checking your GitHub access…" : "Loading connections…"), checkingGitHub ? h("p", { className: "muted" }, "You’ll review repository access here before anything is connected.") : null) : configured === null ? h("section", { className: "panel connection-intro", "aria-label": "Connection status unavailable" },
+    error === "" || confirmationOpen ? null : h(Banner,{status:"error",role:"alert",title:error}),
+    notice === "" ? null : h(Banner,{status:"success",role:"status",title:notice}),
+    loading ? h(Card,{className:"connection-intro"},h(Spinner,{label:checkingGitHub?"Checking your GitHub access…":"Loading connections…"}),checkingGitHub?h("p",{className:"muted"},"You’ll review repository access here before anything is connected."):null) : configured === null ? h(Card, {className: "connection-intro", role:"region", "aria-label": "Connection status unavailable" },
       h("h2", null, "Could not load connection status"), h("p", { className: "muted" }, "Retry to check whether GitHub is ready to connect."),
-      h("button", { type: "button", disabled, onClick: () => { void run(refresh); } }, "Retry connection status"),
-    ) : configured ? setup !== null || selected !== null ? null : h("section", { className: "panel connection-intro", "aria-label": "Connect GitHub" },
+      h(Button, {type: "button", isDisabled: disabled, onClick: () => { void run(refresh); }, variant: "primary", label: "Retry connection status"}),
+    ) : configured ? setup !== null || selected !== null ? null : h(Card, {className: "connection-intro", role:"region", "aria-label": "Connect GitHub" },
       progress,
       h("h2", null, installationBlocked ? "Choose repositories on GitHub" : resumable === undefined ? "Connect your GitHub account" : "Finish connecting GitHub"),
       installationBlocked ? h(React.Fragment, null,
@@ -323,64 +334,64 @@ export function Connections({ onSessionExpired, active, onConnectionsChanged }: 
         h("p", { className: "small muted connection-permissions" }, "Read access to issues and repository metadata. Nothing is connected until you confirm."),
         installationHelp,
       ),
-    ) : h("section", { className: "panel connection-intro", "aria-label": "GitHub setup required" },
-      h("h2", null, "Set up GitHub"),
+    ) : h(Card, {className: "connection-intro", role:"region", "aria-label": "GitHub setup required" },
+      h("h2", null, "Set up GitHub"),h(Badge,{label:"Provider not configured",variant:"warning"}),
       providerSetup?.available === true ? h(React.Fragment, null,
         h("p", { className: "muted" }, `Create the dedicated Capykit GitHub App for ${providerSetup.organization}. GitHub will ask an authorized organization administrator to approve its creation. Capykit saves the app credentials securely when you return.`),
         h("p", { className: "small muted" }, "After setup, install the app on selected repositories and approve their access here. Permissions: read issues and repository metadata."),
-        h("button", { type: "button", disabled, onClick: () => { void startProviderSetup(); } }, "Set up GitHub"),
+        h(Button, {type: "button", isDisabled: disabled, onClick: () => { void startProviderSetup(); }, variant: "primary", label: "Set up GitHub"}),
       ) : h("p", { className: "muted" }, providerSetup === null ? "Your operator needs to enable GitHub App setup for this Capykit deployment. Once enabled, they can create the app here and you can connect selected repositories." : "Only this deployment’s designated operator can set up the GitHub App. Ask them to open Connections and complete setup, then refresh to connect your repositories."),
     ),
-    setup === null ? null : h("section", { className: "panel connection-setup", "aria-label": "Review GitHub connection" },
+    setup === null ? null : h(Card, {className: "connection-setup", role:"region", "aria-label": "Review GitHub connection" },
       progress,
       h("h2", { ref: reviewHeading, tabIndex: -1 }, reviewExpired ? "Review expired" : setup.candidates.length === 0 ? "No repositories are ready to connect" : "Choose repositories for this workspace"),
       reviewExpired ? h(React.Fragment, null,
         h("p", { className: "muted" }, "Continue with GitHub to get a fresh repository list, then review access again."),
-        h("div", { className: "actions" }, continueSetup(setup.connectionId), h("button", { type: "button", className: "text-button", disabled, onClick: () => { void cancel(); } }, "Cancel setup")),
+        h("div", { className: "actions" }, continueSetup(setup.connectionId), h(Button, {type: "button", variant: "ghost", isDisabled: disabled, onClick: () => { void cancel(); }, label: "Cancel setup"})),
       ) : setup.candidates.length === 0 ? h(React.Fragment, null,
         h("p", null, "GitHub authorization succeeded, but no repositories you administer are available to Capykit. No connection has been approved."),
         h("p", { className: "muted" }, "Open the GitHub App installation, choose Only select repositories, select at least one repository you administer, and save. If it already uses selected repositories, check that you authorized the GitHub account with administrator access."),
         h("p", { className: "small muted" }, "Then return here and continue with GitHub to review the updated list."),
-        h("div", { className: "actions" }, manageAccess, continueSetup(setup.connectionId), h("button", { type: "button", className: "text-button", disabled, onClick: () => { void cancel(); } }, "Cancel setup")),
+        h("div", { className: "actions" }, manageAccess, continueSetup(setup.connectionId), h(Button, {type: "button", variant: "ghost", isDisabled: disabled, onClick: () => { void cancel(); }, label: "Cancel setup"})),
       ) : h("form", { onSubmit: (event) => { void confirm(event); } },
-        setup.candidates.length === 1 ? h("p", { className: "connection-verified" }, h("strong", null, "GitHub verified. "), `Repositories from ${candidate?.account.login ?? "your GitHub account"} are ready to review.`) : h("label", { htmlFor: "github-installation" }, "Choose a GitHub account", h("select", { id: "github-installation", value: installationId, disabled, required: true, onChange: (event: React.ChangeEvent<HTMLSelectElement>) => { setInstallationId(event.currentTarget.value); setRepositoryIds([]); setConsent(false); } }, h("option", { value: "" }, "Choose a GitHub account"), ...setup.candidates.map((entry) => h("option", { key: entry.installationId, value: entry.installationId }, `${entry.account.login} (${entry.account.type})`)))),
+        setup.candidates.length === 1 ? h("p", { className: "connection-verified" }, h("strong", null, "GitHub verified. "), `Repositories from ${candidate?.account.login ?? "your GitHub account"} are ready to review.`) : h(NativeField, {label: "Choose a GitHub account"}, h("select", { id: "github-installation", value: installationId, disabled, required: true, onChange: (event: React.ChangeEvent<HTMLSelectElement>) => { setInstallationId(event.currentTarget.value); setRepositoryIds([]); setConsent(false); } }, h("option", { value: "" }, "Choose a GitHub account"), ...setup.candidates.map((entry) => h("option", { key: entry.installationId, value: entry.installationId }, `${entry.account.login} (${entry.account.type})`)))),
         h("p", { id: "repository-instructions", className: "muted" }, "Select the repositories this workspace may use. Capykit can read their issues and metadata; it cannot write to them."),
-        candidate === undefined ? null : h("fieldset", { className: "repository-picker", disabled, "aria-describedby": "repository-instructions" }, h("legend", null, "Repositories"), candidate.repositories.length === 0 ? h("p", { className: "muted" }, "No repositories are available for this installation.") : null,
-          ...candidate.repositories.map((repo) => h("label", { key: repo.id, className: "checkbox-label" }, h("input", { type: "checkbox", disabled: disabled || !repo.admin, checked: repositoryIds.includes(repo.id), onChange: (event) => { const checked = event.currentTarget.checked; setRepositoryIds((current) => checked ? [...current, repo.id] : current.filter((id) => id !== repo.id)); setConsent(false); } }), h("span", null, repo.fullName, !repo.admin ? h("span", { className: "muted small" }, " — administrator access required") : null))),
+        candidate === undefined ? null : h("fieldset", { className: "repository-picker", disabled, "aria-describedby": "repository-instructions" }, h("legend", null, "Repositories"), candidate.repositories.length === 0 ? h(EmptyState,{title:"No repositories available for this installation",isCompact:true}) : null,
+          ...candidate.repositories.map((repo) => h(CheckboxInput,{key:repo.id,label:repo.fullName,...repo.admin?{}:{description:"Administrator access required"},isDisabled:disabled||!repo.admin,value:repositoryIds.includes(repo.id),onChange:(checked:boolean)=>{setRepositoryIds(current=>checked?[...current,repo.id]:current.filter(id=>id!==repo.id));setConsent(false);}})),
         ),
         h("p", { className: "small muted", role: "status" }, `${String(repositoryIds.length)} ${repositoryIds.length === 1 ? "repository" : "repositories"} selected.`, repositoryIds.length === 0 ? " Select at least one to continue." : !consent ? " Approve workspace access below to connect." : " Ready to connect."),
         repositoryIds.length === 0 ? null : h("div", { className: "connection-consent" },
-          h("label", { className: "checkbox-label" }, h("input", { type: "checkbox", checked: consent, disabled, "aria-describedby": "connection-disclosure", onChange: (event) => { setConsent(event.currentTarget.checked); } }), h("span", null, "I approve read access to these repositories for this workspace.")),
+          h(CheckboxInput,{label:"I approve read access to these repositories for this workspace.",value:consent,isDisabled:disabled,"aria-describedby":"connection-disclosure",onChange:(checked:boolean)=>{setConsent(checked);}}),
           h("p", { id: "connection-disclosure", className: "small muted" }, "Humans and agents explicitly granted access may use this connection without their own GitHub repository access. Publishing a function does not grant provider access."),
         ),
-        h("div", { className: "actions" }, h("button", { type: "submit", disabled: disabled || !consent || repositoryIds.length === 0 }, pending ? "Connecting…" : "Confirm connection"), h("button", { type: "button", className: "text-button", disabled, onClick: () => { void cancel(); } }, "Cancel setup")),
+        h("div", { className: "actions" }, h(Button, {type: "submit", isDisabled: disabled || !consent || repositoryIds.length === 0, variant: "primary", label: pending ? "Connecting…" : "Confirm connection"}), h(Button, {type: "button", variant: "ghost", isDisabled: disabled, onClick: () => { void cancel(); }, label: "Cancel setup"})),
         h("details", { className: "connection-help" }, h("summary", null, "Missing a repository?"),
           h("p", { className: "small muted" }, "Manage the GitHub App’s selected repositories and save your changes. You need administrator access to each repository. Then check again to refresh this list."),
-          h("div", { className: "actions" }, manageAccess, h("button", { type: "button", className: "secondary", disabled, onClick: () => { void start(setup.connectionId); } }, "Check again")),
+          h("div", { className: "actions" }, manageAccess, h(Button, {type: "button", variant: "secondary", isDisabled: disabled, onClick: () => { void start(setup.connectionId); }, label: "Check again"})),
         ),
       ),
     ),
     loading || configured === null || setup !== null || connections.length === 0 ? null : h("div", { className: `library-layout${selected === null ? " connection-list-only" : ""}` },
-      h("nav", { className: "panel library-nav", "aria-label": "Connections" }, h("h2", null, "Your connections"), h("ul", { className: "capability-list" }, ...connections.map((connection) => h("li", { key: connection.id }, h("button", { type: "button", className: `capability-item${selected?.id === connection.id ? " active" : ""}`, "aria-pressed": selected?.id === connection.id, disabled, onClick: () => { void open(connection.id); } }, h("strong", null, connection.account?.login ?? "GitHub setup"), h("span", { className: "small muted" }, connectionStatus(connection))))))),
-      selected === null ? null : h("section", { className: "panel connection-detail", "aria-label": "Connection details" },
-        h("button", { type: "button", className: "text-button connection-back", disabled, onClick: () => { setSelected(null); setDisconnecting(false); setReconnecting(false); } }, "← Back to connections"),
+      h(Card, {className:"library-nav",role:"navigation","aria-label":"Connections"}, h("h2", null, "Your connections"), h(List,{className:"capability-list",hasDividers:true,children:connections.map(connection=>h(ListItem,{key:connection.id,className:"capability-item",label:connection.account?.login??"GitHub setup",isSelected:selected?.id===connection.id,isDisabled:disabled,onClick:()=>{void open(connection.id);},description:"Workspace connection",endContent:h(Badge,{label:connectionStatus(connection),variant:connection.status==="active"?"success":connection.status==="revoked"?"neutral":"warning"})}))})),
+      selected === null ? null : h(Card, {className: "connection-detail", role:"region", "aria-label": "Connection details" },
+        h(Button, {type: "button", variant: "ghost", className: "connection-back", isDisabled: disabled, onClick: () => { setSelected(null); setDisconnecting(false); setReconnecting(false); }, label: "← Back to connections"}),
         selectedUnfinished ? h(React.Fragment, null,
           progress,
-          h("div", { className: "section-heading compact" }, h("h2", null, "Finish setup"), h("span", { className: "status-badge" }, "Setup unfinished")),
+          h("div", { className: "section-heading compact" }, h("h2", null, "Finish setup"), h(Badge,{label:"Setup unfinished",variant:"warning"})),
           h("p", { className: "muted" }, "Continue with GitHub to verify your account. You’ll return here to choose repositories and approve access. No repository access has been approved yet."),
           installationBlocked ? h("p", null, manageAccess) : null,
           configured ? continueSetup(selected.id) : null,
           installationHelp,
-          h("details", null, h("summary", null, "Cancel this setup"), h("p", { className: "small muted" }, "You can discard this unfinished setup. No repository access has been approved."), h("button", { type: "button", className: "text-button danger-text", disabled, onClick: () => { setDisconnecting(true); setReconnecting(false); } }, "Discard setup")),
+          h("details", null, h("summary", null, "Cancel this setup"), h("p", { className: "small muted" }, "You can discard this unfinished setup. No repository access has been approved."), h(Button, {type: "button", variant: "destructive", isDisabled: disabled, onClick: () => { setDisconnecting(true); setReconnecting(false); }, label: "Discard setup"})),
         ) : h(React.Fragment, null,
-          h("div", { className: "section-heading compact" }, h("h2", null, selected.account?.login ?? "GitHub setup"), h("span", { className: `status-badge${selected.status === "active" ? " connected" : ""}` }, connectionStatus(selected))),
+          h("div", { className: "section-heading compact" }, h("h2", null, selected.account?.login ?? "GitHub setup"),h("p",{className:"small muted"},`Workspace account · ${selected.account?.id??selected.id}`), h(Badge,{label:connectionStatus(selected),variant:selected.status==="active"?"success":selected.status==="revoked"?"neutral":"warning"})),
           h("p", { className: "muted" }, selected.status === "active" ? "Grant users access to a published function and selected repositories in Access. Function execution is the next delivery milestone." : selected.status === "suspended" ? "This installation is suspended on GitHub. Resume it on GitHub and reconnect to verify access." : selected.status === "reconnect_required" ? "Repository access changed. Reconnect to verify the current repositories before this connection can be used." : "Capykit access is disabled for this connection."),
-          h("h3", null, "Selected repositories"), selected.repositories.length === 0 ? h("p", { className: "muted" }, "No repositories are approved.") : h("ul", { className: "repository-list" }, ...selected.repositories.map((repo) => h("li", { key: repo.id }, githubLink(repo.url) === undefined ? repo.fullName : h("a", { href: githubLink(repo.url), target: "_blank", rel: "noopener noreferrer" }, repo.fullName)))),
+          h("h3", null, "Selected repositories"), selected.repositories.length === 0 ? h(EmptyState,{title:"No repositories are approved",isCompact:true}) : h(List,{className:"repository-list",children:selected.repositories.map(repo=>h(ListItem,{key:repo.id,label:repo.fullName,...githubLink(repo.url)?{href:githubLink(repo.url) as string}:{},target:"_blank",rel:"noopener noreferrer"}))}),
           h("dl", null, h("dt", null, "Permissions"), h("dd", null, "Issues: read · Metadata: read"), h("dt", null, "Approved"), h("dd", null, selected.consentAt === null ? "Not confirmed" : new Date(selected.consentAt).toLocaleString()), selected.consentByPrincipalId == null ? null : h(React.Fragment, null, h("dt", null, "Approved by"), h("dd", null, selected.consentByPrincipalId)), h("dt", null, "Updated"), h("dd", null, new Date(selected.updatedAt).toLocaleString())),
-          h("div", { className: "actions" }, configured ? h("button", { type: "button", className: "secondary", disabled, onClick: () => { setReconnecting(true); setDisconnecting(false); } }, selected.status === "active" ? "Review and reconnect" : "Reconnect") : null, selected.status === "revoked" ? null : h("button", { type: "button", className: "text-button danger-text", disabled, onClick: () => { setDisconnecting(true); setReconnecting(false); } }, "Disconnect")),
+          h("div", { className: "actions" }, configured ? h(Button, {type: "button", variant: "secondary", isDisabled: disabled, onClick: () => { setError(""); setReconnecting(true); setDisconnecting(false); }, label: selected.status === "active" ? "Review and reconnect" : "Reconnect"}) : null, selected.status === "revoked" ? null : h(Button, {type: "button", variant: "destructive", isDisabled: disabled, onClick: () => { setError(""); setDisconnecting(true); setReconnecting(false); }, label: "Disconnect"})),
         ),
-        reconnecting ? h("div", { className: "connection-confirm" }, h("p", null, "Starting a reconnect pauses use of this connection until you verify repository access and confirm again."), h("div", { className: "actions" }, h("button", { type: "button", disabled, onClick: () => { void start(selected.id); } }, "Continue with GitHub"), h("button", { type: "button", className: "secondary", disabled, onClick: () => { setReconnecting(false); } }, "Keep current connection"))) : null,
-        disconnecting ? h("div", { className: "connection-confirm" }, h("p", null, selectedUnfinished ? "Discard this unfinished setup? No repository access has been approved. The GitHub App will stay installed." : "Disconnect this account from Capykit? Access stops immediately. The GitHub App stays installed until you uninstall it on GitHub."), h("div", { className: "actions" }, h("button", { type: "button", className: "danger", disabled, onClick: () => { void disconnect(); } }, selectedUnfinished ? "Confirm discard" : "Confirm disconnect"), h("button", { type: "button", className: "secondary", disabled, onClick: () => { setDisconnecting(false); } }, "Cancel"))) : null,
+        h(Dialog, {className:"connection-confirm", isOpen:active&&reconnecting, onOpenChange:(open:boolean)=>{if(!disabled)setReconnecting(open);}, purpose:disabled?"required":"form", "aria-label":"Review and reconnect GitHub", children:h("div",{style:{overflowY:"auto"}},h("p", null, "Starting a reconnect pauses use of this connection until you verify repository access and confirm again."), reconnecting&&error?h(Banner,{status:"error",role:"alert",title:error}):null, installationBlocked?manageAccess:null, h("div", { className: "actions" }, h(Button, {type: "button", isDisabled: disabled, onClick: () => { void start(selected.id); }, variant: "primary", label: "Continue with GitHub"}), h(Button, {type: "button", variant: "secondary", "data-autofocus":"", isDisabled: disabled, onClick: () => { setReconnecting(false); }, label: "Keep current connection"})))}),
+        h(Dialog, {className:"connection-confirm", isOpen:active&&disconnecting, onOpenChange:(open:boolean)=>{if(!disabled)setDisconnecting(open);}, purpose:disabled?"required":"form", "aria-label":selectedUnfinished?"Discard GitHub setup":"Disconnect GitHub", children:h("div",{style:{overflowY:"auto"}},h("p", null, selectedUnfinished ? "Discard this unfinished setup? No repository access has been approved. The GitHub App will stay installed." : "Disconnect this account from Capykit? Access stops immediately. The GitHub App stays installed until you uninstall it on GitHub."), disconnecting&&error?h(Banner,{status:"error",role:"alert",title:error}):null, h("div", { className: "actions" }, h(Button, {type: "button", variant: "destructive", isDisabled: disabled, onClick: () => { void disconnect(); }, label: selectedUnfinished ? "Confirm discard" : "Confirm disconnect"}), h(Button, {type: "button", variant: "secondary", "data-autofocus":"", isDisabled: disabled, onClick: () => { setDisconnecting(false); }, label: "Cancel"})))}),
         githubLink(selected.uninstallUrl) === undefined || selectedUnfinished ? null : h("p", { className: "small github-manage" }, h("a", { href: githubLink(selected.uninstallUrl), target: "_blank", rel: "noopener noreferrer" }, "Manage or uninstall this app on GitHub")),
       ),
     ),
