@@ -1,0 +1,48 @@
+{
+  "fixtureOnly": true,
+  "afterBuildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+  "reports": [
+    {
+      "command": "CAPYKIT_ADVANCED_BASELINE=1 CAPYKIT_CONSOLE_DIR=<baseline>/dist/console node scripts/test-advanced-console.mjs",
+      "exit_code": 0,
+      "report": "advanced/before/metadata.json",
+      "scenarios": 24,
+      "fixtureOnly": true
+    },
+    {
+      "command": "node scripts/test-advanced-console.mjs",
+      "exit_code": 0,
+      "report": "advanced/after/metadata.json",
+      "scenarios": 49,
+      "fixtureOnly": true
+    },
+    {
+      "command": "CAPYKIT_AGENT_VISUAL_DIR=docs/evidence/ENG-162/apps-agents CAPYKIT_AGENT_VISUAL_ONLY=1 node scripts/test-agent-setup.mjs",
+      "exit_code": 0,
+      "report": "apps-agents/metadata.json",
+      "scenarios": 58,
+      "fixtureOnly": true
+    },
+    {
+      "command": "CAPYKIT_SHELL_EVIDENCE_DIR=docs/evidence/ENG-162/shell node scripts/test-astryx-shell.mjs",
+      "exit_code": 0,
+      "report": "shell/metadata.json",
+      "scenarios": 51,
+      "fixtureOnly": true
+    },
+    {
+      "command": "CAPYKIT_AGENT_EVIDENCE_FILE=docs/evidence/ENG-162/agent-regression.json node scripts/test-agent-setup.mjs",
+      "exit_code": 0,
+      "report": "agent-regression.json",
+      "scenarios": 67,
+      "fixtureOnly": true
+    },
+    {
+      "command": "CAPYKIT_BROWSER_ARTIFACT_PREFIX=docs/evidence/ENG-162/access/flow node scripts/test-access-flow.mjs",
+      "exit_code": 0,
+      "report": "access/flow-results.json",
+      "scenarios": 6,
+      "fixtureOnly": true
+    }
+  ]
+}

@@ -7,6 +7,7 @@ import { Apps, discardGoogleReturn } from "./apps.js";
 import { Access } from "./access.js";
 import { ActionAccess } from "./action-access.js";
 import { ActionConsole } from "./actions.js";
+import { NativeField } from "./piece-details.js";
 import { Theme } from "@astryxdesign/core/theme";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 import { Button } from "@astryxdesign/core/Button";
@@ -21,7 +22,7 @@ import "@astryxdesign/core/reset.css";
 import "@astryxdesign/core/astryx.css";
 import "@astryxdesign/theme-neutral/theme.css";
 import "./fonts.css";
-import "./style.css";
+
 
 interface CurrentUser {
   readonly identity: { readonly email: string; readonly principalKind: string };
@@ -236,7 +237,7 @@ function App(): React.ReactElement {
     h("header", { className: "app-header" },
       h("span", { className: "wordmark" }, "Capykit", h(Badge, { label: "Preview" })),
       h("div", { className: "header-controls" },
-        h("label", { className: "appearance", htmlFor: "appearance" }, "Appearance", h("select", { id: "appearance", value: appearance, onChange: (event: React.ChangeEvent<HTMLSelectElement>) => { const value = event.currentTarget.value; if (value !== "light" && value !== "dark" && value !== "system") return; setAppearance(value); saveAppearance(value); } }, h("option", { value: "system" }, "System"), h("option", { value: "light" }, "Light"), h("option", { value: "dark" }, "Dark"))),
+        h(NativeField, { className: "appearance", label: "Appearance" }, h("select", { id: "appearance", value: appearance, onChange: (event: React.ChangeEvent<HTMLSelectElement>) => { const value = event.currentTarget.value; if (value !== "light" && value !== "dark" && value !== "system") return; setAppearance(value); saveAppearance(value); } }, h("option", { value: "system" }, "System"), h("option", { value: "light" }, "Light"), h("option", { value: "dark" }, "Dark"))),
         currentUser === null ? null : h("div", { className: "account" }, h("span", null, currentUser.identity.email), h(Button, { type: "button", label: pending === "logout" ? "Signing out…" : "Sign out", isDisabled: disabled, onClick: () => { void logout(); } })),
       ),
     ),
@@ -265,21 +266,19 @@ function App(): React.ReactElement {
       ) : h(React.Fragment, null,
       h("p", { className: "small muted" }, "Stay signed in for 30 days between visits."),
       h("form", { onSubmit: (event) => { void requestCode(event); } },
-        h("label", { htmlFor: "email" }, "Invited email address"),
-        h("input", {
+        h(NativeField, { label: "Invited email address" }, h("input", {
           id: "email", name: "email", type: "email", autoComplete: "email", required: true,
           value: email, disabled,
           onChange: (event) => { setEmail(event.currentTarget.value); setCodeRequested(false); setCode(""); },
-        }),
+        })),
         h(Button, { type: "submit", isDisabled: disabled, variant: codeRequested ? "secondary" : "primary", label: pending === "otp" ? "Sending…" : codeRequested ? "Send a new code" : "Send sign-in code" }),
       ),
       codeRequested ? h("form", { onSubmit: (event) => { void verifyCode(event); } },
-        h("label", { htmlFor: "code" }, "Six-digit sign-in code"),
-        h("input", {
+        h(NativeField, { label: "Six-digit sign-in code" }, h("input", {
           id: "code", name: "code", type: "text", inputMode: "numeric", autoComplete: "one-time-code",
           pattern: "[0-9]{6}", maxLength: 6, minLength: 6, required: true,
           value: code, disabled, onChange: (event) => { setCode(event.currentTarget.value); },
-        }),
+        })),
         h(Button, { type: "submit", isDisabled: disabled, variant: "primary", label: pending === "verify" ? "Verifying…" : "Sign in" }),
       ) : null,
       ),
@@ -291,13 +290,13 @@ function App(): React.ReactElement {
             ...(currentUser.workspace.role === "owner" ? ["connections", "agents", "actions"] : ["connections", "actions"]).map(navigationButton),
           ),
           h("details", { className: "workspace-tools", open: tab === "capabilities" || tab === "access" }, h("summary", null, currentUser.workspace.role === "owner" ? "Functions & people access" : "Functions"), h("nav", { className: "secondary-nav", "aria-label": "Workspace tools" }, ...(currentUser.workspace.role === "owner" ? ["capabilities", "access"] : ["capabilities"]).map(navigationButton))),
-          h("div", { className: "legacy-route", hidden: tab !== "capabilities" }, h(CapabilityLibrary, { createFunctionRequest, onSessionExpired: sessionExpired, manage: currentUser.workspace.role === "owner" })),
+          h("div", { className: "astryx-route", hidden: tab !== "capabilities" }, h(CapabilityLibrary, { createFunctionRequest, onSessionExpired: sessionExpired, manage: currentUser.workspace.role === "owner" })),
           h("div", { className: "astryx-route", hidden: tab !== "connections" }, h(Apps, { manage:currentUser.workspace.role === "owner", onSessionExpired: sessionExpired, active: tab === "connections", onManageAgents: () => { setTab("agents"); const url = new URL(window.location.href); url.searchParams.set("tab", "agents"); url.searchParams.delete("setup"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); }, onCreateFunction: () => { setCreateFunctionRequest(value => value + 1); setTab("capabilities"); const url = new URL(window.location.href); url.searchParams.set("tab","capabilities"); url.searchParams.delete("setup"); window.history.replaceState(null,"",`${url.pathname}${url.search}`); } })),
           currentUser.workspace.role !== "owner" ? null : h("div", { className: "astryx-route", hidden: tab !== "agents" }, h(ActionAccess, { onSessionExpired: sessionExpired, active: tab === "agents", onOpenApps: () => { setTab("connections"); const url = new URL(window.location.href); url.searchParams.set("tab", "connections"); window.history.replaceState(null, "", `${url.pathname}${url.search}`); } })),
-          tab === "actions" ? h("div", { className: "legacy-route" }, h(ActionConsole, { onSessionExpired: sessionExpired })) : null,
-          currentUser.workspace.role !== "owner" ? null : h("div", { className: "legacy-route", hidden: tab !== "access" }, h(Access, { onSessionExpired: sessionExpired, active: tab === "access" })),
+          tab === "actions" ? h("div", { className: "astryx-route" }, h(ActionConsole, { onSessionExpired: sessionExpired })) : null,
+          currentUser.workspace.role !== "owner" ? null : h("div", { className: "astryx-route", hidden: tab !== "access" }, h(Access, { onSessionExpired: sessionExpired, active: tab === "access" })),
         )
-        : h("section", { className: "legacy-route panel", "aria-label": "Capability access" }, h("h1", null, "Your workspace"), h("p", null, "Your account is active. Capability access is currently available to workspace owners. Member and agent access will become available through grants.")),
+        : h(Card, { className: "astryx-route", role: "region", "aria-label": "Capability access" }, h("h1", null, "Your workspace"), h("p", null, "Your account is active. Capability access is currently available to workspace owners. Member and agent access will become available through grants.")),
       h("details", { className: "workspace-details", "aria-label": "Current identity and workspace" }, h("summary", null, "Workspace and account details"),
       h("dl", null,
         h("dt", null, "Signed in as"), h("dd", null, currentUser.identity.email),

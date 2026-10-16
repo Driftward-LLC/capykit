@@ -50,6 +50,7 @@ function checkChangedFileScope() {
     ".github/workflows/release.yml",
     ".github/workflows/schema.yml",
     ".gitignore",
+    ".gitleaksignore",
     ".dockerignore",
     ".npmrc",
     ".markdownlint.json",

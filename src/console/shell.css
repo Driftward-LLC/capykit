@@ -1,5 +1,5 @@
-/* Declare every layer before imports so legacy rules stay below installed components. */
-@layer reset, legacy, astryx-base, astryx-theme, capykit;
+/* Installed reset, components and theme precede application composition. */
+@layer reset, astryx-base, astryx-theme, capykit;
 
 @layer capykit {
   body { font-family: var(--font-family-body); color: var(--color-text-primary); background: var(--color-background-body); font-synthesis: none; }
@@ -10,7 +10,7 @@
   .wordmark { display: flex; gap: 10px; align-items: center; font-size: 1.5rem; font-weight: 700; letter-spacing: -.04em; }
   .header-controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; min-width: 0; max-width: 100%; }
   .appearance { display: grid; gap: 4px; font-size: .75rem; font-weight: 500; color: var(--color-text-secondary); }
-  .appearance select { min-height: 44px; max-width: 100%; padding: 8px 12px; font-size: 1rem; border: 1px solid var(--color-border-emphasized); border-radius: var(--radius-element); background: var(--color-background-surface); color: var(--color-text-primary); }
+
   .account { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-width: 0; }
   .account > span { max-width: 200px; overflow-wrap: anywhere; font-size: .8rem; color: var(--color-text-secondary); }
   .console .astryx-button { min-height: 44px; min-width: 44px; }
@@ -29,14 +29,13 @@
   .sign-in .small { font-size: .875rem; }
   .sign-in form { display: grid; gap: 12px; margin-top: 24px; }
   .sign-in label { font-size: .875rem; font-weight: 500; }
-  .sign-in input { width: 100%; min-width: 0; min-height: 48px; padding: 12px; font-size: 1rem; border: 1px solid var(--color-border-emphasized); border-radius: var(--radius-element); background: var(--color-background-surface); color: var(--color-text-primary); }
-  .sign-in input:disabled { opacity: .6; }
+
   .sign-in > .astryx-button, .sign-in > .astryx-banner { margin-block: 12px; }
   .workspace-details { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--color-border); }
   .workspace-details dl { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 8px 16px; font-size: .85rem; }
   .workspace-details dt { color: var(--color-text-secondary); }
   .workspace-details dd { margin: 0; overflow-wrap: anywhere; }
-  /* ENG-161: composition only; installed Neutral components own presentation. */
+  /* Composition only; installed Neutral components own presentation on every route. */
   .astryx-route { min-width: 0; overflow-wrap: anywhere; }
   .astryx-route .apps, .astryx-route .action-access { max-width: 920px; margin-inline: auto; }
   .astryx-route h1 { font-size: clamp(1.8rem, 5vw, 2.5rem); line-height: 1.2; margin-bottom: 12px; }
@@ -45,7 +44,7 @@
   .astryx-route p { margin-block: 12px; }
   .astryx-route .muted { color: var(--color-text-secondary); }
   .astryx-route .small { font-size: .875rem; }
-  .astryx-route .section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-block: 16px; }
+  .astryx-route .section-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; margin-block: 16px; }
   .astryx-route .section-heading > div { min-width: 0; }
   .astryx-route .section-heading > .astryx-button { flex-shrink: 0; }
   .astryx-route form, .astryx-route .app-row-copy { display: grid; gap: 12px; min-width: 0; }
@@ -84,14 +83,25 @@
   .astryx-dialog .astryx-button { min-height: 44px; min-width: 44px; }
   /* Native selects/date/credential constraints stay native inside the documented Field slot. */
   .astryx-route .astryx-field { min-width: 0; }
-  .astryx-route .capykit-native-control { width: 100%; min-width: 0; min-height: 44px; font: inherit; font-size: 1rem; padding: 10px; }
+  .console .capykit-native-control { width: 100%; max-width: 100%; min-width: 0; min-height: 44px; font: inherit; font-size: 1rem; padding: 10px; }
   .astryx-route .astryx-field input[type="datetime-local"] { max-width: 100%; }
   .astryx-route .astryx-text-input input { min-height: 44px; }
+  .astryx-route .library-layout > *, .astryx-route .capability-detail, .astryx-route .form-grid > * { min-width: 0; }
+  .astryx-route .capability-detail, .astryx-route .form-grid { display: grid; gap: 16px; }
+  .astryx-route .digest, .astryx-route .file-hash, .astryx-route td { overflow-wrap: anywhere; }
+  .astryx-route .file-hash { display: block; font-size: .75rem; }
+  .astryx-route .published-version { border-top: 1px solid var(--color-border); padding-top: 16px; margin-top: 16px; }
+  .astryx-route .version-field { max-width: 230px; }
+  .astryx-route .action-result { margin-top: 24px; }
+  .astryx-dialog dl { display: grid; grid-template-columns: minmax(0, 100px) minmax(0, 1fr); gap: 8px; }
+  .astryx-dialog dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
   @media (max-width: 640px) {
     .astryx-route .agent-heading { flex-wrap: wrap; }
     .astryx-route .agent-heading > div { width: 100%; }
   }
   @media (min-width: 641px) {
+    .astryx-route .library .library-layout { grid-template-columns: minmax(180px, 1fr) minmax(0, 3fr); }
+    .astryx-route .uploads { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
     .console { padding-inline: 32px; padding-bottom: 48px; }
     .app-header { flex-wrap: nowrap; }
     .workspace-nav { position: static; padding: 0 0 16px; margin-bottom: 16px; background: transparent; border-top: 0; border-bottom: 1px solid var(--color-border); }

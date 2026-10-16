@@ -1,0 +1,1356 @@
+{
+  "phase": "after",
+  "revision": "6819c79230221355046261a16bf5e314753eb46e",
+  "revisionMeaning": "Repository HEAD; buildSha256 identifies exact served bytes including working-tree changes.",
+  "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+  "browserVersion": "156.0.8078.4",
+  "nodeVersion": "v26.7.0",
+  "implementationModel": "gpt-6.1-sol",
+  "pluginRevision": "08359024b405bf92afc3b4624675415384b67e5a",
+  "fixtureOnly": true,
+  "backendVerified": false,
+  "providerVerified": false,
+  "physicalDeviceVerified": false,
+  "independentReview": false,
+  "results": [
+    {
+      "name": "Actions list/form 320 light",
+      "settings": {
+        "tab": "actions",
+        "width": 320,
+        "theme": "light"
+      },
+      "passed": true
+    },
+    {
+      "name": "Functions draft/inventory 320 light",
+      "settings": {
+        "tab": "capabilities",
+        "width": 320,
+        "theme": "light"
+      },
+      "passed": true
+    },
+    {
+      "name": "People exact grant 320 light",
+      "settings": {
+        "tab": "access",
+        "width": 320,
+        "theme": "light"
+      },
+      "passed": true
+    },
+    {
+      "name": "Actions list/form 320 dark",
+      "settings": {
+        "tab": "actions",
+        "width": 320,
+        "theme": "dark"
+      },
+      "passed": true
+    },
+    {
+      "name": "Functions draft/inventory 320 dark",
+      "settings": {
+        "tab": "capabilities",
+        "width": 320,
+        "theme": "dark"
+      },
+      "passed": true
+    },
+    {
+      "name": "People exact grant 320 dark",
+      "settings": {
+        "tab": "access",
+        "width": 320,
+        "theme": "dark"
+      },
+      "passed": true
+    },
+    {
+      "name": "Actions list/form 375 light",
+      "settings": {
+        "tab": "actions",
+        "width": 375,
+        "theme": "light"
+      },
+      "passed": true
+    },
+    {
+      "name": "Functions draft/inventory 375 light",
+      "settings": {
+        "tab": "capabilities",
+        "width": 375,
+        "theme": "light"
+      },
+      "passed": true
+    },
+    {
+      "name": "People exact grant 375 light",
+      "settings": {
+        "tab": "access",
+        "width": 375,
+        "theme": "light"
+      },
+      "passed": true
+    },
+    {
+      "name": "Actions list/form 375 dark",
+      "settings": {
+        "tab": "actions",
+        "width": 375,
+        "theme": "dark"
+      },
+      "passed": true
+    },
+    {
+      "name": "Functions draft/inventory 375 dark",
+      "settings": {
+        "tab": "capabilities",
+        "width": 375,
+        "theme": "dark"
+      },
+      "passed": true
+    },
+    {
+      "name": "People exact grant 375 dark",
+      "settings": {
+        "tab": "access",
+        "width": 375,
+        "theme": "dark"
+      },
+      "passed": true
+    },
+    {
+      "name": "Actions list/form 430 light",
+      "settings": {
+        "tab": "actions",
+        "width": 430,
+        "theme": "light"
+      },
+      "passed": true
+    },
+    {
+      "name": "Functions draft/inventory 430 light",
+      "settings": {
+        "tab": "capabilities",
+        "width": 430,
+        "theme": "light"
+      },
+      "passed": true
+    },
+    {
+      "name": "People exact grant 430 light",
+      "settings": {
+        "tab": "access",
+        "width": 430,
+        "theme": "light"
+      },
+      "passed": true
+    },
+    {
+      "name": "Actions list/form 430 dark",
+      "settings": {
+        "tab": "actions",
+        "width": 430,
+        "theme": "dark"
+      },
+      "passed": true
+    },
+    {
+      "name": "Functions draft/inventory 430 dark",
+      "settings": {
+        "tab": "capabilities",
+        "width": 430,
+        "theme": "dark"
+      },
+      "passed": true
+    },
+    {
+      "name": "People exact grant 430 dark",
+      "settings": {
+        "tab": "access",
+        "width": 430,
+        "theme": "dark"
+      },
+      "passed": true
+    },
+    {
+      "name": "Actions list/form 1440 light",
+      "settings": {
+        "tab": "actions",
+        "width": 1440,
+        "theme": "light"
+      },
+      "passed": true
+    },
+    {
+      "name": "Functions draft/inventory 1440 light",
+      "settings": {
+        "tab": "capabilities",
+        "width": 1440,
+        "theme": "light"
+      },
+      "passed": true
+    },
+    {
+      "name": "People exact grant 1440 light",
+      "settings": {
+        "tab": "access",
+        "width": 1440,
+        "theme": "light"
+      },
+      "passed": true
+    },
+    {
+      "name": "Actions list/form 1440 dark",
+      "settings": {
+        "tab": "actions",
+        "width": 1440,
+        "theme": "dark"
+      },
+      "passed": true
+    },
+    {
+      "name": "Functions draft/inventory 1440 dark",
+      "settings": {
+        "tab": "capabilities",
+        "width": 1440,
+        "theme": "dark"
+      },
+      "passed": true
+    },
+    {
+      "name": "People exact grant 1440 dark",
+      "settings": {
+        "tab": "access",
+        "width": 1440,
+        "theme": "dark"
+      },
+      "passed": true
+    },
+    {
+      "name": "actions loading light",
+      "settings": {
+        "tab": "actions",
+        "theme": "light",
+        "readGate": "held-until-assertion"
+      },
+      "passed": true
+    },
+    {
+      "name": "actions empty light",
+      "settings": {
+        "tab": "actions",
+        "theme": "light",
+        "empty": true
+      },
+      "passed": true
+    },
+    {
+      "name": "actions error light",
+      "settings": {
+        "tab": "actions",
+        "theme": "light",
+        "readError": true
+      },
+      "passed": true
+    },
+    {
+      "name": "capabilities loading light",
+      "settings": {
+        "tab": "capabilities",
+        "theme": "light",
+        "readGate": "held-until-assertion"
+      },
+      "passed": true
+    },
+    {
+      "name": "capabilities empty light",
+      "settings": {
+        "tab": "capabilities",
+        "theme": "light",
+        "empty": true
+      },
+      "passed": true
+    },
+    {
+      "name": "capabilities error light",
+      "settings": {
+        "tab": "capabilities",
+        "theme": "light",
+        "readError": true
+      },
+      "passed": true
+    },
+    {
+      "name": "access loading light",
+      "settings": {
+        "tab": "access",
+        "theme": "light",
+        "readGate": "held-until-assertion"
+      },
+      "passed": true
+    },
+    {
+      "name": "access empty light",
+      "settings": {
+        "tab": "access",
+        "theme": "light",
+        "empty": true
+      },
+      "passed": true
+    },
+    {
+      "name": "access error light",
+      "settings": {
+        "tab": "access",
+        "theme": "light",
+        "readError": true
+      },
+      "passed": true
+    },
+    {
+      "name": "Action native validation/pending/recovery light",
+      "settings": {
+        "tab": "actions",
+        "theme": "light",
+        "runGate": "held-until-assertion"
+      },
+      "passed": true
+    },
+    {
+      "name": "Function upload/publish/delete recovery light",
+      "settings": {
+        "tab": "capabilities",
+        "theme": "light"
+      },
+      "passed": true
+    },
+    {
+      "name": "People confirmation keyboard/error/pending recovery light",
+      "settings": {
+        "tab": "access",
+        "theme": "light",
+        "revokeError": true
+      },
+      "passed": true
+    },
+    {
+      "name": "actions loading dark",
+      "settings": {
+        "tab": "actions",
+        "theme": "dark",
+        "readGate": "held-until-assertion"
+      },
+      "passed": true
+    },
+    {
+      "name": "actions empty dark",
+      "settings": {
+        "tab": "actions",
+        "theme": "dark",
+        "empty": true
+      },
+      "passed": true
+    },
+    {
+      "name": "actions error dark",
+      "settings": {
+        "tab": "actions",
+        "theme": "dark",
+        "readError": true
+      },
+      "passed": true
+    },
+    {
+      "name": "capabilities loading dark",
+      "settings": {
+        "tab": "capabilities",
+        "theme": "dark",
+        "readGate": "held-until-assertion"
+      },
+      "passed": true
+    },
+    {
+      "name": "capabilities empty dark",
+      "settings": {
+        "tab": "capabilities",
+        "theme": "dark",
+        "empty": true
+      },
+      "passed": true
+    },
+    {
+      "name": "capabilities error dark",
+      "settings": {
+        "tab": "capabilities",
+        "theme": "dark",
+        "readError": true
+      },
+      "passed": true
+    },
+    {
+      "name": "access loading dark",
+      "settings": {
+        "tab": "access",
+        "theme": "dark",
+        "readGate": "held-until-assertion"
+      },
+      "passed": true
+    },
+    {
+      "name": "access empty dark",
+      "settings": {
+        "tab": "access",
+        "theme": "dark",
+        "empty": true
+      },
+      "passed": true
+    },
+    {
+      "name": "access error dark",
+      "settings": {
+        "tab": "access",
+        "theme": "dark",
+        "readError": true
+      },
+      "passed": true
+    },
+    {
+      "name": "Action native validation/pending/recovery dark",
+      "settings": {
+        "tab": "actions",
+        "theme": "dark",
+        "runGate": "held-until-assertion"
+      },
+      "passed": true
+    },
+    {
+      "name": "Function upload/publish/delete recovery dark",
+      "settings": {
+        "tab": "capabilities",
+        "theme": "dark"
+      },
+      "passed": true
+    },
+    {
+      "name": "People confirmation keyboard/error/pending recovery dark",
+      "settings": {
+        "tab": "access",
+        "theme": "dark",
+        "revokeError": true
+      },
+      "passed": true
+    },
+    {
+      "name": "System appearance and account details retained across direct routes",
+      "settings": {
+        "tab": "actions",
+        "theme": "dark",
+        "media": "light"
+      },
+      "passed": true
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "actions-list-320-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-form-320-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "functions-draft-320-light.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "people-grant-320-light.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-list-320-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-form-320-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "functions-draft-320-dark.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "people-grant-320-dark.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-list-375-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-form-375-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "functions-draft-375-light.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "people-grant-375-light.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-list-375-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-form-375-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "functions-draft-375-dark.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "people-grant-375-dark.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-list-430-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-form-430-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "functions-draft-430-light.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "people-grant-430-light.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-list-430-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-form-430-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "functions-draft-430-dark.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "people-grant-430-dark.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-list-1440-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-form-1440-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "functions-draft-1440-light.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "people-grant-1440-light.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-list-1440-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-form-1440-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "functions-draft-1440-dark.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "people-grant-1440-dark.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-loading-375-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-empty-375-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-error-375-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "capabilities-loading-375-light.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "capabilities-empty-375-light.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "capabilities-error-375-light.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "access-loading-375-light.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "access-empty-375-light.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "access-error-375-light.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-pending-375-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-result-375-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-provider-error-375-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-no-results-375-light.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "functions-upload-375-light.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "functions-delete-error-375-light.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "people-revoke-dialog-375-light.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "people-revoke-error-375-light.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "light",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-loading-375-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-empty-375-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-error-375-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "capabilities-loading-375-dark.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "capabilities-empty-375-dark.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "capabilities-error-375-dark.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "access-loading-375-dark.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "access-empty-375-dark.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "access-error-375-dark.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-pending-375-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-result-375-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-provider-error-375-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "actions-no-results-375-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "functions-upload-375-dark.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "functions-delete-error-375-dark.png",
+      "route": "/?tab=capabilities&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "people-revoke-dialog-375-dark.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "people-revoke-error-375-dark.png",
+      "route": "/?tab=access&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "system-dark-375-system.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "system",
+      "media": "dark",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "system-light-375-system.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "system",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    },
+    {
+      "file": "account-settings-375-dark.png",
+      "route": "/?tab=actions&retain=fixture",
+      "viewport": {
+        "width": 375,
+        "height": 900
+      },
+      "theme": "dark",
+      "media": "light",
+      "fixtureOnly": true,
+      "buildSha256": "1174f2e4aa73abc5c6826b55f794e5a8c3a32c599f7d19f1b0b0a9ef1d6ec2c2",
+      "revision": "6819c79230221355046261a16bf5e314753eb46e"
+    }
+  ],
+  "passed": true
+}

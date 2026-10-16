@@ -1,0 +1,7 @@
+# ENG-162: exactly two source-provenance SHA-256 values, not credentials.
+# Independently hashed git-show bytes at the commit below and matched both
+# afterSourceSha256 entries in docs/evidence/ENG-162/bundle-size.json:
+# line 139 -> src/console/access.ts; line 140 -> src/console/action-access.ts.
+# Keep the evidence/history intact; no other commit, path, rule or line is exempt.
+4a6e27b59cd721768e7b55e11ec68ee987f50240:docs/evidence/ENG-162/bundle-size.json:generic-api-key:139
+4a6e27b59cd721768e7b55e11ec68ee987f50240:docs/evidence/ENG-162/bundle-size.json:generic-api-key:140
